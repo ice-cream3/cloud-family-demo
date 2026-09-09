@@ -1,0 +1,31 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: manager-service
+
+demo:
+  datasource:
+    crypto:
+      secret: ${DATASOURCE_CRYPTO_SECRET:cloud-family-demo-datasource-crypto-secret}
+    cloud:
+      url: ${FA_CLOUD_DB_URL:jdbc:mysql://localhost:3306/fa-cloud?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
+      username: ${FA_CLOUD_DB_USERNAME:ENC(U0rj/0TFqN/ikdyYo1QcsZa9APbjTkdLYLth5ycDEk4=)}
+      password: ${FA_CLOUD_DB_PASSWORD:ENC(O/mIkbzTm1uHasWUrJSMKaIDlfcpqXW6E8FFh3e0+Y0=)}
+      maximum-pool-size: ${FA_CLOUD_DB_MAX_POOL_SIZE:10}
+      minimum-idle: ${FA_CLOUD_DB_MIN_IDLE:2}
+      pool-name: fa-cloud
+    model:
+      url: ${FA_MODEL_DB_URL:jdbc:mysql://localhost:3306/fa-model?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
+      username: ${FA_MODEL_DB_USERNAME:ENC(U0rj/0TFqN/ikdyYo1QcsZa9APbjTkdLYLth5ycDEk4=)}
+      password: ${FA_MODEL_DB_PASSWORD:ENC(O/mIkbzTm1uHasWUrJSMKaIDlfcpqXW6E8FFh3e0+Y0=)}
+      maximum-pool-size: ${FA_MODEL_DB_MAX_POOL_SIZE:10}
+      minimum-idle: ${FA_MODEL_DB_MIN_IDLE:2}
+      pool-name: fa-model
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

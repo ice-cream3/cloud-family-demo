@@ -1,0 +1,53 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: auth-service
+              uri: http://localhost:8081
+              predicates:
+                - Path=/auth/**
+            - id: user-api-service
+              uri: http://localhost:8082
+              predicates:
+                - Path=/api/users/**
+            - id: manager-service
+              uri: http://localhost:8083
+              predicates:
+                - Path=/api/manager/**
+
+demo:
+  auth-service-url: http://localhost:8081
+  datasource:
+    crypto:
+      secret: ${DATASOURCE_CRYPTO_SECRET:cloud-family-demo-datasource-crypto-secret}
+    cloud:
+      url: ${FA_CLOUD_DB_URL:jdbc:mysql://localhost:3306/fa-cloud?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
+      username: ${FA_CLOUD_DB_USERNAME:ENC(U0rj/0TFqN/ikdyYo1QcsZa9APbjTkdLYLth5ycDEk4=)}
+      password: ${FA_CLOUD_DB_PASSWORD:ENC(O/mIkbzTm1uHasWUrJSMKaIDlfcpqXW6E8FFh3e0+Y0=)}
+      maximum-pool-size: ${FA_CLOUD_DB_MAX_POOL_SIZE:10}
+      minimum-idle: ${FA_CLOUD_DB_MIN_IDLE:2}
+      pool-name: fa-cloud
+    model:
+      url: ${FA_MODEL_DB_URL:jdbc:mysql://localhost:3306/fa-model?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
+      username: ${FA_MODEL_DB_USERNAME:ENC(U0rj/0TFqN/ikdyYo1QcsZa9APbjTkdLYLth5ycDEk4=)}
+      password: ${FA_MODEL_DB_PASSWORD:ENC(O/mIkbzTm1uHasWUrJSMKaIDlfcpqXW6E8FFh3e0+Y0=)}
+      maximum-pool-size: ${FA_MODEL_DB_MAX_POOL_SIZE:10}
+      minimum-idle: ${FA_MODEL_DB_MIN_IDLE:2}
+      pool-name: fa-model
+  auth:
+    jwt:
+      issuer: cloud-family-demo
+      secret: cloud-family-demo-jwt-signing-secret-please-change-in-production
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
