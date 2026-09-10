@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfpd.cloud.partner.dao.VipUserDao">
+
+    <resultMap id="VipUserResultMap" type="com.kfpd.cloud.partner.pojo.VipUser">
+        <id property="id" column="id"/>
+        <result property="username" column="username"/>
+        <result property="passwordHash" column="password_hash"/>
+        <result property="displayName" column="display_name"/>
+        <result property="email" column="email"/>
+        <result property="phone" column="phone"/>
+        <result property="vipLevel" column="vip_level"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="VipUserColumns">
+        id, username, password_hash, display_name, email, phone, vip_level, status, created_at, updated_at
+    </sql>
+
+    <select id="findByUsername" resultMap="VipUserResultMap">
+        SELECT <include refid="VipUserColumns"/>
+        FROM vip_user
+        WHERE username = #{username}
+          AND status = 'ENABLED'
+    </select>
+</mapper>

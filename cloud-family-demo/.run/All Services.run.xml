@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="All Services" type="CompoundRunConfigurationType">
     <toRun name="Auth Service" type="SpringBootApplicationConfigurationType" />
-    <toRun name="User API Service" type="SpringBootApplicationConfigurationType" />
+    <toRun name="Partner Service" type="SpringBootApplicationConfigurationType" />
     <toRun name="Manager Service" type="SpringBootApplicationConfigurationType" />
     <toRun name="Gateway Service" type="SpringBootApplicationConfigurationType" />
     <method v="2" />

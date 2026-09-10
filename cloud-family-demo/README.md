@@ -7,10 +7,10 @@ JDK 21 + Spring Boot 4.0.8 + Spring Cloud 2025.1.3 microservice demo.
 - `common-service`: shared configuration properties, constants, and MySQL multi-data-source auto-configuration.
 - `gateway-service`: Spring Cloud Gateway WebFlux gateway on port `8080`.
 - `auth-service`: JWT issuing service on port `8081`.
-- `user-api-service`: protected user API service on port `8082`.
+- `partner-service`: protected partner API service on port `8082`.
 - `manager-service`: protected manager API service on port `8083`.
 
-System users, roles, permissions, menus, and their relationships are manager-service features backed by the `fa-cloud` MySQL database.
+System users, roles, permissions, menus, and their relationships are manager-service features backed by the `fa-cloud` MySQL database. API user profile data is stored in `fa-cloud.vip_user`.
 
 ## Build
 
@@ -24,7 +24,7 @@ Start each service in a separate terminal:
 
 ```bash
 mvn -pl auth-service spring-boot:run
-mvn -pl user-api-service spring-boot:run
+mvn -pl partner-service spring-boot:run
 mvn -pl manager-service spring-boot:run
 mvn -pl gateway-service spring-boot:run
 ```

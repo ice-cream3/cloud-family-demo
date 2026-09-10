@@ -14,9 +14,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.kfpd.cloud.auth.base.config.AuthOAuth2JdbcConfig;
 import com.kfpd.cloud.auth.base.config.AuthLoginProperties;
-import com.kfpd.cloud.auth.pojo.LoginRequest;
+import com.kfpd.cloud.auth.pojo.vo.LoginVO;
 import com.kfpd.cloud.auth.pojo.LoginResponse;
-import com.kfpd.cloud.auth.pojo.RefreshTokenRequest;
+import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
 import com.kfpd.cloud.auth.pojo.TokenValidation;
 import com.kfpd.cloud.auth.dao.AuthLoginAccountDao;
 import com.kfpd.cloud.common.security.CommonJwtProperties;
@@ -72,13 +72,13 @@ public class AuthService {
         this.loginAccountDao = loginAccountDao;
     }
 
-    public LoginResponse apiLogin(LoginRequest request, String clientIp) {
+    public LoginResponse apiLogin(LoginVO request, String clientIp) {
         // API login protects public clients from brute-force attempts by username and source IP.
         String attemptKey = request.username() + "@" + clientIp;
         assertApiLoginNotLocked(attemptKey);
 
-        Optional<AuthLoginAccount> account = Optional.ofNullable(loginAccountDao.findByUsername(request.username()));
-        if (account.isEmpty() || !matches(account.get(), request) || "MANAGER".equalsIgnoreCase(account.get().userType())) {
+        Optional<AuthLoginAccount> account = Optional.ofNullable(loginAccountDao.findApiByUsername(request.username()));
+        if (account.isEmpty() || !matches(account.get(), request)) {
             recordApiLoginFailure(attemptKey);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid api username or password");
         }
@@ -87,13 +87,13 @@ public class AuthService {
         return login(account.get(), AuthOAuth2JdbcConfig.API_CLIENT_ID, AuthOAuth2JdbcConfig.API_LOGIN_GRANT_TYPE);
     }
 
-    public LoginResponse managerLogin(LoginRequest request, String clientIp) {
+    public LoginResponse managerLogin(LoginVO request, String clientIp) {
         // Manager login is checked by network boundary first, then credentials, then explicit permission.
         if (!isManagerIpAllowed(clientIp)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager login IP is not allowed");
         }
 
-        Optional<AuthLoginAccount> account = Optional.ofNullable(loginAccountDao.findByUsername(request.username()));
+        Optional<AuthLoginAccount> account = Optional.ofNullable(loginAccountDao.findManagerByUsername(request.username()));
         if (account.isEmpty() || !matches(account.get(), request)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid manager username or password");
         }
@@ -144,7 +144,7 @@ public class AuthService {
         );
     }
 
-    public LoginResponse refreshAccessToken(RefreshTokenRequest request) {
+    public LoginResponse refreshAccessToken(RefreshTokenVO request) {
         OAuth2Authorization existingAuthorization = authorizationService.findByToken(request.refreshToken(), OAuth2TokenType.REFRESH_TOKEN);
         if (existingAuthorization == null || existingAuthorization.getRefreshToken() == null || !existingAuthorization.getRefreshToken().isActive()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token");
@@ -228,7 +228,7 @@ public class AuthService {
         return authorization.substring("Bearer ".length());
     }
 
-    private boolean matches(AuthLoginAccount account, LoginRequest request) {
+    private boolean matches(AuthLoginAccount account, LoginVO request) {
         return account != null && account.passwordHash() != null && account.passwordHash().equals(request.password());
     }
 

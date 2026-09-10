@@ -11,8 +11,8 @@
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
-    <artifactId>manager-service</artifactId>
-    <name>manager-service</name>
+    <artifactId>partner-service</artifactId>
+    <name>partner-service</name>
 
     <dependencies>
         <!-- Shared configuration, constants, and utility classes. -->
@@ -31,7 +31,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-        <!-- MyBatis integration for manager-owned system tables. -->
+        <!-- MyBatis integration for API-owned user profile tables. -->
         <dependency>
             <groupId>org.mybatis</groupId>
             <artifactId>mybatis</artifactId>

@@ -8,7 +8,9 @@ import org.apache.ibatis.annotations.Param;
 
 public interface AuthLoginAccountDao {
 
-    AuthLoginAccount findByUsername(@Param("username") String username);
+    AuthLoginAccount findApiByUsername(@Param("username") String username);
+
+    AuthLoginAccount findManagerByUsername(@Param("username") String username);
 
     List<String> findRolesByUsername(@Param("username") String username);
 

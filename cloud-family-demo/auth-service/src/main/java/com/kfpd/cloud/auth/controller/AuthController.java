@@ -1,8 +1,8 @@
 package com.kfpd.cloud.auth.controller;
 
-import com.kfpd.cloud.auth.pojo.LoginRequest;
+import com.kfpd.cloud.auth.pojo.vo.LoginVO;
 import com.kfpd.cloud.auth.pojo.LoginResponse;
-import com.kfpd.cloud.auth.pojo.RefreshTokenRequest;
+import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
 import com.kfpd.cloud.auth.pojo.TokenValidation;
 import com.kfpd.cloud.auth.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,19 +26,19 @@ public class AuthController {
     }
 
     @PostMapping("/api/login")
-    public LoginResponse apiLogin(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
+    public LoginResponse apiLogin(@Valid @RequestBody LoginVO request, HttpServletRequest servletRequest) {
         // API users are rate-limited by username and client IP in AuthService.
         return authService.apiLogin(request, resolveClientIp(servletRequest));
     }
 
     @PostMapping("/manager/login")
-    public LoginResponse managerLogin(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
+    public LoginResponse managerLogin(@Valid @RequestBody LoginVO request, HttpServletRequest servletRequest) {
         // Manager login has stricter checks, including IP allowlist and login permission.
         return authService.managerLogin(request, resolveClientIp(servletRequest));
     }
 
     @PostMapping("/refresh")
-    public LoginResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
+    public LoginResponse refresh(@Valid @RequestBody RefreshTokenVO request) {
         return authService.refreshAccessToken(request);
     }
 

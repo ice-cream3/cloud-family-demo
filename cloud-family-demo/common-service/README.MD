@@ -9,7 +9,7 @@
 | `common-service` | 无 | Jar 公共模块 | 放置全局公用配置、常量、工具类。 |
 | `gateway-service` | `8080` | Spring Cloud Gateway WebFlux | 统一 API 入口、路由转发、JWT 本地验签、用户身份 header 注入、管理接口角色校验。 |
 | `auth-service` | `8081` | Spring MVC REST 服务 | 用户登录、管理员登录、JWT 签发、OAuth2 授权数据持久化、兼容性 token 校验接口。 |
-| `user-api-service` | `8082` | Spring MVC REST 服务 | 用户侧受保护接口示例。 |
+| `partner-service` | `8082` | Spring MVC REST 服务 | 伙伴侧受保护接口示例。 |
 | `manager-service` | `8083` | Spring MVC REST 服务 | 管理侧受保护接口示例。 |
 
 ## common-service 功能
@@ -235,9 +235,10 @@ mysql -h127.0.0.1 -P3306 -uroot -proot < manager-service/src/main/resources/db/f
 | 类 | 说明 |
 | --- | --- |
 | `com.kfpd.cloud.manager.dao.*Dao` | MyBatis DAO 接口，对接 `mapper/system/*.xml`。 |
-| `com.kfpd.cloud.manager.service.SystemManagementService` | 用户、角色、权限、菜单 CRUD 及关系维护业务服务。 |
+| `com.kfpd.cloud.manager.service.SysUserService` / `SysRoleService` / `SysPermissionService` | 用户、角色、权限业务服务接口。 |
+| `com.kfpd.cloud.manager.service.impl.*ServiceImpl` | 用户、角色、权限 CRUD 及关系维护业务服务实现。 |
 | `com.kfpd.cloud.manager.pojo.entity.SysUser` / `SysRole` / `SysPermission` / `SysMenu` | 数据库表实体。 |
-| `com.kfpd.cloud.manager.pojo.dto.*Request` | 管理接口请求模型。 |
+| `com.kfpd.cloud.manager.pojo.vo.*VO` | 管理接口请求入参模型。 |
 
 写操作使用 `faCloudTransactionManager`。
 
@@ -290,7 +291,7 @@ Authorization: Bearer <accessToken>
 
 6. `gateway-service` 使用 Spring Security Resource Server 本地验签 JWT，同时校验 `issuer`、`exp` 等标准声明。
 7. 验签成功后，`gateway-service` 从 JWT claims 中读取用户信息，并注入 `X-User-*` header。
-8. 请求被转发到 `user-api-service` 或 `manager-service`。
+8. 请求被转发到 `partner-service` 或 `manager-service`。
 9. 访问 `/api/manager/**` 时，`gateway-service` 额外要求 JWT 的 `roles` 包含 `MANAGER`，否则返回 `403`。
 
 ## JWT 内容
@@ -305,8 +306,8 @@ Authorization: Bearer <accessToken>
 | `exp` | `Instant` | 自动生成 | 过期时间。 |
 | `username` | `String` | `alice` | 用户名。 |
 | `user_type` | `String` | `API` | 用户类型。 |
-| `roles` | `List<String>` | `["USER"]` | 角色列表。 |
-| `permissions` | `List<String>` | `["user:profile:read"]` | 权限列表。 |
+| `roles` | `List<String>` | `[]` | 角色列表，API 登录为空，管理员登录包含 `MANAGER`。 |
+| `permissions` | `List<String>` | `[]` | 权限列表，API 登录为空，管理员登录包含管理权限。 |
 
 当前使用 HS256 对称签名。生产环境如果存在多个调用方或需要密钥轮换，建议切换到 RSA/ECDSA 非对称签名，并通过 JWK Set 暴露公钥。
 
@@ -317,7 +318,7 @@ Authorization: Bearer <accessToken>
 | 网关路径 | 转发目标 | 说明 |
 | --- | --- | --- |
 | `/auth/**` | `http://localhost:8081` | 认证服务。 |
-| `/api/users/**` | `http://localhost:8082` | 用户 API 服务。 |
+| `/api/users/**` | `http://localhost:8082` | 伙伴 API 服务。 |
 | `/api/manager/**` | `http://localhost:8083` | 管理 API 服务。 |
 
 网关白名单路径：
@@ -360,8 +361,8 @@ Content-Type: application/json
   "refreshToken": "<refresh-token>",
   "username": "alice",
   "userType": "API",
-  "roles": ["USER"],
-  "permissions": ["user:profile:read"],
+  "roles": [],
+  "permissions": [],
   "expiresAt": "2026-09-09T12:00:00",
   "refreshTokenExpiresAt": "2026-09-16T10:00:00"
 }
@@ -455,8 +456,8 @@ Content-Type: application/json
   "refreshToken": "<same-refresh-token>",
   "username": "alice",
   "userType": "API",
-  "roles": ["USER"],
-  "permissions": ["user:profile:read"],
+  "roles": [],
+  "permissions": [],
   "expiresAt": "2026-09-09T12:00:00",
   "refreshTokenExpiresAt": "2026-09-16T10:00:00"
 }
@@ -498,8 +499,8 @@ Authorization: Bearer <accessToken>
   "valid": true,
   "username": "alice",
   "userType": "API",
-  "roles": ["USER"],
-  "permissions": ["user:profile:read"],
+  "roles": [],
+  "permissions": [],
   "claims": {
     "expiresAt": "2026-09-09T08:00:00Z"
   }
@@ -538,16 +539,17 @@ Authorization: Bearer <accessToken>
 ```json
 {
   "username": "alice",
-  "displayName": "demo-user",
-  "roles": ["USER"],
+  "displayName": "API Demo User",
+  "roles": [],
   "requestTime": "2026-09-09T12:00:00"
 }
 ```
 
 说明：
 
-- `user-api-service` 从 `X-User-Name` 读取用户名。
-- `X-User-Name` 由 `gateway-service` 从 JWT 中解析后注入。
+- `partner-service` 从 `X-User-Name` 读取用户名，并查询 `fa-cloud.vip_user` 返回 API 用户资料。
+- `api/login` 不区分角色和权限，因此 API token 中 `roles` 和 `permissions` 为空。
+- `vip_user` 属于 `partner-service` 管理，初始化脚本位于 `partner-service/src/main/resources/db/fa-cloud/vip-user-schema.sql`。
 
 可能状态码：
 
@@ -568,14 +570,14 @@ Authorization: Bearer <accessToken>
 ```json
 {
   "status": "UP",
-  "service": "user-api-service"
+  "service": "partner-service"
 }
 ```
 
 说明：
 
 - 通过网关访问该接口时需要 JWT。
-- 如果直接访问 `user-api-service:8082/api/users/health`，当前服务自身没有本地鉴权过滤。
+- 如果直接访问 `partner-service:8082/api/users/health`，当前服务自身没有本地鉴权过滤。
 
 ### 获取管理员面板
 
@@ -732,7 +734,7 @@ demo:
       pool-name: fa-model
 ```
 
-以上配置已添加到 `auth-service`、`gateway-service`、`user-api-service`、`manager-service`。可通过下面环境变量覆盖：
+以上配置已添加到 `auth-service`、`gateway-service`、`partner-service`、`manager-service`。可通过下面环境变量覆盖：
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -766,7 +768,7 @@ spring:
               uri: http://localhost:8081
               predicates:
                 - Path=/auth/**
-            - id: user-api-service
+            - id: partner-service
               uri: http://localhost:8082
               predicates:
                 - Path=/api/users/**
@@ -786,7 +788,7 @@ demo:
       secret: cloud-family-demo-jwt-signing-secret-please-change-in-production
 ```
 
-### user-api-service
+### partner-service
 
 ```yaml
 server:
@@ -812,9 +814,15 @@ mvn clean package
 
 ```bash
 mvn -pl auth-service spring-boot:run
-mvn -pl user-api-service spring-boot:run
+mvn -pl partner-service spring-boot:run
 mvn -pl manager-service spring-boot:run
 mvn -pl gateway-service spring-boot:run
+```
+
+初始化伙伴 API 资料表：
+
+```bash
+mysql -h127.0.0.1 -P3306 -uroot -proot < partner-service/src/main/resources/db/fa-cloud/vip-user-schema.sql
 ```
 
 也可以在 IntelliJ IDEA 使用项目中的 `All Services` compound run configuration 同时启动。
@@ -829,7 +837,7 @@ curl -s -X POST http://localhost:8080/auth/api/login \
   -d '{"username":"alice","password":"demo"}'
 ```
 
-使用返回的 `accessToken` 访问用户接口：
+使用返回的 `accessToken` 访问伙伴接口：
 
 ```bash
 curl -s http://localhost:8080/api/users/me \
@@ -864,7 +872,7 @@ curl -s http://localhost:8080/api/manager/dashboard \
 
 | 类型 | 用户名 | 密码 | 角色 | 权限 |
 | --- | --- | --- | --- | --- |
-| API 用户 | `alice` | `demo` | `USER` | `user:profile:read` |
+| API 用户 | `alice` | `demo` | 无 | 无 |
 | 管理员 | `manager` | `demo` | `MANAGER` | `manager:login`, `manager:dashboard:read`, `user:profile:read` |
 
 ## 安全边界

@@ -1,9 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="User API Service" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
-    <module name="user-api-service" />
-    <option name="SPRING_BOOT_MAIN_CLASS" value="com.kfpd.cloud.userapi.UserApiServiceApplication" />
-    <method v="2">
-      <option name="Make" enabled="true" />
-    </method>
-  </configuration>
-</component>

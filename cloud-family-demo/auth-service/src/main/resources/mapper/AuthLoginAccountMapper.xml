@@ -14,20 +14,29 @@
         </constructor>
     </resultMap>
 
-    <select id="findByUsername" resultMap="AuthLoginAccountResultMap">
+    <resultMap id="ApiLoginAccountResultMap" type="com.kfpd.cloud.auth.service.AuthLoginAccount">
+        <constructor>
+            <arg column="username" javaType="java.lang.String"/>
+            <arg column="password_hash" javaType="java.lang.String"/>
+            <arg column="user_type" javaType="java.lang.String"/>
+            <arg javaType="java.util.List" select="findApiRolesByUsername" column="username"/>
+            <arg javaType="java.util.List" select="findApiPermissionsByUsername" column="username"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findApiByUsername" resultMap="ApiLoginAccountResultMap">
+        SELECT username,
+               password_hash,
+               'API' AS user_type
+        FROM vip_user
+        WHERE username = #{username}
+          AND status = 'ENABLED'
+    </select>
+
+    <select id="findManagerByUsername" resultMap="AuthLoginAccountResultMap">
         SELECT u.username,
                u.password_hash,
-               CASE
-                   WHEN EXISTS (
-                       SELECT 1
-                       FROM sys_user_role ur
-                       INNER JOIN sys_role r ON r.id = ur.role_id
-                       WHERE ur.user_id = u.id
-                         AND r.status = 'ENABLED'
-                         AND UPPER(r.role_code) = 'MANAGER'
-                   ) THEN 'MANAGER'
-                   ELSE 'API'
-               END AS user_type
+               'MANAGER' AS user_type
         FROM sys_user u
         WHERE u.username = #{username}
           AND u.status = 'ENABLED'
@@ -56,5 +65,15 @@
           AND r.status = 'ENABLED'
           AND p.status = 'ENABLED'
         ORDER BY p.permission_code ASC
+    </select>
+
+    <select id="findApiRolesByUsername" resultType="java.lang.String">
+        SELECT NULL
+        WHERE 1 = 0
+    </select>
+
+    <select id="findApiPermissionsByUsername" resultType="java.lang.String">
+        SELECT NULL
+        WHERE 1 = 0
     </select>
 </mapper>
