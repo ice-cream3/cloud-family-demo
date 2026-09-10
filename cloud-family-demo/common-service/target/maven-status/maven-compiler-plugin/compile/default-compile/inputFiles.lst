@@ -1,8 +1,0 @@
-/Users/july/soft/workspace/cloud-family-demo/common-service/src/main/java/com/kfpd/cloud/common/datasource/DataSourceCryptoProperties.java
-/Users/july/soft/workspace/cloud-family-demo/common-service/src/main/java/com/kfpd/cloud/common/datasource/EncryptedDataSourceValues.java
-/Users/july/soft/workspace/cloud-family-demo/common-service/src/main/java/com/kfpd/cloud/common/datasource/MultiDataSourceAutoConfiguration.java
-/Users/july/soft/workspace/cloud-family-demo/common-service/src/main/java/com/kfpd/cloud/common/datasource/MultiDataSourceNames.java
-/Users/july/soft/workspace/cloud-family-demo/common-service/src/main/java/com/kfpd/cloud/common/datasource/MultiDataSourceProperties.java
-/Users/july/soft/workspace/cloud-family-demo/common-service/src/main/java/com/kfpd/cloud/common/security/CommonJwtProperties.java
-/Users/july/soft/workspace/cloud-family-demo/common-service/src/main/java/com/kfpd/cloud/common/security/JwtSecretKeys.java
-/Users/july/soft/workspace/cloud-family-demo/common-service/src/main/java/com/kfpd/cloud/common/web/GatewayHeaders.java

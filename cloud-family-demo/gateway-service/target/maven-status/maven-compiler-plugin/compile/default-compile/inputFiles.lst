@@ -1,5 +1,0 @@
-/Users/july/soft/workspace/cloud-family-demo/gateway-service/src/main/java/com/kfpd/cloud/gateway/GatewayServiceApplication.java
-/Users/july/soft/workspace/cloud-family-demo/gateway-service/src/main/java/com/kfpd/cloud/gateway/base/config/SecurityConfig.java
-/Users/july/soft/workspace/cloud-family-demo/gateway-service/src/main/java/com/kfpd/cloud/gateway/base/config/WebClientConfig.java
-/Users/july/soft/workspace/cloud-family-demo/gateway-service/src/main/java/com/kfpd/cloud/gateway/base/filter/AuthenticationFilter.java
-/Users/july/soft/workspace/cloud-family-demo/gateway-service/src/main/java/com/kfpd/cloud/gateway/pojo/TokenValidation.java
