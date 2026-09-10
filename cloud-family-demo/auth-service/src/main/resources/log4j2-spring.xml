@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" monitorInterval="60">
+    <Properties>
+        <Property name="logDir">${env:LOG_DIR:-logs}/${spring:spring.application.name}/${spring:spring.profiles.active}</Property>
+        <Property name="logPattern">%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n%throwable</Property>
+    </Properties>
+
+    <SpringProfile name="dev">
+        <Appenders>
+            <Console name="Console" target="SYSTEM_OUT">
+                <PatternLayout pattern="${logPattern}"/>
+            </Console>
+            <RollingFile name="ApplicationFile" fileName="${logDir}/application.log" filePattern="${logDir}/application-%d{yyyy-MM-dd}-%i.log.gz">
+                <PatternLayout pattern="${logPattern}"/>
+                <Policies>
+                    <TimeBasedTriggeringPolicy interval="1"/>
+                    <SizeBasedTriggeringPolicy size="50 MB"/>
+                </Policies>
+                <DefaultRolloverStrategy max="14"/>
+            </RollingFile>
+            <RollingFile name="ErrorFile" fileName="${logDir}/error.log" filePattern="${logDir}/error-%d{yyyy-MM-dd}-%i.log.gz">
+                <PatternLayout pattern="${logPattern}"/>
+                <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
+                <Policies>
+                    <TimeBasedTriggeringPolicy interval="1"/>
+                    <SizeBasedTriggeringPolicy size="50 MB"/>
+                </Policies>
+                <DefaultRolloverStrategy max="14"/>
+            </RollingFile>
+        </Appenders>
+        <Loggers>
+            <Logger name="com.kfpd.cloud" level="DEBUG" additivity="false">
+                <AppenderRef ref="Console"/>
+                <AppenderRef ref="ApplicationFile"/>
+                <AppenderRef ref="ErrorFile"/>
+            </Logger>
+            <Root level="INFO">
+                <AppenderRef ref="Console"/>
+                <AppenderRef ref="ApplicationFile"/>
+                <AppenderRef ref="ErrorFile"/>
+            </Root>
+        </Loggers>
+    </SpringProfile>
+
+    <SpringProfile name="test">
+        <Appenders>
+            <Console name="Console" target="SYSTEM_OUT">
+                <PatternLayout pattern="${logPattern}"/>
+            </Console>
+            <RollingFile name="ApplicationFile" fileName="${logDir}/application.log" filePattern="${logDir}/application-%d{yyyy-MM-dd}-%i.log.gz">
+                <PatternLayout pattern="${logPattern}"/>
+                <Policies>
+                    <TimeBasedTriggeringPolicy interval="1"/>
+                    <SizeBasedTriggeringPolicy size="100 MB"/>
+                </Policies>
+                <DefaultRolloverStrategy max="30"/>
+            </RollingFile>
+            <RollingFile name="ErrorFile" fileName="${logDir}/error.log" filePattern="${logDir}/error-%d{yyyy-MM-dd}-%i.log.gz">
+                <PatternLayout pattern="${logPattern}"/>
+                <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
+                <Policies>
+                    <TimeBasedTriggeringPolicy interval="1"/>
+                    <SizeBasedTriggeringPolicy size="100 MB"/>
+                </Policies>
+                <DefaultRolloverStrategy max="30"/>
+            </RollingFile>
+        </Appenders>
+        <Loggers>
+            <Logger name="com.kfpd.cloud" level="INFO" additivity="false">
+                <AppenderRef ref="Console"/>
+                <AppenderRef ref="ApplicationFile"/>
+                <AppenderRef ref="ErrorFile"/>
+            </Logger>
+            <Root level="WARN">
+                <AppenderRef ref="Console"/>
+                <AppenderRef ref="ApplicationFile"/>
+                <AppenderRef ref="ErrorFile"/>
+            </Root>
+        </Loggers>
+    </SpringProfile>
+</Configuration>

@@ -1,25 +1,6 @@
 server:
   port: ${GATEWAY_SERVER_PORT:8080}
 
-spring:
-  cloud:
-    gateway:
-      server:
-        webflux:
-          routes:
-            - id: auth-service
-              uri: ${AUTH_SERVICE_URI:http://localhost:8081}
-              predicates:
-                - Path=/auth/**
-            - id: partner-service
-              uri: ${PARTNER_SERVICE_URI:http://localhost:8082}
-              predicates:
-                - Path=/api/users/**
-            - id: manager-service
-              uri: ${MANAGER_SERVICE_URI:http://localhost:8083}
-              predicates:
-                - Path=/api/manager/**
-
 demo:
   auth-service-url: ${AUTH_SERVICE_URL:http://localhost:8081}
   auth:
@@ -54,3 +35,22 @@ demo:
       validation-timeout: ${FA_MODEL_DB_VALIDATION_TIMEOUT:5000}
       leak-detection-threshold: ${FA_MODEL_DB_LEAK_DETECTION_THRESHOLD:0}
       pool-name: fa-model
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: auth-service
+              uri: ${AUTH_SERVICE_URI:http://localhost:8081}
+              predicates:
+                - Path=/auth/**
+            - id: partner-service
+              uri: ${PARTNER_SERVICE_URI:http://localhost:8082}
+              predicates:
+                - Path=/api/users/**
+            - id: manager-service
+              uri: ${MANAGER_SERVICE_URI:http://localhost:8083}
+              predicates:
+                - Path=/api/manager/**
