@@ -1,0 +1,11 @@
+/Users/july/soft/workspace/cloud-family-demo/partner-service/src/main/java/com/kfpd/cloud/partner/PartnerServiceApplication.java
+/Users/july/soft/workspace/cloud-family-demo/partner-service/src/main/java/com/kfpd/cloud/partner/base/config/PartnerMyBatisConfig.java
+/Users/july/soft/workspace/cloud-family-demo/partner-service/src/main/java/com/kfpd/cloud/partner/controller/UserController.java
+/Users/july/soft/workspace/cloud-family-demo/partner-service/src/main/java/com/kfpd/cloud/partner/dao/VipUserDao.java
+/Users/july/soft/workspace/cloud-family-demo/partner-service/src/main/java/com/kfpd/cloud/partner/pojo/entity/VipUser.java
+/Users/july/soft/workspace/cloud-family-demo/partner-service/src/main/java/com/kfpd/cloud/partner/pojo/vo/PageVO.java
+/Users/july/soft/workspace/cloud-family-demo/partner-service/src/main/java/com/kfpd/cloud/partner/pojo/vo/UserProfileVO.java
+/Users/july/soft/workspace/cloud-family-demo/partner-service/src/main/java/com/kfpd/cloud/partner/pojo/vo/VipUserPageQueryVO.java
+/Users/july/soft/workspace/cloud-family-demo/partner-service/src/main/java/com/kfpd/cloud/partner/pojo/vo/VipUserRequestVO.java
+/Users/july/soft/workspace/cloud-family-demo/partner-service/src/main/java/com/kfpd/cloud/partner/pojo/vo/VipUserVO.java
+/Users/july/soft/workspace/cloud-family-demo/partner-service/src/main/java/com/kfpd/cloud/partner/service/UserService.java

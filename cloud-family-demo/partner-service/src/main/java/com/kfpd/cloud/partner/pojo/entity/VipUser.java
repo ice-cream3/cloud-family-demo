@@ -1,4 +1,4 @@
-package com.kfpd.cloud.partner.pojo;
+package com.kfpd.cloud.partner.pojo.entity;
 
 import java.time.LocalDateTime;
 

@@ -38,7 +38,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                     Jwt jwt = authentication.getToken();
                     List<String> roles = claimAsStringList(jwt, "roles");
                     List<String> permissions = claimAsStringList(jwt, "permissions");
-                    if (path.startsWith("/api/manager/") && !roles.contains("MANAGER")) {
+                    if (path.startsWith("/api/manager/") && !hasManagerAccess(roles)) {
                         return forbidden(exchange, "Manager role required");
                     }
                     ServerHttpRequest authenticatedRequest = request.mutate()
@@ -76,6 +76,10 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     private List<String> claimAsStringList(Jwt jwt, String claimName) {
         List<String> values = jwt.getClaimAsStringList(claimName);
         return values == null ? List.of() : values;
+    }
+
+    private boolean hasManagerAccess(List<String> roles) {
+        return roles.contains("MANAGER") || roles.contains("SUPER_ADMIN");
     }
 
     private String claimOrSubject(Jwt jwt, String claimName) {

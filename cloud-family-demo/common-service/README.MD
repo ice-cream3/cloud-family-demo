@@ -306,7 +306,7 @@ Authorization: Bearer <accessToken>
 | `exp` | `Instant` | 自动生成 | 过期时间。 |
 | `username` | `String` | `alice` | 用户名。 |
 | `user_type` | `String` | `API` | 用户类型。 |
-| `roles` | `List<String>` | `[]` | 角色列表，API 登录为空，管理员登录包含 `MANAGER`。 |
+| `roles` | `List<String>` | `[]` | 角色列表，API 登录为空，管理员登录包含 `MANAGER` 或 `SUPER_ADMIN`。 |
 | `permissions` | `List<String>` | `[]` | 权限列表，API 登录为空，管理员登录包含管理权限。 |
 
 当前使用 HS256 对称签名。生产环境如果存在多个调用方或需要密钥轮换，建议切换到 RSA/ECDSA 非对称签名，并通过 JWK Set 暴露公钥。
@@ -704,6 +704,10 @@ demo:
 MySQL 多数据源：
 
 ```yaml
+spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
 demo:
   datasource:
     crypto:
@@ -734,7 +738,21 @@ demo:
       pool-name: fa-model
 ```
 
-以上配置已添加到 `auth-service`、`gateway-service`、`partner-service`、`manager-service`。可通过下面环境变量覆盖：
+以上配置已按环境拆分到 `auth-service`、`gateway-service`、`partner-service`、`manager-service`：
+
+| 文件 | 说明 |
+| --- | --- |
+| `application.yml` | 公共配置，包含服务名、端口、actuator、网关路由、JWT 基础配置，并默认激活 `dev`。 |
+| `application-dev.yml` | 开发环境数据源，默认连接 `fa-cloud` / `fa-model`。 |
+| `application-test.yml` | 测试环境数据源，默认连接 `fa-cloud-test` / `fa-model-test`。 |
+
+切换测试环境：
+
+```bash
+SPRING_PROFILES_ACTIVE=test mvn -pl partner-service spring-boot:run
+```
+
+可通过下面环境变量覆盖：
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -749,6 +767,12 @@ demo:
 | `FA_MODEL_DB_PASSWORD` | `ENC(...)`，解密后为 `root` | `fa-model` 密码。 |
 | `FA_MODEL_DB_MAX_POOL_SIZE` | `10` | `fa-model` 最大连接数。 |
 | `FA_MODEL_DB_MIN_IDLE` | `2` | `fa-model` 最小空闲连接数。 |
+| `FA_CLOUD_TEST_DB_URL` | `jdbc:mysql://localhost:3306/fa-cloud-test?...` | test 环境 `fa-cloud` JDBC URL。 |
+| `FA_CLOUD_TEST_DB_USERNAME` | `ENC(...)`，解密后为 `root` | test 环境 `fa-cloud` 用户名。 |
+| `FA_CLOUD_TEST_DB_PASSWORD` | `ENC(...)`，解密后为 `root` | test 环境 `fa-cloud` 密码。 |
+| `FA_MODEL_TEST_DB_URL` | `jdbc:mysql://localhost:3306/fa-model-test?...` | test 环境 `fa-model` JDBC URL。 |
+| `FA_MODEL_TEST_DB_USERNAME` | `ENC(...)`，解密后为 `root` | test 环境 `fa-model` 用户名。 |
+| `FA_MODEL_TEST_DB_PASSWORD` | `ENC(...)`，解密后为 `root` | test 环境 `fa-model` 密码。 |
 
 ### gateway-service
 
@@ -819,6 +843,12 @@ mvn -pl manager-service spring-boot:run
 mvn -pl gateway-service spring-boot:run
 ```
 
+默认启动使用 `dev` 环境。测试环境启动示例：
+
+```bash
+SPRING_PROFILES_ACTIVE=test mvn -pl auth-service spring-boot:run
+```
+
 初始化伙伴 API 资料表：
 
 ```bash
@@ -874,6 +904,7 @@ curl -s http://localhost:8080/api/manager/dashboard \
 | --- | --- | --- | --- | --- |
 | API 用户 | `alice` | `demo` | 无 | 无 |
 | 管理员 | `manager` | `demo` | `MANAGER` | `manager:login`, `manager:dashboard:read`, `user:profile:read` |
+| 超级管理员 | `admin` | `demo` | `SUPER_ADMIN` | `manager:login`, `manager:dashboard:read`, `user:profile:read` |
 
 ## 安全边界
 

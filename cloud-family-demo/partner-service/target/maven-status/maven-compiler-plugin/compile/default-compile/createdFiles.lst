@@ -1,0 +1,6 @@
+com/kfpd/cloud/partner/pojo/vo/UserProfileVO.class
+com/kfpd/cloud/partner/pojo/vo/VipUserVO.class
+com/kfpd/cloud/partner/pojo/vo/PageVO.class
+com/kfpd/cloud/partner/pojo/vo/VipUserRequestVO.class
+com/kfpd/cloud/partner/pojo/entity/VipUser.class
+com/kfpd/cloud/partner/pojo/vo/VipUserPageQueryVO.class
