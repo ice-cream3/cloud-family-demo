@@ -22,7 +22,7 @@ import reactor.core.publisher.Mono;
 public class AuthenticationFilter implements GlobalFilter, Ordered {
 
     // Login and actuator health endpoints must be reachable before a token exists.
-    private final List<String> publicPaths = List.of("/auth/api/login", "/auth/manager/login", "/actuator/health");
+    private final List<String> publicPaths = List.of("/auth/api/login", "/auth/manager/login", "/auth/refresh", "/actuator/health");
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {

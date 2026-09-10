@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfpd.cloud.manager.dao.SysRoleDao">
+
+    <resultMap id="SysRoleResultMap" type="com.kfpd.cloud.manager.pojo.entity.SysRole">
+        <id property="id" column="id"/>
+        <result property="roleCode" column="role_code"/>
+        <result property="roleName" column="role_name"/>
+        <result property="description" column="description"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="SysPermissionResultMap" type="com.kfpd.cloud.manager.pojo.entity.SysPermission">
+        <id property="id" column="id"/>
+        <result property="permissionCode" column="permission_code"/>
+        <result property="permissionName" column="permission_name"/>
+        <result property="description" column="description"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="SysMenuResultMap" type="com.kfpd.cloud.manager.pojo.entity.SysMenu">
+        <id property="id" column="id"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="menuCode" column="menu_code"/>
+        <result property="menuName" column="menu_name"/>
+        <result property="path" column="path"/>
+        <result property="component" column="component"/>
+        <result property="icon" column="icon"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="visible" column="visible"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="SysRoleColumns">
+        id, role_code, role_name, description, status, created_at, updated_at
+    </sql>
+
+    <select id="findAll" resultMap="SysRoleResultMap">
+        SELECT <include refid="SysRoleColumns"/>
+        FROM sys_role
+        ORDER BY id DESC
+    </select>
+
+    <select id="findById" resultMap="SysRoleResultMap">
+        SELECT <include refid="SysRoleColumns"/>
+        FROM sys_role
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.kfpd.cloud.manager.pojo.entity.SysRole"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_role (role_code, role_name, description, status)
+        VALUES (#{roleCode}, #{roleName}, #{description}, #{status})
+    </insert>
+
+    <update id="update" parameterType="com.kfpd.cloud.manager.pojo.entity.SysRole">
+        UPDATE sys_role
+        SET role_code = #{roleCode},
+            role_name = #{roleName},
+            description = #{description},
+            status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM sys_role
+        WHERE id = #{id}
+    </delete>
+
+    <select id="findPermissionsByRoleId" resultMap="SysPermissionResultMap">
+        SELECT p.id, p.permission_code, p.permission_name, p.description, p.status, p.created_at, p.updated_at
+        FROM sys_permission p
+        INNER JOIN sys_role_permission rp ON rp.permission_id = p.id
+        WHERE rp.role_id = #{roleId}
+        ORDER BY p.id DESC
+    </select>
+
+    <delete id="deleteRolePermissions">
+        DELETE FROM sys_role_permission
+        WHERE role_id = #{roleId}
+    </delete>
+
+    <insert id="insertRolePermission">
+        INSERT INTO sys_role_permission (role_id, permission_id)
+        VALUES (#{roleId}, #{permissionId})
+    </insert>
+
+    <select id="findMenusByRoleId" resultMap="SysMenuResultMap">
+        SELECT m.id, m.parent_id, m.menu_code, m.menu_name, m.path, m.component, m.icon,
+               m.sort_order, m.visible, m.status, m.created_at, m.updated_at
+        FROM sys_menu m
+        INNER JOIN sys_role_menu rm ON rm.menu_id = m.id
+        WHERE rm.role_id = #{roleId}
+        ORDER BY m.sort_order ASC, m.id DESC
+    </select>
+
+    <delete id="deleteRoleMenus">
+        DELETE FROM sys_role_menu
+        WHERE role_id = #{roleId}
+    </delete>
+
+    <insert id="insertRoleMenu">
+        INSERT INTO sys_role_menu (role_id, menu_id)
+        VALUES (#{roleId}, #{menuId})
+    </insert>
+</mapper>

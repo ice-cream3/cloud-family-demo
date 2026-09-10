@@ -8,6 +8,7 @@ public class CommonJwtProperties {
     private String issuer = "cloud-family-demo";
     private String secret;
     private long ttlSeconds = 7200;
+    private long refreshTtlSeconds = 604800;
 
     public String getIssuer() {
         return issuer;
@@ -31,5 +32,13 @@ public class CommonJwtProperties {
 
     public void setTtlSeconds(long ttlSeconds) {
         this.ttlSeconds = ttlSeconds;
+    }
+
+    public long getRefreshTtlSeconds() {
+        return refreshTtlSeconds;
+    }
+
+    public void setRefreshTtlSeconds(long refreshTtlSeconds) {
+        this.refreshTtlSeconds = refreshTtlSeconds;
     }
 }

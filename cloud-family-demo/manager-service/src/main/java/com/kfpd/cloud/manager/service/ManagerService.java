@@ -4,15 +4,15 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 
-import com.kfpd.cloud.manager.pojo.ManagerDashboard;
+import com.kfpd.cloud.manager.pojo.vo.ManagerDashboardVO;
 
 import org.springframework.stereotype.Service;
 
 @Service
 public class ManagerService {
 
-    public ManagerDashboard dashboard(String username, String roles, String permissions) {
-        return new ManagerDashboard(
+    public ManagerDashboardVO dashboard(String username, String roles, String permissions) {
+        return new ManagerDashboardVO(
                 username,
                 "manager-user",
                 splitHeader(roles),

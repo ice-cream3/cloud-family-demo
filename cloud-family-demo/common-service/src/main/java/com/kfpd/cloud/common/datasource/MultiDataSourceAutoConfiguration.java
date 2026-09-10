@@ -71,6 +71,11 @@ public class MultiDataSourceAutoConfiguration {
         dataSource.setDriverClassName(properties.getDriverClassName());
         dataSource.setMaximumPoolSize(properties.getMaximumPoolSize());
         dataSource.setMinimumIdle(properties.getMinimumIdle());
+        dataSource.setConnectionTimeout(properties.getConnectionTimeout());
+        dataSource.setIdleTimeout(properties.getIdleTimeout());
+        dataSource.setMaxLifetime(properties.getMaxLifetime());
+        dataSource.setValidationTimeout(properties.getValidationTimeout());
+        dataSource.setLeakDetectionThreshold(properties.getLeakDetectionThreshold());
         dataSource.setPoolName(StringUtils.hasText(properties.getPoolName()) ? properties.getPoolName() : defaultPoolName);
         return dataSource;
     }

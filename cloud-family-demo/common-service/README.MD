@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | `common-service` | 无 | Jar 公共模块 | 放置全局公用配置、常量、工具类。 |
 | `gateway-service` | `8080` | Spring Cloud Gateway WebFlux | 统一 API 入口、路由转发、JWT 本地验签、用户身份 header 注入、管理接口角色校验。 |
-| `auth-service` | `8081` | Spring MVC REST 服务 | 用户登录、管理员登录、JWT 签发、兼容性 token 校验接口。 |
+| `auth-service` | `8081` | Spring MVC REST 服务 | 用户登录、管理员登录、JWT 签发、OAuth2 授权数据持久化、兼容性 token 校验接口。 |
 | `user-api-service` | `8082` | Spring MVC REST 服务 | 用户侧受保护接口示例。 |
 | `manager-service` | `8083` | Spring MVC REST 服务 | 管理侧受保护接口示例。 |
 
@@ -38,6 +38,7 @@ demo:
 | `issuer` | `String` | `cloud-family-demo` | JWT 签发方。`auth-service` 写入 JWT，`gateway-service` 验签时校验。 |
 | `secret` | `String` | 无 | HS256 对称签名密钥。auth 和 gateway 必须一致。生产环境应改为强随机密钥，并从环境变量或密钥管理系统加载。 |
 | `ttlSeconds` | `long` | `7200` | JWT 有效期，单位秒。 |
+| `refreshTtlSeconds` | `long` | `604800` | Refresh token 有效期，单位秒，默认 7 天。 |
 
 ### JWT Secret 工具
 
@@ -96,6 +97,11 @@ demo:
       password: ENC(O/mIkbzTm1uHasWUrJSMKaIDlfcpqXW6E8FFh3e0+Y0=)
       maximum-pool-size: 10
       minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      validation-timeout: 5000
+      leak-detection-threshold: 0
       pool-name: fa-cloud
     model:
       url: jdbc:mysql://localhost:3306/fa-model?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8
@@ -103,6 +109,11 @@ demo:
       password: ENC(O/mIkbzTm1uHasWUrJSMKaIDlfcpqXW6E8FFh3e0+Y0=)
       maximum-pool-size: 10
       minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      validation-timeout: 5000
+      leak-detection-threshold: 0
       pool-name: fa-model
 ```
 
@@ -134,6 +145,101 @@ demo:
 ```
 
 生产环境必须通过 `DATASOURCE_CRYPTO_SECRET` 覆盖默认密钥，并重新生成数据库用户名和密码密文。
+
+### Spring Security OAuth2 授权表
+
+`fa-cloud` 库中使用 Spring Authorization Server JDBC 标准表结构保存 OAuth2 客户端、授权和授权同意数据。初始化脚本位于：
+
+```text
+common-service/src/main/resources/db/fa-cloud/spring-security-oauth2-authorization-schema.sql
+```
+
+脚本会创建数据库：
+
+```sql
+CREATE DATABASE IF NOT EXISTS `fa-cloud`;
+```
+
+并创建三张表：
+
+| 表名 | Spring JDBC 服务 | 说明 |
+| --- | --- | --- |
+| `oauth2_registered_client` | `JdbcRegisteredClientRepository` | 保存 OAuth2 client 注册信息。 |
+| `oauth2_authorization` | `JdbcOAuth2AuthorizationService` | 保存 authorization code、access token、refresh token、OIDC id token、device code 等授权数据。 |
+| `oauth2_authorization_consent` | `JdbcOAuth2AuthorizationConsentService` | 保存用户对 client 的授权同意记录。 |
+
+`auth-service` 当前已经接入：
+
+| Bean | 数据源 | 说明 |
+| --- | --- | --- |
+| `JdbcRegisteredClientRepository` | `faCloudJdbcTemplate` | 持久化和读取 `oauth2_registered_client`。 |
+| `JdbcOAuth2AuthorizationService` | `faCloudJdbcTemplate` | 持久化和读取 `oauth2_authorization`。 |
+
+服务启动时会自动初始化两个 demo client：
+
+| client_id | registered_client_id | grant type | scopes |
+| --- | --- | --- | --- |
+| `cloud-api-client` | `cloud-api-client-registration` | `demo_api_login` | `user:profile:read` |
+| `cloud-manager-client` | `cloud-manager-client-registration` | `demo_manager_login` | `manager:login`, `manager:dashboard:read`, `user:profile:read` |
+
+登录成功后，`auth-service` 会：
+
+1. 从 `JdbcRegisteredClientRepository` 读取对应 `RegisteredClient`。
+2. 签发 JWT access token。
+3. 构造 `OAuth2Authorization`，写入 principal、grant type、authorized scopes、access token、token claims 等信息。
+4. 通过 `JdbcOAuth2AuthorizationService.save(...)` 保存到 `fa-cloud.oauth2_authorization`。
+
+兼容性接口 `/auth/validate` 会先校验 JWT 签名和过期时间，再通过 `JdbcOAuth2AuthorizationService.findByToken(...)` 确认 access token 存在且仍处于 active 状态。
+
+执行脚本：
+
+```bash
+mysql -uroot -proot < common-service/src/main/resources/db/fa-cloud/spring-security-oauth2-authorization-schema.sql
+```
+
+该表结构以 Spring Authorization Server 官方 JDBC schema 为基准，并针对 MySQL 增加了 `IF NOT EXISTS`、字符集、存储引擎和常用索引。
+
+### 系统管理表
+
+用户、角色、权限、菜单功能属于 `manager-service`。它们使用 `fa-cloud` 库中的系统管理表，初始化脚本位于：
+
+```text
+manager-service/src/main/resources/db/fa-cloud/system-management-schema.sql
+```
+
+脚本会创建以下主表：
+
+| 表名 | 说明 |
+| --- | --- |
+| `sys_user` | 用户表，保存用户名、密码哈希、显示名、邮箱、状态。 |
+| `sys_role` | 角色表，保存角色编码、名称、描述、状态。 |
+| `sys_permission` | 权限表，保存权限编码、名称、描述、状态。 |
+| `sys_menu` | 菜单表，保存菜单编码、名称、路径、组件、图标、排序、可见性、状态。 |
+
+脚本也预留以下关联表：
+
+| 表名 | 说明 |
+| --- | --- |
+| `sys_user_role` | 用户和角色关联。 |
+| `sys_role_permission` | 角色和权限关联。 |
+| `sys_role_menu` | 角色和菜单关联。 |
+
+执行脚本：
+
+```bash
+mysql -h127.0.0.1 -P3306 -uroot -proot < manager-service/src/main/resources/db/fa-cloud/system-management-schema.sql
+```
+
+`manager-service` 提供 CRUD 和关联关系维护能力：
+
+| 类 | 说明 |
+| --- | --- |
+| `com.kfpd.cloud.manager.dao.*Dao` | MyBatis DAO 接口，对接 `mapper/system/*.xml`。 |
+| `com.kfpd.cloud.manager.service.SystemManagementService` | 用户、角色、权限、菜单 CRUD 及关系维护业务服务。 |
+| `com.kfpd.cloud.manager.pojo.entity.SysUser` / `SysRole` / `SysPermission` / `SysMenu` | 数据库表实体。 |
+| `com.kfpd.cloud.manager.pojo.dto.*Request` | 管理接口请求模型。 |
+
+写操作使用 `faCloudTransactionManager`。
 
 业务服务使用示例：
 
@@ -175,7 +281,7 @@ public void updateModelData() {
 1. 客户端访问 `gateway-service` 的登录接口：`POST /auth/api/login` 或 `POST /auth/manager/login`。
 2. `gateway-service` 将 `/auth/**` 路由到 `auth-service`。
 3. `auth-service` 校验账号、密码以及登录限制。
-4. 登录成功后，`auth-service` 使用 HS256 签发 JWT，并返回 `accessToken`。
+4. 登录成功后，`auth-service` 使用 HS256 签发 JWT，通过 `JdbcOAuth2AuthorizationService` 写入 `fa-cloud.oauth2_authorization`，并返回 `accessToken`。
 5. 客户端访问受保护接口时携带：
 
 ```http
@@ -220,6 +326,7 @@ Authorization: Bearer <accessToken>
 | --- | --- |
 | `/auth/api/login` | API 用户登录，无需 token。 |
 | `/auth/manager/login` | 管理员登录，无需 token。 |
+| `/auth/refresh` | Access token 刷新，无需 access token，但需要合法 refresh token。 |
 | `/actuator/health` | 网关健康检查，无需 token。 |
 
 其他请求都需要合法 Bearer JWT。
@@ -250,11 +357,13 @@ Content-Type: application/json
 {
   "tokenType": "Bearer",
   "accessToken": "<jwt>",
+  "refreshToken": "<refresh-token>",
   "username": "alice",
   "userType": "API",
   "roles": ["USER"],
   "permissions": ["user:profile:read"],
-  "expiresAt": "2026-09-09T12:00:00"
+  "expiresAt": "2026-09-09T12:00:00",
+  "refreshTokenExpiresAt": "2026-09-16T10:00:00"
 }
 ```
 
@@ -296,11 +405,13 @@ Content-Type: application/json
 {
   "tokenType": "Bearer",
   "accessToken": "<jwt>",
+  "refreshToken": "<refresh-token>",
   "username": "manager",
   "userType": "MANAGER",
   "roles": ["MANAGER"],
   "permissions": ["manager:login", "manager:dashboard:read", "user:profile:read"],
-  "expiresAt": "2026-09-09T12:00:00"
+  "expiresAt": "2026-09-09T12:00:00",
+  "refreshTokenExpiresAt": "2026-09-16T10:00:00"
 }
 ```
 
@@ -320,6 +431,53 @@ Content-Type: application/json
 | `401` | 用户名或密码错误。 |
 | `403` | 来源 IP 不允许，或账号缺少 `manager:login` 权限。 |
 
+### 刷新 Access Token
+
+```http
+POST /auth/refresh
+Content-Type: application/json
+```
+
+请求体：
+
+```json
+{
+  "refreshToken": "<refresh-token>"
+}
+```
+
+成功响应：
+
+```json
+{
+  "tokenType": "Bearer",
+  "accessToken": "<new-jwt>",
+  "refreshToken": "<same-refresh-token>",
+  "username": "alice",
+  "userType": "API",
+  "roles": ["USER"],
+  "permissions": ["user:profile:read"],
+  "expiresAt": "2026-09-09T12:00:00",
+  "refreshTokenExpiresAt": "2026-09-16T10:00:00"
+}
+```
+
+说明：
+
+- refresh token 是随机 opaque token，不是 JWT。
+- refresh token 保存在 `fa-cloud.oauth2_authorization.refresh_token_value`。
+- 刷新时通过 `JdbcOAuth2AuthorizationService.findByToken(..., OAuth2TokenType.REFRESH_TOKEN)` 查库。
+- refresh token 必须存在、未过期、未失效。
+- 当前配置复用 refresh token，刷新 access token 后会更新同一条 `oauth2_authorization` 记录里的 `access_token_*` 字段。
+
+可能状态码：
+
+| 状态码 | 场景 |
+| --- | --- |
+| `200` | 刷新成功。 |
+| `400` | 请求体字段为空或格式错误。 |
+| `401` | refresh token 不存在、过期、失效，或授权记录不完整。 |
+
 ### Token 校验
 
 ```http
@@ -330,6 +488,7 @@ Authorization: Bearer <accessToken>
 说明：
 
 - 该接口由 `auth-service` 提供，当前保留为兼容性/调试接口。
+- 该接口会读取 `fa-cloud.oauth2_authorization`，确认 access token 已持久化且未失效。
 - `gateway-service` 的主鉴权流程已经改为 Resource Server 本地验签，不依赖该接口。
 
 成功响应示例：
@@ -471,6 +630,23 @@ Authorization: Bearer <managerAccessToken>
 
 - 因为路径属于 `/api/manager/**`，通过网关访问时也需要 `MANAGER` 角色。
 
+### 管理服务系统管理 CRUD
+
+`manager-service` 暴露系统管理 CRUD，基础路径：
+
+```http
+/api/manager/system
+```
+
+| 资源 | 列表 | 单条 | 新增 | 修改 | 删除 |
+| --- | --- | --- | --- | --- | --- |
+| 用户 | `GET /api/manager/system/users` | `GET /api/manager/system/users/{id}` | `POST /api/manager/system/users` | `PUT /api/manager/system/users/{id}` | `DELETE /api/manager/system/users/{id}` |
+| 角色 | `GET /api/manager/system/roles` | `GET /api/manager/system/roles/{id}` | `POST /api/manager/system/roles` | `PUT /api/manager/system/roles/{id}` | `DELETE /api/manager/system/roles/{id}` |
+| 权限 | `GET /api/manager/system/permissions` | `GET /api/manager/system/permissions/{id}` | `POST /api/manager/system/permissions` | `PUT /api/manager/system/permissions/{id}` | `DELETE /api/manager/system/permissions/{id}` |
+| 菜单 | `GET /api/manager/system/menus` | `GET /api/manager/system/menus/{id}` | `POST /api/manager/system/menus` | `PUT /api/manager/system/menus/{id}` | `DELETE /api/manager/system/menus/{id}` |
+
+通过网关访问 `/api/manager/system/**` 时需要合法 JWT，并且 JWT 的 `roles` 必须包含 `MANAGER`。
+
 ### Actuator 健康检查
 
 各服务都暴露 actuator health/info。通过网关访问：
@@ -504,6 +680,7 @@ demo:
       issuer: cloud-family-demo
       secret: cloud-family-demo-jwt-signing-secret-please-change-in-production
       ttl-seconds: 7200
+      refresh-ttl-seconds: 604800
 ```
 
 登录限制：
@@ -535,6 +712,11 @@ demo:
       password: ${FA_CLOUD_DB_PASSWORD:ENC(O/mIkbzTm1uHasWUrJSMKaIDlfcpqXW6E8FFh3e0+Y0=)}
       maximum-pool-size: ${FA_CLOUD_DB_MAX_POOL_SIZE:10}
       minimum-idle: ${FA_CLOUD_DB_MIN_IDLE:2}
+      connection-timeout: ${FA_CLOUD_DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${FA_CLOUD_DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${FA_CLOUD_DB_MAX_LIFETIME:1800000}
+      validation-timeout: ${FA_CLOUD_DB_VALIDATION_TIMEOUT:5000}
+      leak-detection-threshold: ${FA_CLOUD_DB_LEAK_DETECTION_THRESHOLD:0}
       pool-name: fa-cloud
     model:
       url: ${FA_MODEL_DB_URL:jdbc:mysql://localhost:3306/fa-model?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
@@ -542,6 +724,11 @@ demo:
       password: ${FA_MODEL_DB_PASSWORD:ENC(O/mIkbzTm1uHasWUrJSMKaIDlfcpqXW6E8FFh3e0+Y0=)}
       maximum-pool-size: ${FA_MODEL_DB_MAX_POOL_SIZE:10}
       minimum-idle: ${FA_MODEL_DB_MIN_IDLE:2}
+      connection-timeout: ${FA_MODEL_DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${FA_MODEL_DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${FA_MODEL_DB_MAX_LIFETIME:1800000}
+      validation-timeout: ${FA_MODEL_DB_VALIDATION_TIMEOUT:5000}
+      leak-detection-threshold: ${FA_MODEL_DB_LEAK_DETECTION_THRESHOLD:0}
       pool-name: fa-model
 ```
 

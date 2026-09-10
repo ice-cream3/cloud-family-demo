@@ -9,10 +9,12 @@ import java.util.List;
 public record LoginResponse(
         String tokenType,
         String accessToken,
+        String refreshToken,
         String username,
         String userType,
         List<String> roles,
         List<String> permissions,
-        LocalDateTime expiresAt
+        LocalDateTime expiresAt,
+        LocalDateTime refreshTokenExpiresAt
 ) {
 }

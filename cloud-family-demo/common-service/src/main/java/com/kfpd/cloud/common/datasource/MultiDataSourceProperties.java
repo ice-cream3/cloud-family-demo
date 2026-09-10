@@ -32,6 +32,11 @@ public class MultiDataSourceProperties {
         private String driverClassName = "com.mysql.cj.jdbc.Driver";
         private int maximumPoolSize = 10;
         private int minimumIdle = 2;
+        private long connectionTimeout = 30000;
+        private long idleTimeout = 600000;
+        private long maxLifetime = 1800000;
+        private long validationTimeout = 5000;
+        private long leakDetectionThreshold = 0;
         private String poolName;
 
         public String getUrl() {
@@ -80,6 +85,46 @@ public class MultiDataSourceProperties {
 
         public void setMinimumIdle(int minimumIdle) {
             this.minimumIdle = minimumIdle;
+        }
+
+        public long getConnectionTimeout() {
+            return connectionTimeout;
+        }
+
+        public void setConnectionTimeout(long connectionTimeout) {
+            this.connectionTimeout = connectionTimeout;
+        }
+
+        public long getIdleTimeout() {
+            return idleTimeout;
+        }
+
+        public void setIdleTimeout(long idleTimeout) {
+            this.idleTimeout = idleTimeout;
+        }
+
+        public long getMaxLifetime() {
+            return maxLifetime;
+        }
+
+        public void setMaxLifetime(long maxLifetime) {
+            this.maxLifetime = maxLifetime;
+        }
+
+        public long getValidationTimeout() {
+            return validationTimeout;
+        }
+
+        public void setValidationTimeout(long validationTimeout) {
+            this.validationTimeout = validationTimeout;
+        }
+
+        public long getLeakDetectionThreshold() {
+            return leakDetectionThreshold;
+        }
+
+        public void setLeakDetectionThreshold(long leakDetectionThreshold) {
+            this.leakDetectionThreshold = leakDetectionThreshold;
         }
 
         public String getPoolName() {

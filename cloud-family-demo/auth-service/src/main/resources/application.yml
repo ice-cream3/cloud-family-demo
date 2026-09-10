@@ -10,24 +10,35 @@ demo:
     crypto:
       secret: ${DATASOURCE_CRYPTO_SECRET:cloud-family-demo-datasource-crypto-secret}
     cloud:
-      url: ${FA_CLOUD_DB_URL:jdbc:mysql://localhost:3306/fa-cloud?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
+      url: ${FA_CLOUD_DB_URL:jdbc:mysql://localhost:3306/fa-cloud?useSSL=false&allowPublicKeyRetrieval=true&preserveInstants=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
       username: ${FA_CLOUD_DB_USERNAME:ENC(U0rj/0TFqN/ikdyYo1QcsZa9APbjTkdLYLth5ycDEk4=)}
       password: ${FA_CLOUD_DB_PASSWORD:ENC(O/mIkbzTm1uHasWUrJSMKaIDlfcpqXW6E8FFh3e0+Y0=)}
       maximum-pool-size: ${FA_CLOUD_DB_MAX_POOL_SIZE:10}
       minimum-idle: ${FA_CLOUD_DB_MIN_IDLE:2}
+      connection-timeout: ${FA_CLOUD_DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${FA_CLOUD_DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${FA_CLOUD_DB_MAX_LIFETIME:1800000}
+      validation-timeout: ${FA_CLOUD_DB_VALIDATION_TIMEOUT:5000}
+      leak-detection-threshold: ${FA_CLOUD_DB_LEAK_DETECTION_THRESHOLD:0}
       pool-name: fa-cloud
     model:
-      url: ${FA_MODEL_DB_URL:jdbc:mysql://localhost:3306/fa-model?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
+      url: ${FA_MODEL_DB_URL:jdbc:mysql://localhost:3306/fa-model?useSSL=false&allowPublicKeyRetrieval=true&preserveInstants=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
       username: ${FA_MODEL_DB_USERNAME:ENC(U0rj/0TFqN/ikdyYo1QcsZa9APbjTkdLYLth5ycDEk4=)}
       password: ${FA_MODEL_DB_PASSWORD:ENC(O/mIkbzTm1uHasWUrJSMKaIDlfcpqXW6E8FFh3e0+Y0=)}
       maximum-pool-size: ${FA_MODEL_DB_MAX_POOL_SIZE:10}
       minimum-idle: ${FA_MODEL_DB_MIN_IDLE:2}
+      connection-timeout: ${FA_MODEL_DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${FA_MODEL_DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${FA_MODEL_DB_MAX_LIFETIME:1800000}
+      validation-timeout: ${FA_MODEL_DB_VALIDATION_TIMEOUT:5000}
+      leak-detection-threshold: ${FA_MODEL_DB_LEAK_DETECTION_THRESHOLD:0}
       pool-name: fa-model
   auth:
     jwt:
       issuer: cloud-family-demo
       secret: cloud-family-demo-jwt-signing-secret-please-change-in-production
       ttl-seconds: 7200
+      refresh-ttl-seconds: 604800
     login:
       api:
         max-failed-attempts: 5

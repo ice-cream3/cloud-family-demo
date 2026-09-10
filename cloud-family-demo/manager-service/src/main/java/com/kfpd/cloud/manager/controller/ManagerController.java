@@ -3,7 +3,7 @@ package com.kfpd.cloud.manager.controller;
 import java.util.Map;
 
 import com.kfpd.cloud.common.web.GatewayHeaders;
-import com.kfpd.cloud.manager.pojo.ManagerDashboard;
+import com.kfpd.cloud.manager.pojo.vo.ManagerDashboardVO;
 import com.kfpd.cloud.manager.service.ManagerService;
 
 import org.springframework.http.ResponseEntity;
@@ -23,7 +23,7 @@ public class ManagerController {
     }
 
     @GetMapping("/dashboard")
-    public ManagerDashboard dashboard(@RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+    public ManagerDashboardVO dashboard(@RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
                                       @RequestHeader(value = GatewayHeaders.USER_ROLES, defaultValue = "") String roles,
                                       @RequestHeader(value = GatewayHeaders.USER_PERMISSIONS, defaultValue = "") String permissions) {
         // These headers are injected by gateway after token validation.
