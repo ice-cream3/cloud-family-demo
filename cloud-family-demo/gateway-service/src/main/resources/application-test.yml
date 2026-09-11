@@ -22,6 +22,11 @@ spring:
 
 demo:
   auth-service-url: ${AUTH_SERVICE_TEST_URL:http://localhost:8081}
+  gateway:
+    rate-limit:
+      enabled: ${GATEWAY_TEST_RATE_LIMIT_ENABLED:true}
+      max-requests: ${GATEWAY_TEST_RATE_LIMIT_MAX_REQUESTS:120}
+      window-seconds: ${GATEWAY_TEST_RATE_LIMIT_WINDOW_SECONDS:60}
   auth:
     jwt:
       issuer: ${JWT_TEST_ISSUER:cloud-family-demo-test}

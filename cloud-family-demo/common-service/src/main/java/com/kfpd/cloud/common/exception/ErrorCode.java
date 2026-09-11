@@ -23,7 +23,8 @@ public enum ErrorCode {
     MANAGER_RESOURCE_NOT_FOUND(300001, 404, "Manager resource not found"),
 
     GATEWAY_MISSING_AUTHENTICATED_JWT(400001, 401, "Missing authenticated JWT"),
-    GATEWAY_MANAGER_ROLE_REQUIRED(400002, 403, "Manager role required");
+    GATEWAY_MANAGER_ROLE_REQUIRED(400002, 403, "Manager role required"),
+    GATEWAY_TOO_MANY_REQUESTS(400003, 429, "Too many requests");
 
     private final int code;
     private final int httpStatus;
