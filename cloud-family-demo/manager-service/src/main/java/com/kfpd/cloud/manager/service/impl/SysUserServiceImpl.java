@@ -15,11 +15,15 @@ import com.kfpd.cloud.manager.pojo.entity.SysUser;
 import com.kfpd.cloud.manager.service.SysRoleService;
 import com.kfpd.cloud.manager.service.SysUserService;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SysUserServiceImpl implements SysUserService {
+
+    private static final Logger log = LoggerFactory.getLogger(SysUserServiceImpl.class);
 
     private final SysUserDao userDao;
     private final SysRoleService roleService;
@@ -36,8 +40,10 @@ public class SysUserServiceImpl implements SysUserService {
 
     @Override
     public SysUser findUserById(Long id) {
-        return Optional.ofNullable(userDao.findById(id))
-                .orElseThrow(() -> SystemManagementSupport.notFound("User not found"));
+        return Optional.ofNullable(userDao.findById(id)).orElseThrow(() -> {
+            log.warn("User service exception: action=findUserById, id={}, message=User not found", id);
+            return SystemManagementSupport.notFound("User not found");
+        });
     }
 
     @Override
@@ -54,9 +60,13 @@ public class SysUserServiceImpl implements SysUserService {
     @Override
     public LoginAccountDTO findLoginAccount(String username) {
         SystemManagementSupport.requireText(username, "username is required");
-        SysUser user = Optional.ofNullable(userDao.findByUsername(username))
-                .orElseThrow(() -> SystemManagementSupport.notFound("User not found"));
+        SysUser user = Optional.ofNullable(userDao.findByUsername(username)).orElseThrow(() -> {
+            log.warn("User service exception: action=findLoginAccount, username={}, message=User not found", username);
+            return SystemManagementSupport.notFound("User not found");
+        });
         if (!"ENABLED".equalsIgnoreCase(user.getStatus())) {
+            log.warn("User service exception: action=findLoginAccount, username={}, status={}, message=User not found",
+                    username, user.getStatus());
             throw SystemManagementSupport.notFound("User not found");
         }
         List<SysRole> roles = userDao.findRolesByUserId(user.getId()).stream()
@@ -95,6 +105,7 @@ public class SysUserServiceImpl implements SysUserService {
         user.setId(id);
         apply(user, request);
         if (userDao.update(user) == 0) {
+            log.warn("User service exception: action=updateUser, id={}, message=User not found", id);
             throw SystemManagementSupport.notFound("User not found");
         }
         return findUserById(id);
@@ -104,6 +115,7 @@ public class SysUserServiceImpl implements SysUserService {
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void deleteUser(Long id) {
         if (userDao.deleteById(id) == 0) {
+            log.warn("User service exception: action=deleteUser, id={}, message=User not found", id);
             throw SystemManagementSupport.notFound("User not found");
         }
     }

@@ -9,11 +9,15 @@ import com.kfpd.cloud.manager.pojo.vo.SysPermissionRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
 import com.kfpd.cloud.manager.service.SysPermissionService;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SysPermissionServiceImpl implements SysPermissionService {
+
+    private static final Logger log = LoggerFactory.getLogger(SysPermissionServiceImpl.class);
 
     private final SysPermissionDao permissionDao;
 
@@ -28,8 +32,10 @@ public class SysPermissionServiceImpl implements SysPermissionService {
 
     @Override
     public SysPermission findPermissionById(Long id) {
-        return Optional.ofNullable(permissionDao.findById(id))
-                .orElseThrow(() -> SystemManagementSupport.notFound("Permission not found"));
+        return Optional.ofNullable(permissionDao.findById(id)).orElseThrow(() -> {
+            log.warn("Permission service exception: action=findPermissionById, id={}, message=Permission not found", id);
+            return SystemManagementSupport.notFound("Permission not found");
+        });
     }
 
     @Override
@@ -52,6 +58,7 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         permission.setId(id);
         apply(permission, request);
         if (permissionDao.update(permission) == 0) {
+            log.warn("Permission service exception: action=updatePermission, id={}, message=Permission not found", id);
             throw SystemManagementSupport.notFound("Permission not found");
         }
         return findPermissionById(id);
@@ -61,6 +68,7 @@ public class SysPermissionServiceImpl implements SysPermissionService {
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void deletePermission(Long id) {
         if (permissionDao.deleteById(id) == 0) {
+            log.warn("Permission service exception: action=deletePermission, id={}, message=Permission not found", id);
             throw SystemManagementSupport.notFound("Permission not found");
         }
     }

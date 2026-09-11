@@ -10,6 +10,8 @@ import com.kfpd.cloud.common.web.GatewayHeaders;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -22,6 +24,8 @@ import reactor.core.publisher.Mono;
 
 @Component
 public class AuthenticationFilter implements GlobalFilter, Ordered {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthenticationFilter.class);
 
     // Login and actuator health endpoints must be reachable before a token exists.
     private final List<String> publicPaths = List.of("/auth/api/login", "/auth/manager/login", "/auth/refresh", "/actuator/health");
@@ -60,6 +64,12 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     }
 
     private Mono<Void> writeError(ServerWebExchange exchange, ErrorCode errorCode) {
+        log.warn("Gateway authentication exception: code={}, status={}, method={}, path={}, message={}",
+                errorCode.getCode(),
+                errorCode.getHttpStatus(),
+                exchange.getRequest().getMethod(),
+                exchange.getRequest().getURI().getPath(),
+                errorCode.getMessage());
         byte[] body = errorBody(exchange, errorCode);
         exchange.getResponse().setStatusCode(HttpStatus.valueOf(errorCode.getHttpStatus()));
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);

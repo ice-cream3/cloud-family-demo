@@ -15,11 +15,15 @@ import com.kfpd.cloud.manager.pojo.entity.SysRole;
 import com.kfpd.cloud.manager.service.SysPermissionService;
 import com.kfpd.cloud.manager.service.SysRoleService;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SysRoleServiceImpl implements SysRoleService {
+
+    private static final Logger log = LoggerFactory.getLogger(SysRoleServiceImpl.class);
 
     private final SysRoleDao roleDao;
     private final SysMenuDao menuDao;
@@ -38,8 +42,10 @@ public class SysRoleServiceImpl implements SysRoleService {
 
     @Override
     public SysRole findRoleById(Long id) {
-        return Optional.ofNullable(roleDao.findById(id))
-                .orElseThrow(() -> SystemManagementSupport.notFound("Role not found"));
+        return Optional.ofNullable(roleDao.findById(id)).orElseThrow(() -> {
+            log.warn("Role service exception: action=findRoleById, id={}, message=Role not found", id);
+            return SystemManagementSupport.notFound("Role not found");
+        });
     }
 
     @Override
@@ -62,6 +68,7 @@ public class SysRoleServiceImpl implements SysRoleService {
         role.setId(id);
         apply(role, request);
         if (roleDao.update(role) == 0) {
+            log.warn("Role service exception: action=updateRole, id={}, message=Role not found", id);
             throw SystemManagementSupport.notFound("Role not found");
         }
         return findRoleById(id);
@@ -71,6 +78,7 @@ public class SysRoleServiceImpl implements SysRoleService {
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void deleteRole(Long id) {
         if (roleDao.deleteById(id) == 0) {
+            log.warn("Role service exception: action=deleteRole, id={}, message=Role not found", id);
             throw SystemManagementSupport.notFound("Role not found");
         }
     }
@@ -99,8 +107,10 @@ public class SysRoleServiceImpl implements SysRoleService {
 
     @Override
     public SysMenu findMenuById(Long id) {
-        return Optional.ofNullable(menuDao.findById(id))
-                .orElseThrow(() -> SystemManagementSupport.notFound("Menu not found"));
+        return Optional.ofNullable(menuDao.findById(id)).orElseThrow(() -> {
+            log.warn("Role service exception: action=findMenuById, id={}, message=Menu not found", id);
+            return SystemManagementSupport.notFound("Menu not found");
+        });
     }
 
     @Override
@@ -123,6 +133,7 @@ public class SysRoleServiceImpl implements SysRoleService {
         menu.setId(id);
         apply(menu, request);
         if (menuDao.update(menu) == 0) {
+            log.warn("Role service exception: action=updateMenu, id={}, message=Menu not found", id);
             throw SystemManagementSupport.notFound("Menu not found");
         }
         return findMenuById(id);
@@ -132,6 +143,7 @@ public class SysRoleServiceImpl implements SysRoleService {
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void deleteMenu(Long id) {
         if (menuDao.deleteById(id) == 0) {
+            log.warn("Role service exception: action=deleteMenu, id={}, message=Menu not found", id);
             throw SystemManagementSupport.notFound("Menu not found");
         }
     }

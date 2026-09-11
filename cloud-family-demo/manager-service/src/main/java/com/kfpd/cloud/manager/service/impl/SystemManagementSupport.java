@@ -9,17 +9,24 @@ import com.kfpd.cloud.common.exception.BusinessException;
 import com.kfpd.cloud.common.exception.ErrorCode;
 import com.kfpd.cloud.manager.pojo.vo.IdListVO;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 final class SystemManagementSupport {
+
+    private static final Logger log = LoggerFactory.getLogger(SystemManagementSupport.class);
 
     private SystemManagementSupport() {
     }
 
     static BusinessException notFound(String message) {
+        log.warn("Manager service exception: code={}, message={}", ErrorCode.MANAGER_RESOURCE_NOT_FOUND.getCode(), message);
         return new BusinessException(ErrorCode.MANAGER_RESOURCE_NOT_FOUND, message);
     }
 
     static void requireText(String value, String message) {
         if (value == null || value.isBlank()) {
+            log.warn("Manager service exception: code={}, message={}", ErrorCode.COMMON_BAD_REQUEST.getCode(), message);
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, message);
         }
     }

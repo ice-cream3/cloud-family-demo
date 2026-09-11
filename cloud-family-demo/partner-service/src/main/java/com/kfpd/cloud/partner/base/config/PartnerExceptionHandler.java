@@ -5,6 +5,8 @@ import com.kfpd.cloud.common.exception.BusinessException;
 import com.kfpd.cloud.common.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -17,8 +19,12 @@ import org.springframework.web.server.ResponseStatusException;
 @RestControllerAdvice
 public class PartnerExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(PartnerExceptionHandler.class);
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiError> handleBusinessException(BusinessException ex, HttpServletRequest request) {
+        log.warn("Business exception: code={}, status={}, method={}, path={}, message={}",
+                ex.getCode(), ex.getHttpStatus(), request.getMethod(), request.getRequestURI(), ex.getMessage());
         return ResponseEntity.status(ex.getHttpStatus()).body(ApiError.of(ex.getErrorCode(), ex.getMessage(), request.getRequestURI()));
     }
 
@@ -28,6 +34,8 @@ public class PartnerExceptionHandler {
             MethodArgumentTypeMismatchException.class
     })
     public ResponseEntity<ApiError> handleBadRequest(Exception ex, HttpServletRequest request) {
+        log.warn("Bad request: code={}, method={}, path={}, message={}",
+                ErrorCode.COMMON_BAD_REQUEST.getCode(), request.getMethod(), request.getRequestURI(), ex.getMessage());
         return ResponseEntity.badRequest().body(ApiError.of(ErrorCode.COMMON_BAD_REQUEST, ex.getMessage(), request.getRequestURI()));
     }
 
@@ -40,12 +48,16 @@ public class PartnerExceptionHandler {
             case 404 -> ErrorCode.COMMON_NOT_FOUND;
             default -> ErrorCode.COMMON_INTERNAL_ERROR;
         };
+        log.warn("Response status exception: code={}, status={}, method={}, path={}, message={}",
+                errorCode.getCode(), ex.getStatusCode().value(), request.getMethod(), request.getRequestURI(), ex.getReason());
         return ResponseEntity.status(status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status)
                 .body(ApiError.of(errorCode, ex.getReason(), request.getRequestURI()));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleException(Exception ex, HttpServletRequest request) {
+        log.error("Unhandled exception: code={}, method={}, path={}",
+                ErrorCode.COMMON_INTERNAL_ERROR.getCode(), request.getMethod(), request.getRequestURI(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiError.of(ErrorCode.COMMON_INTERNAL_ERROR, request.getRequestURI()));
     }
