@@ -46,15 +46,27 @@ public class AuthOAuth2JdbcConfig {
     ApplicationRunner registeredClientInitializer(RegisteredClientRepository registeredClientRepository,
                                                   CommonJwtProperties jwtProperties) {
         return args -> {
-            saveIfMissing(registeredClientRepository, apiClient(jwtProperties));
-            saveIfMissing(registeredClientRepository, managerClient(jwtProperties));
+            saveOrRepair(registeredClientRepository, apiClient(jwtProperties));
+            saveOrRepair(registeredClientRepository, managerClient(jwtProperties));
         };
     }
 
-    private void saveIfMissing(RegisteredClientRepository repository, RegisteredClient registeredClient) {
-        if (repository.findByClientId(registeredClient.getClientId()) == null) {
+    private void saveOrRepair(RegisteredClientRepository repository, RegisteredClient registeredClient) {
+        RegisteredClient existing = repository.findByClientId(registeredClient.getClientId());
+        if (existing == null) {
             repository.save(registeredClient);
+            return;
         }
+        if (isTokenTimeToLiveMissing(existing)) {
+            repository.save(RegisteredClient.from(existing)
+                    .tokenSettings(registeredClient.getTokenSettings())
+                    .build());
+        }
+    }
+
+    private boolean isTokenTimeToLiveMissing(RegisteredClient registeredClient) {
+        TokenSettings tokenSettings = registeredClient.getTokenSettings();
+        return tokenSettings.getAccessTokenTimeToLive() == null || tokenSettings.getRefreshTokenTimeToLive() == null;
     }
 
     private RegisteredClient apiClient(CommonJwtProperties jwtProperties) {

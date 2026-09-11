@@ -39,6 +39,7 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -111,8 +112,9 @@ public class AuthService {
         }
 
         Instant issuedAt = Instant.now();
-        Instant expiresAtInstant = issuedAt.plusSeconds(jwtProperties.getTtlSeconds());
-        Instant refreshTokenExpiresAtInstant = issuedAt.plusSeconds(jwtProperties.getRefreshTtlSeconds());
+        TokenSettings tokenSettings = registeredClient.getTokenSettings();
+        Instant expiresAtInstant = issuedAt.plus(tokenSettings.getAccessTokenTimeToLive());
+        Instant refreshTokenExpiresAtInstant = issuedAt.plus(tokenSettings.getRefreshTokenTimeToLive());
         Set<String> scopes = new LinkedHashSet<>(account.permissions());
         Jwt jwt = issueAccessToken(account, registeredClient, issuedAt, expiresAtInstant);
         OAuth2AccessToken accessToken = accessToken(jwt, issuedAt, expiresAtInstant, scopes);
@@ -164,7 +166,7 @@ public class AuthService {
         }
 
         Instant issuedAt = Instant.now();
-        Instant expiresAtInstant = issuedAt.plusSeconds(jwtProperties.getTtlSeconds());
+        Instant expiresAtInstant = issuedAt.plus(registeredClient.getTokenSettings().getAccessTokenTimeToLive());
         Set<String> scopes = existingAuthorization.getAuthorizedScopes();
         AuthLoginAccount account = new AuthLoginAccount(username, "", userType, splitCsv(roles), splitCsv(permissions));
         Jwt jwt = issueAccessToken(account, registeredClient, issuedAt, expiresAtInstant);

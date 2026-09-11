@@ -7,7 +7,6 @@ demo:
     jwt:
       issuer: ${JWT_ISSUER:cloud-family-demo}
       secret: ${JWT_SECRET:cloud-family-demo-jwt-signing-secret-please-change-in-production}
-      refresh-ttl-seconds: ${JWT_REFRESH_TTL_SECONDS:604800}
   datasource:
     crypto:
       secret: ${DATASOURCE_CRYPTO_SECRET:cloud-family-demo-datasource-crypto-secret}

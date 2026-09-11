@@ -6,8 +6,6 @@ demo:
     jwt:
       issuer: ${JWT_TEST_ISSUER:cloud-family-demo-test}
       secret: ${JWT_TEST_SECRET:cloud-family-demo-test-jwt-signing-secret-please-change-in-production}
-      ttl-seconds: ${JWT_TEST_TTL_SECONDS:7200}
-      refresh-ttl-seconds: ${JWT_TEST_REFRESH_TTL_SECONDS:604800}
     login:
       api:
         max-failed-attempts: ${API_TEST_LOGIN_MAX_FAILED_ATTEMPTS:5}
