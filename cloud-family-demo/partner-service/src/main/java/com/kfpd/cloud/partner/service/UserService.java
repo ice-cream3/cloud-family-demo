@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Optional;
 
 import com.kfpd.cloud.common.datasource.MultiDataSourceNames;
+import com.kfpd.cloud.common.exception.BusinessException;
+import com.kfpd.cloud.common.exception.ErrorCode;
 import com.kfpd.cloud.partner.dao.VipUserDao;
 import com.kfpd.cloud.partner.pojo.entity.VipUser;
 import com.kfpd.cloud.partner.pojo.vo.PageVO;
@@ -14,10 +16,8 @@ import com.kfpd.cloud.partner.pojo.vo.VipUserPageQueryVO;
 import com.kfpd.cloud.partner.pojo.vo.VipUserRequestVO;
 import com.kfpd.cloud.partner.pojo.vo.VipUserVO;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class UserService {
@@ -135,12 +135,12 @@ public class UserService {
 
     private void requireText(String value, String message) {
         if (value == null || value.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, message);
         }
     }
 
-    private ResponseStatusException notFound(String message) {
-        return new ResponseStatusException(HttpStatus.NOT_FOUND, message);
+    private BusinessException notFound(String message) {
+        return new BusinessException(ErrorCode.PARTNER_VIP_USER_NOT_FOUND, message);
     }
 
     private int normalizePageNum(Integer pageNum) {

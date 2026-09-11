@@ -5,25 +5,22 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.kfpd.cloud.common.exception.BusinessException;
+import com.kfpd.cloud.common.exception.ErrorCode;
 import com.kfpd.cloud.manager.pojo.vo.IdListVO;
-
-import org.springframework.web.server.ResponseStatusException;
-
-import static org.springframework.http.HttpStatus.BAD_REQUEST;
-import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 final class SystemManagementSupport {
 
     private SystemManagementSupport() {
     }
 
-    static ResponseStatusException notFound(String message) {
-        return new ResponseStatusException(NOT_FOUND, message);
+    static BusinessException notFound(String message) {
+        return new BusinessException(ErrorCode.MANAGER_RESOURCE_NOT_FOUND, message);
     }
 
     static void requireText(String value, String message) {
         if (value == null || value.isBlank()) {
-            throw new ResponseStatusException(BAD_REQUEST, message);
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, message);
         }
     }
 

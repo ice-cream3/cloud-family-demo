@@ -19,9 +19,10 @@ import com.kfpd.cloud.auth.pojo.LoginResponse;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
 import com.kfpd.cloud.auth.pojo.TokenValidation;
 import com.kfpd.cloud.auth.dao.AuthLoginAccountDao;
+import com.kfpd.cloud.common.exception.BusinessException;
+import com.kfpd.cloud.common.exception.ErrorCode;
 import com.kfpd.cloud.common.security.CommonJwtProperties;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
@@ -39,7 +40,6 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AuthService {
@@ -80,7 +80,7 @@ public class AuthService {
         Optional<AuthLoginAccount> account = Optional.ofNullable(loginAccountDao.findApiByUsername(request.username()));
         if (account.isEmpty() || !matches(account.get(), request)) {
             recordApiLoginFailure(attemptKey);
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid api username or password");
+            throw new BusinessException(ErrorCode.AUTH_INVALID_API_CREDENTIALS);
         }
 
         apiLoginAttempts.remove(attemptKey);
@@ -90,15 +90,15 @@ public class AuthService {
     public LoginResponse managerLogin(LoginVO request, String clientIp) {
         // Manager login is checked by network boundary first, then credentials, then explicit permission.
         if (!isManagerIpAllowed(clientIp)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager login IP is not allowed");
+            throw new BusinessException(ErrorCode.AUTH_MANAGER_IP_FORBIDDEN);
         }
 
         Optional<AuthLoginAccount> account = Optional.ofNullable(loginAccountDao.findManagerByUsername(request.username()));
         if (account.isEmpty() || !matches(account.get(), request)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid manager username or password");
+            throw new BusinessException(ErrorCode.AUTH_INVALID_MANAGER_CREDENTIALS);
         }
         if (!"MANAGER".equalsIgnoreCase(account.get().userType()) || !account.get().permissions().contains(MANAGER_LOGIN_PERMISSION)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager login permission required");
+            throw new BusinessException(ErrorCode.AUTH_MANAGER_PERMISSION_REQUIRED);
         }
 
         return login(account.get(), AuthOAuth2JdbcConfig.MANAGER_CLIENT_ID, AuthOAuth2JdbcConfig.MANAGER_LOGIN_GRANT_TYPE);
@@ -107,7 +107,7 @@ public class AuthService {
     private LoginResponse login(AuthLoginAccount account, String clientId, AuthorizationGrantType grantType) {
         RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
         if (registeredClient == null) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "OAuth2 registered client is not initialized");
+            throw new BusinessException(ErrorCode.AUTH_CLIENT_NOT_INITIALIZED);
         }
 
         Instant issuedAt = Instant.now();
@@ -147,12 +147,12 @@ public class AuthService {
     public LoginResponse refreshAccessToken(RefreshTokenVO request) {
         OAuth2Authorization existingAuthorization = authorizationService.findByToken(request.refreshToken(), OAuth2TokenType.REFRESH_TOKEN);
         if (existingAuthorization == null || existingAuthorization.getRefreshToken() == null || !existingAuthorization.getRefreshToken().isActive()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token");
+            throw new BusinessException(ErrorCode.AUTH_INVALID_REFRESH_TOKEN);
         }
 
         RegisteredClient registeredClient = registeredClientRepository.findById(existingAuthorization.getRegisteredClientId());
         if (registeredClient == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Registered client not found");
+            throw new BusinessException(ErrorCode.AUTH_REGISTERED_CLIENT_NOT_FOUND);
         }
 
         String username = existingAuthorization.getPrincipalName();
@@ -160,7 +160,7 @@ public class AuthService {
         String roles = existingAuthorization.getAttribute("roles");
         String permissions = existingAuthorization.getAttribute("permissions");
         if (userType == null || roles == null || permissions == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authorization metadata is incomplete");
+            throw new BusinessException(ErrorCode.AUTHORIZATION_METADATA_INCOMPLETE);
         }
 
         Instant issuedAt = Instant.now();
@@ -274,7 +274,7 @@ public class AuthService {
     private void assertApiLoginNotLocked(String attemptKey) {
         LoginAttempt attempt = apiLoginAttempts.get(attemptKey);
         if (attempt != null && attempt.lockedUntil() != null && attempt.lockedUntil().isAfter(LocalDateTime.now())) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many api login attempts");
+            throw new BusinessException(ErrorCode.AUTH_TOO_MANY_API_LOGIN_ATTEMPTS);
         }
     }
 

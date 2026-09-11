@@ -1,8 +1,10 @@
 package com.kfpd.cloud.gateway.base.filter;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.List;
 
+import com.kfpd.cloud.common.exception.ErrorCode;
 import com.kfpd.cloud.common.web.GatewayHeaders;
 
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -39,7 +41,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                     List<String> roles = claimAsStringList(jwt, "roles");
                     List<String> permissions = claimAsStringList(jwt, "permissions");
                     if (path.startsWith("/api/manager/") && !hasManagerAccess(roles)) {
-                        return forbidden(exchange, "Manager role required");
+                        return writeError(exchange, ErrorCode.GATEWAY_MANAGER_ROLE_REQUIRED);
                     }
                     ServerHttpRequest authenticatedRequest = request.mutate()
                             .header(GatewayHeaders.USER_NAME, claimOrSubject(jwt, "username"))
@@ -49,7 +51,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                             .build();
                     return chain.filter(exchange.mutate().request(authenticatedRequest).build());
                 })
-                .switchIfEmpty(Mono.defer(() -> unauthorized(exchange, "Missing authenticated JWT")));
+                .switchIfEmpty(Mono.defer(() -> writeError(exchange, ErrorCode.GATEWAY_MISSING_AUTHENTICATED_JWT)));
     }
 
     @Override
@@ -57,20 +59,25 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
         return -100;
     }
 
-    private Mono<Void> unauthorized(ServerWebExchange exchange, String message) {
-        byte[] body = ("{\"code\":401,\"message\":\"" + message + "\"}").getBytes(StandardCharsets.UTF_8);
-        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+    private Mono<Void> writeError(ServerWebExchange exchange, ErrorCode errorCode) {
+        byte[] body = errorBody(exchange, errorCode);
+        exchange.getResponse().setStatusCode(HttpStatus.valueOf(errorCode.getHttpStatus()));
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
         return exchange.getResponse()
                 .writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(body)));
     }
 
-    private Mono<Void> forbidden(ServerWebExchange exchange, String message) {
-        byte[] body = ("{\"code\":403,\"message\":\"" + message + "\"}").getBytes(StandardCharsets.UTF_8);
-        exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
-        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
-        return exchange.getResponse()
-                .writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(body)));
+    private byte[] errorBody(ServerWebExchange exchange, ErrorCode errorCode) {
+        String body = "{\"code\":" + errorCode.getCode()
+                + ",\"message\":\"" + escapeJson(errorCode.getMessage())
+                + "\",\"path\":\"" + escapeJson(exchange.getRequest().getURI().getPath())
+                + "\",\"timestamp\":\"" + LocalDateTime.now()
+                + "\"}";
+        return body.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private String escapeJson(String value) {
+        return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private List<String> claimAsStringList(Jwt jwt, String claimName) {
