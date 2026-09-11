@@ -43,16 +43,18 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        <!-- MyBatis integration for API-owned user profile tables. -->
+        <!-- MyBatis-Plus integration for API-owned user profile tables and plugins. -->
         <dependency>
-            <groupId>org.mybatis</groupId>
-            <artifactId>mybatis</artifactId>
-            <version>3.5.16</version>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
         </dependency>
         <dependency>
             <groupId>org.mybatis</groupId>
             <artifactId>mybatis-spring</artifactId>
-            <version>3.0.5</version>
         </dependency>
         <!-- Lombok generates boilerplate accessors for entity classes. -->
         <dependency>
