@@ -2,11 +2,12 @@ package com.kfpd.cloud.partner.dao;
 
 import java.util.List;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.kfpd.cloud.partner.pojo.entity.VipUser;
 
 import org.apache.ibatis.annotations.Param;
 
-public interface VipUserDao {
+public interface VipUserDao extends BaseMapper<VipUser> {
 
     List<VipUser> findPage(@Param("username") String username,
                            @Param("displayName") String displayName,

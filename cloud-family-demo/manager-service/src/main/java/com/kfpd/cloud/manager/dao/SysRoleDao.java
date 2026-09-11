@@ -2,13 +2,14 @@ package com.kfpd.cloud.manager.dao;
 
 import java.util.List;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.kfpd.cloud.manager.pojo.entity.SysMenu;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
 import com.kfpd.cloud.manager.pojo.entity.SysRole;
 
 import org.apache.ibatis.annotations.Param;
 
-public interface SysRoleDao {
+public interface SysRoleDao extends BaseMapper<SysRole> {
 
     List<SysRole> findAll();
 
