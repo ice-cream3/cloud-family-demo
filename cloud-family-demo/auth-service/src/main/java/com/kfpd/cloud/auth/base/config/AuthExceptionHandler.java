@@ -1,8 +1,8 @@
 package com.kfpd.cloud.auth.base.config;
 
-import com.kfpd.cloud.common.exception.ApiError;
 import com.kfpd.cloud.common.exception.BusinessException;
 import com.kfpd.cloud.common.exception.ErrorCode;
+import com.kfpd.cloud.common.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 
 import org.slf4j.Logger;
@@ -22,10 +22,10 @@ public class AuthExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(AuthExceptionHandler.class);
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiError> handleBusinessException(BusinessException ex, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex, HttpServletRequest request) {
         log.warn("Business exception: code={}, status={}, method={}, path={}, message={}",
                 ex.getCode(), ex.getHttpStatus(), request.getMethod(), request.getRequestURI(), ex.getMessage());
-        return ResponseEntity.status(ex.getHttpStatus()).body(ApiError.of(ex.getErrorCode(), ex.getMessage(), request.getRequestURI()));
+        return ResponseEntity.status(ex.getHttpStatus()).body(ApiResponse.error(ex.getErrorCode(), ex.getMessage()));
     }
 
     @ExceptionHandler({
@@ -33,14 +33,14 @@ public class AuthExceptionHandler {
             MissingServletRequestParameterException.class,
             MethodArgumentTypeMismatchException.class
     })
-    public ResponseEntity<ApiError> handleBadRequest(Exception ex, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception ex, HttpServletRequest request) {
         log.warn("Bad request: code={}, method={}, path={}, message={}",
                 ErrorCode.COMMON_BAD_REQUEST.getCode(), request.getMethod(), request.getRequestURI(), ex.getMessage());
-        return ResponseEntity.badRequest().body(ApiError.of(ErrorCode.COMMON_BAD_REQUEST, ex.getMessage(), request.getRequestURI()));
+        return ResponseEntity.badRequest().body(ApiResponse.error(ErrorCode.COMMON_BAD_REQUEST, ex.getMessage()));
     }
 
     @ExceptionHandler(ResponseStatusException.class)
-    public ResponseEntity<ApiError> handleResponseStatusException(ResponseStatusException ex, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<Void>> handleResponseStatusException(ResponseStatusException ex, HttpServletRequest request) {
         HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
         ErrorCode errorCode = switch (ex.getStatusCode().value()) {
             case 401 -> ErrorCode.COMMON_UNAUTHORIZED;
@@ -51,14 +51,14 @@ public class AuthExceptionHandler {
         log.warn("Response status exception: code={}, status={}, method={}, path={}, message={}",
                 errorCode.getCode(), ex.getStatusCode().value(), request.getMethod(), request.getRequestURI(), ex.getReason());
         return ResponseEntity.status(status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status)
-                .body(ApiError.of(errorCode, ex.getReason(), request.getRequestURI()));
+                .body(ApiResponse.error(errorCode, ex.getReason()));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiError> handleException(Exception ex, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<Void>> handleException(Exception ex, HttpServletRequest request) {
         log.error("Unhandled exception: code={}, method={}, path={}",
                 ErrorCode.COMMON_INTERNAL_ERROR.getCode(), request.getMethod(), request.getRequestURI(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiError.of(ErrorCode.COMMON_INTERNAL_ERROR, request.getRequestURI()));
+                .body(ApiResponse.error(ErrorCode.COMMON_INTERNAL_ERROR));
     }
 }

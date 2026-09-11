@@ -2,6 +2,7 @@ package com.kfpd.cloud.manager.controller;
 
 import java.util.List;
 
+import com.kfpd.cloud.common.web.ApiResponse;
 import com.kfpd.cloud.manager.pojo.vo.SysMenuRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysMenu;
 import com.kfpd.cloud.manager.service.SysRoleService;
@@ -28,28 +29,28 @@ public class SystemManagementController {
     }
 
     @GetMapping("/menus")
-    public List<SysMenu> menus() {
-        return roleService.findMenus();
+    public ApiResponse<List<SysMenu>> menus() {
+        return ApiResponse.success(roleService.findMenus());
     }
 
     @GetMapping("/menus/{id}")
-    public SysMenu menu(@PathVariable Long id) {
-        return roleService.findMenuById(id);
+    public ApiResponse<SysMenu> menu(@PathVariable Long id) {
+        return ApiResponse.success(roleService.findMenuById(id));
     }
 
     @PostMapping("/menus")
-    public ResponseEntity<SysMenu> createMenu(@RequestBody SysMenuRequestVO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(roleService.createMenu(request));
+    public ResponseEntity<ApiResponse<SysMenu>> createMenu(@RequestBody SysMenuRequestVO request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(roleService.createMenu(request)));
     }
 
     @PutMapping("/menus/{id}")
-    public SysMenu updateMenu(@PathVariable Long id, @RequestBody SysMenuRequestVO request) {
-        return roleService.updateMenu(id, request);
+    public ApiResponse<SysMenu> updateMenu(@PathVariable Long id, @RequestBody SysMenuRequestVO request) {
+        return ApiResponse.success(roleService.updateMenu(id, request));
     }
 
     @DeleteMapping("/menus/{id}")
-    public ResponseEntity<Void> deleteMenu(@PathVariable Long id) {
+    public ApiResponse<Void> deleteMenu(@PathVariable Long id) {
         roleService.deleteMenu(id);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 }

@@ -2,6 +2,7 @@ package com.kfpd.cloud.manager.controller;
 
 import java.util.List;
 
+import com.kfpd.cloud.common.web.ApiResponse;
 import com.kfpd.cloud.manager.pojo.vo.IdListVO;
 import com.kfpd.cloud.manager.pojo.dto.SysUserAccessDTO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserRequestVO;
@@ -31,43 +32,43 @@ public class SysUserController {
     }
 
     @GetMapping
-    public List<SysUser> users() {
-        return userService.findUsers();
+    public ApiResponse<List<SysUser>> users() {
+        return ApiResponse.success(userService.findUsers());
     }
 
     @GetMapping("/{id}")
-    public SysUser user(@PathVariable Long id) {
-        return userService.findUserById(id);
+    public ApiResponse<SysUser> user(@PathVariable Long id) {
+        return ApiResponse.success(userService.findUserById(id));
     }
 
     @GetMapping("/{id}/access")
-    public SysUserAccessDTO userAccess(@PathVariable Long id) {
-        return userService.findUserAccess(id);
+    public ApiResponse<SysUserAccessDTO> userAccess(@PathVariable Long id) {
+        return ApiResponse.success(userService.findUserAccess(id));
     }
 
     @PostMapping
-    public ResponseEntity<SysUser> createUser(@RequestBody SysUserRequestVO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(request));
+    public ResponseEntity<ApiResponse<SysUser>> createUser(@RequestBody SysUserRequestVO request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(userService.createUser(request)));
     }
 
     @PutMapping("/{id}")
-    public SysUser updateUser(@PathVariable Long id, @RequestBody SysUserRequestVO request) {
-        return userService.updateUser(id, request);
+    public ApiResponse<SysUser> updateUser(@PathVariable Long id, @RequestBody SysUserRequestVO request) {
+        return ApiResponse.success(userService.updateUser(id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+    public ApiResponse<Void> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     @GetMapping("/{id}/roles")
-    public List<SysRole> userRoles(@PathVariable Long id) {
-        return userService.findUserRoles(id);
+    public ApiResponse<List<SysRole>> userRoles(@PathVariable Long id) {
+        return ApiResponse.success(userService.findUserRoles(id));
     }
 
     @PutMapping("/{id}/roles")
-    public List<SysRole> replaceUserRoles(@PathVariable Long id, @RequestBody IdListVO request) {
-        return userService.replaceUserRoles(id, request);
+    public ApiResponse<List<SysRole>> replaceUserRoles(@PathVariable Long id, @RequestBody IdListVO request) {
+        return ApiResponse.success(userService.replaceUserRoles(id, request));
     }
 }

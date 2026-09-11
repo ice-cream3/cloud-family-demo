@@ -2,6 +2,7 @@ package com.kfpd.cloud.manager.controller;
 
 import java.util.List;
 
+import com.kfpd.cloud.common.web.ApiResponse;
 import com.kfpd.cloud.manager.pojo.vo.IdListVO;
 import com.kfpd.cloud.manager.pojo.vo.SysRoleRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysMenu;
@@ -31,48 +32,48 @@ public class SysRoleController {
     }
 
     @GetMapping
-    public List<SysRole> roles() {
-        return roleService.findRoles();
+    public ApiResponse<List<SysRole>> roles() {
+        return ApiResponse.success(roleService.findRoles());
     }
 
     @GetMapping("/{id}")
-    public SysRole role(@PathVariable Long id) {
-        return roleService.findRoleById(id);
+    public ApiResponse<SysRole> role(@PathVariable Long id) {
+        return ApiResponse.success(roleService.findRoleById(id));
     }
 
     @PostMapping
-    public ResponseEntity<SysRole> createRole(@RequestBody SysRoleRequestVO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(roleService.createRole(request));
+    public ResponseEntity<ApiResponse<SysRole>> createRole(@RequestBody SysRoleRequestVO request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(roleService.createRole(request)));
     }
 
     @PutMapping("/{id}")
-    public SysRole updateRole(@PathVariable Long id, @RequestBody SysRoleRequestVO request) {
-        return roleService.updateRole(id, request);
+    public ApiResponse<SysRole> updateRole(@PathVariable Long id, @RequestBody SysRoleRequestVO request) {
+        return ApiResponse.success(roleService.updateRole(id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteRole(@PathVariable Long id) {
+    public ApiResponse<Void> deleteRole(@PathVariable Long id) {
         roleService.deleteRole(id);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     @GetMapping("/{id}/permissions")
-    public List<SysPermission> rolePermissions(@PathVariable Long id) {
-        return roleService.findRolePermissions(id);
+    public ApiResponse<List<SysPermission>> rolePermissions(@PathVariable Long id) {
+        return ApiResponse.success(roleService.findRolePermissions(id));
     }
 
     @PutMapping("/{id}/permissions")
-    public List<SysPermission> replaceRolePermissions(@PathVariable Long id, @RequestBody IdListVO request) {
-        return roleService.replaceRolePermissions(id, request);
+    public ApiResponse<List<SysPermission>> replaceRolePermissions(@PathVariable Long id, @RequestBody IdListVO request) {
+        return ApiResponse.success(roleService.replaceRolePermissions(id, request));
     }
 
     @GetMapping("/{id}/menus")
-    public List<SysMenu> roleMenus(@PathVariable Long id) {
-        return roleService.findRoleMenus(id);
+    public ApiResponse<List<SysMenu>> roleMenus(@PathVariable Long id) {
+        return ApiResponse.success(roleService.findRoleMenus(id));
     }
 
     @PutMapping("/{id}/menus")
-    public List<SysMenu> replaceRoleMenus(@PathVariable Long id, @RequestBody IdListVO request) {
-        return roleService.replaceRoleMenus(id, request);
+    public ApiResponse<List<SysMenu>> replaceRoleMenus(@PathVariable Long id, @RequestBody IdListVO request) {
+        return ApiResponse.success(roleService.replaceRoleMenus(id, request));
     }
 }

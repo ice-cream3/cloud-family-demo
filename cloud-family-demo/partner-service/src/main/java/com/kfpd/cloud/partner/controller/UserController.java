@@ -2,6 +2,7 @@ package com.kfpd.cloud.partner.controller;
 
 import java.util.Map;
 
+import com.kfpd.cloud.common.web.ApiResponse;
 import com.kfpd.cloud.common.web.GatewayHeaders;
 import com.kfpd.cloud.partner.pojo.vo.PageVO;
 import com.kfpd.cloud.partner.pojo.vo.UserProfileVO;
@@ -34,41 +35,41 @@ public class UserController {
     }
 
     @GetMapping({"/me", "/my"})
-    public UserProfileVO currentUser(
+    public ApiResponse<UserProfileVO> currentUser(
             @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
             @RequestHeader(value = GatewayHeaders.USER_ROLES, required = false) String roles
     ) {
-        return userService.currentUser(username, roles);
+        return ApiResponse.success(userService.currentUser(username, roles));
     }
 
     @GetMapping("/vip-users")
-    public PageVO<VipUserVO> vipUsers(@ModelAttribute VipUserPageQueryVO query) {
-        return userService.findVipUsers(query);
+    public ApiResponse<PageVO<VipUserVO>> vipUsers(@ModelAttribute VipUserPageQueryVO query) {
+        return ApiResponse.success(userService.findVipUsers(query));
     }
 
     @GetMapping("/vip-users/{id}")
-    public VipUserVO vipUser(@PathVariable Long id) {
-        return userService.findVipUserById(id);
+    public ApiResponse<VipUserVO> vipUser(@PathVariable Long id) {
+        return ApiResponse.success(userService.findVipUserById(id));
     }
 
     @PostMapping("/vip-users")
-    public ResponseEntity<VipUserVO> createVipUser(@RequestBody VipUserRequestVO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(userService.createVipUser(request));
+    public ResponseEntity<ApiResponse<VipUserVO>> createVipUser(@RequestBody VipUserRequestVO request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(userService.createVipUser(request)));
     }
 
     @PutMapping("/vip-users/{id}")
-    public VipUserVO updateVipUser(@PathVariable Long id, @RequestBody VipUserRequestVO request) {
-        return userService.updateVipUser(id, request);
+    public ApiResponse<VipUserVO> updateVipUser(@PathVariable Long id, @RequestBody VipUserRequestVO request) {
+        return ApiResponse.success(userService.updateVipUser(id, request));
     }
 
     @DeleteMapping("/vip-users/{id}")
-    public ResponseEntity<Void> deleteVipUser(@PathVariable Long id) {
+    public ApiResponse<Void> deleteVipUser(@PathVariable Long id) {
         userService.deleteVipUser(id);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     @GetMapping("/health")
-    public ResponseEntity<Map<String, String>> health() {
-        return ResponseEntity.ok(Map.of("status", "UP", "service", "partner-service"));
+    public ApiResponse<Map<String, String>> health() {
+        return ApiResponse.success(Map.of("status", "UP", "service", "partner-service"));
     }
 }

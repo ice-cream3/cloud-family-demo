@@ -2,6 +2,7 @@ package com.kfpd.cloud.manager.controller;
 
 import java.util.List;
 
+import com.kfpd.cloud.common.web.ApiResponse;
 import com.kfpd.cloud.manager.pojo.vo.SysPermissionRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
 import com.kfpd.cloud.manager.service.SysPermissionService;
@@ -28,28 +29,28 @@ public class SysPermissionController {
     }
 
     @GetMapping
-    public List<SysPermission> permissions() {
-        return permissionService.findPermissions();
+    public ApiResponse<List<SysPermission>> permissions() {
+        return ApiResponse.success(permissionService.findPermissions());
     }
 
     @GetMapping("/{id}")
-    public SysPermission permission(@PathVariable Long id) {
-        return permissionService.findPermissionById(id);
+    public ApiResponse<SysPermission> permission(@PathVariable Long id) {
+        return ApiResponse.success(permissionService.findPermissionById(id));
     }
 
     @PostMapping
-    public ResponseEntity<SysPermission> createPermission(@RequestBody SysPermissionRequestVO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(permissionService.createPermission(request));
+    public ResponseEntity<ApiResponse<SysPermission>> createPermission(@RequestBody SysPermissionRequestVO request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(permissionService.createPermission(request)));
     }
 
     @PutMapping("/{id}")
-    public SysPermission updatePermission(@PathVariable Long id, @RequestBody SysPermissionRequestVO request) {
-        return permissionService.updatePermission(id, request);
+    public ApiResponse<SysPermission> updatePermission(@PathVariable Long id, @RequestBody SysPermissionRequestVO request) {
+        return ApiResponse.success(permissionService.updatePermission(id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletePermission(@PathVariable Long id) {
+    public ApiResponse<Void> deletePermission(@PathVariable Long id) {
         permissionService.deletePermission(id);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 }

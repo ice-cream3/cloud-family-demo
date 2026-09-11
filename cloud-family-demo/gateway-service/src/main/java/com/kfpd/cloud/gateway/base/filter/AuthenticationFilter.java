@@ -70,18 +70,18 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                 exchange.getRequest().getMethod(),
                 exchange.getRequest().getURI().getPath(),
                 errorCode.getMessage());
-        byte[] body = errorBody(exchange, errorCode);
+        byte[] body = errorBody(errorCode);
         exchange.getResponse().setStatusCode(HttpStatus.valueOf(errorCode.getHttpStatus()));
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
         return exchange.getResponse()
                 .writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(body)));
     }
 
-    private byte[] errorBody(ServerWebExchange exchange, ErrorCode errorCode) {
+    private byte[] errorBody(ErrorCode errorCode) {
         String body = "{\"code\":" + errorCode.getCode()
                 + ",\"message\":\"" + escapeJson(errorCode.getMessage())
-                + "\",\"path\":\"" + escapeJson(exchange.getRequest().getURI().getPath())
-                + "\",\"timestamp\":\"" + LocalDateTime.now()
+                + "\",\"data\":null"
+                + ",\"timestamp\":\"" + LocalDateTime.now()
                 + "\"}";
         return body.getBytes(StandardCharsets.UTF_8);
     }

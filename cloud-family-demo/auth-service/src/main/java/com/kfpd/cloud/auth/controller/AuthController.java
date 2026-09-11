@@ -5,6 +5,7 @@ import com.kfpd.cloud.auth.pojo.LoginResponse;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
 import com.kfpd.cloud.auth.pojo.TokenValidation;
 import com.kfpd.cloud.auth.service.AuthService;
+import com.kfpd.cloud.common.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
@@ -26,25 +27,25 @@ public class AuthController {
     }
 
     @PostMapping("/api/login")
-    public LoginResponse apiLogin(@Valid @RequestBody LoginVO request, HttpServletRequest servletRequest) {
+    public ApiResponse<LoginResponse> apiLogin(@Valid @RequestBody LoginVO request, HttpServletRequest servletRequest) {
         // API users are rate-limited by username and client IP in AuthService.
-        return authService.apiLogin(request, resolveClientIp(servletRequest));
+        return ApiResponse.success(authService.apiLogin(request, resolveClientIp(servletRequest)));
     }
 
     @PostMapping("/manager/login")
-    public LoginResponse managerLogin(@Valid @RequestBody LoginVO request, HttpServletRequest servletRequest) {
+    public ApiResponse<LoginResponse> managerLogin(@Valid @RequestBody LoginVO request, HttpServletRequest servletRequest) {
         // Manager login has stricter checks, including IP allowlist and login permission.
-        return authService.managerLogin(request, resolveClientIp(servletRequest));
+        return ApiResponse.success(authService.managerLogin(request, resolveClientIp(servletRequest)));
     }
 
     @PostMapping("/refresh")
-    public LoginResponse refresh(@Valid @RequestBody RefreshTokenVO request) {
-        return authService.refreshAccessToken(request);
+    public ApiResponse<LoginResponse> refresh(@Valid @RequestBody RefreshTokenVO request) {
+        return ApiResponse.success(authService.refreshAccessToken(request));
     }
 
     @PostMapping("/validate")
-    public TokenValidation validate(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
-        return authService.validate(authorization);
+    public ApiResponse<TokenValidation> validate(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+        return ApiResponse.success(authService.validate(authorization));
     }
 
     private String resolveClientIp(HttpServletRequest request) {

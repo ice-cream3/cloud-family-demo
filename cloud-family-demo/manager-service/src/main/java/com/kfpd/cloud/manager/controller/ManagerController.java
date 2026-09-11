@@ -2,11 +2,11 @@ package com.kfpd.cloud.manager.controller;
 
 import java.util.Map;
 
+import com.kfpd.cloud.common.web.ApiResponse;
 import com.kfpd.cloud.common.web.GatewayHeaders;
 import com.kfpd.cloud.manager.pojo.vo.ManagerDashboardVO;
 import com.kfpd.cloud.manager.service.ManagerService;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,15 +23,15 @@ public class ManagerController {
     }
 
     @GetMapping("/dashboard")
-    public ManagerDashboardVO dashboard(@RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+    public ApiResponse<ManagerDashboardVO> dashboard(@RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
                                       @RequestHeader(value = GatewayHeaders.USER_ROLES, defaultValue = "") String roles,
                                       @RequestHeader(value = GatewayHeaders.USER_PERMISSIONS, defaultValue = "") String permissions) {
         // These headers are injected by gateway after token validation.
-        return managerService.dashboard(username, roles, permissions);
+        return ApiResponse.success(managerService.dashboard(username, roles, permissions));
     }
 
     @GetMapping("/health")
-    public ResponseEntity<Map<String, String>> health() {
-        return ResponseEntity.ok(Map.of("status", "UP", "service", "manager-service"));
+    public ApiResponse<Map<String, String>> health() {
+        return ApiResponse.success(Map.of("status", "UP", "service", "manager-service"));
     }
 }
