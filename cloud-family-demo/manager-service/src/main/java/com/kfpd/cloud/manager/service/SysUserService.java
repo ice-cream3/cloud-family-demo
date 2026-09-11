@@ -5,6 +5,8 @@ import java.util.List;
 import com.kfpd.cloud.manager.pojo.vo.IdListVO;
 import com.kfpd.cloud.manager.pojo.dto.LoginAccountDTO;
 import com.kfpd.cloud.manager.pojo.dto.SysUserAccessDTO;
+import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
+import com.kfpd.cloud.manager.pojo.vo.PageVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysRole;
 import com.kfpd.cloud.manager.pojo.entity.SysUser;
@@ -12,6 +14,8 @@ import com.kfpd.cloud.manager.pojo.entity.SysUser;
 public interface SysUserService {
 
     List<SysUser> findUsers();
+
+    PageVO<SysUser> findUsers(PageQueryVO query);
 
     SysUser findUserById(Long id);
 

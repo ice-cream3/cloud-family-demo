@@ -3,11 +3,15 @@ package com.kfpd.cloud.manager.service.impl;
 import java.util.List;
 import java.util.Optional;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.kfpd.cloud.common.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.manager.dao.SysUserDao;
 import com.kfpd.cloud.manager.pojo.vo.IdListVO;
 import com.kfpd.cloud.manager.pojo.dto.LoginAccountDTO;
 import com.kfpd.cloud.manager.pojo.dto.SysUserAccessDTO;
+import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
+import com.kfpd.cloud.manager.pojo.vo.PageVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
 import com.kfpd.cloud.manager.pojo.entity.SysRole;
@@ -36,6 +40,17 @@ public class SysUserServiceImpl implements SysUserService {
     @Override
     public List<SysUser> findUsers() {
         return userDao.findAll();
+    }
+
+    @Override
+    public PageVO<SysUser> findUsers(PageQueryVO query) {
+        int normalizedPageNum = SystemManagementSupport.pageNum(query);
+        int normalizedPageSize = SystemManagementSupport.pageSize(query);
+        Page<SysUser> page = userDao.selectPage(
+                new Page<>(normalizedPageNum, normalizedPageSize),
+                Wrappers.lambdaQuery(SysUser.class).orderByDesc(SysUser::getId)
+        );
+        return SystemManagementSupport.pageVO(page, normalizedPageNum, normalizedPageSize);
     }
 
     @Override

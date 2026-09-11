@@ -1,8 +1,8 @@
 package com.kfpd.cloud.manager.controller;
 
-import java.util.List;
-
 import com.kfpd.cloud.common.web.ApiResponse;
+import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
+import com.kfpd.cloud.manager.pojo.vo.PageVO;
 import com.kfpd.cloud.manager.pojo.vo.SysPermissionRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
 import com.kfpd.cloud.manager.service.SysPermissionService;
@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -29,8 +30,8 @@ public class SysPermissionController {
     }
 
     @GetMapping
-    public ApiResponse<List<SysPermission>> permissions() {
-        return ApiResponse.success(permissionService.findPermissions());
+    public ApiResponse<PageVO<SysPermission>> permissions(@ModelAttribute PageQueryVO query) {
+        return ApiResponse.success(permissionService.findPermissions(query));
     }
 
     @GetMapping("/{id}")

@@ -3,8 +3,12 @@ package com.kfpd.cloud.manager.service.impl;
 import java.util.List;
 import java.util.Optional;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.kfpd.cloud.common.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.manager.dao.SysPermissionDao;
+import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
+import com.kfpd.cloud.manager.pojo.vo.PageVO;
 import com.kfpd.cloud.manager.pojo.vo.SysPermissionRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
 import com.kfpd.cloud.manager.service.SysPermissionService;
@@ -28,6 +32,17 @@ public class SysPermissionServiceImpl implements SysPermissionService {
     @Override
     public List<SysPermission> findPermissions() {
         return permissionDao.findAll();
+    }
+
+    @Override
+    public PageVO<SysPermission> findPermissions(PageQueryVO query) {
+        int normalizedPageNum = SystemManagementSupport.pageNum(query);
+        int normalizedPageSize = SystemManagementSupport.pageSize(query);
+        Page<SysPermission> page = permissionDao.selectPage(
+                new Page<>(normalizedPageNum, normalizedPageSize),
+                Wrappers.lambdaQuery(SysPermission.class).orderByDesc(SysPermission::getId)
+        );
+        return SystemManagementSupport.pageVO(page, normalizedPageNum, normalizedPageSize);
     }
 
     @Override

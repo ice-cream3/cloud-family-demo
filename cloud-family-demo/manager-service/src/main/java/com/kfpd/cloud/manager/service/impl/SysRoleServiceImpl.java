@@ -3,10 +3,14 @@ package com.kfpd.cloud.manager.service.impl;
 import java.util.List;
 import java.util.Optional;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.kfpd.cloud.common.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.manager.dao.SysMenuDao;
 import com.kfpd.cloud.manager.dao.SysRoleDao;
 import com.kfpd.cloud.manager.pojo.vo.IdListVO;
+import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
+import com.kfpd.cloud.manager.pojo.vo.PageVO;
 import com.kfpd.cloud.manager.pojo.vo.SysMenuRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.SysRoleRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysMenu;
@@ -38,6 +42,17 @@ public class SysRoleServiceImpl implements SysRoleService {
     @Override
     public List<SysRole> findRoles() {
         return roleDao.findAll();
+    }
+
+    @Override
+    public PageVO<SysRole> findRoles(PageQueryVO query) {
+        int normalizedPageNum = SystemManagementSupport.pageNum(query);
+        int normalizedPageSize = SystemManagementSupport.pageSize(query);
+        Page<SysRole> page = roleDao.selectPage(
+                new Page<>(normalizedPageNum, normalizedPageSize),
+                Wrappers.lambdaQuery(SysRole.class).orderByDesc(SysRole::getId)
+        );
+        return SystemManagementSupport.pageVO(page, normalizedPageNum, normalizedPageSize);
     }
 
     @Override
@@ -103,6 +118,17 @@ public class SysRoleServiceImpl implements SysRoleService {
     @Override
     public List<SysMenu> findMenus() {
         return menuDao.findAll();
+    }
+
+    @Override
+    public PageVO<SysMenu> findMenus(PageQueryVO query) {
+        int normalizedPageNum = SystemManagementSupport.pageNum(query);
+        int normalizedPageSize = SystemManagementSupport.pageSize(query);
+        Page<SysMenu> page = menuDao.selectPage(
+                new Page<>(normalizedPageNum, normalizedPageSize),
+                Wrappers.lambdaQuery(SysMenu.class).orderByDesc(SysMenu::getId)
+        );
+        return SystemManagementSupport.pageVO(page, normalizedPageNum, normalizedPageSize);
     }
 
     @Override
