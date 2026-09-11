@@ -13,6 +13,7 @@ import com.kfpd.cloud.gateway.base.config.GatewayRateLimitProperties;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -22,6 +23,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+import org.redisson.api.RAtomicLongReactive;
+import org.redisson.api.RedissonReactiveClient;
 
 import reactor.core.publisher.Mono;
 
@@ -31,10 +34,13 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
     private final GatewayRateLimitProperties properties;
+    private final RedissonReactiveClient redissonReactiveClient;
     private final Map<String, ArrayDeque<Long>> requestTimestamps = new ConcurrentHashMap<>();
 
-    public RateLimitFilter(GatewayRateLimitProperties properties) {
+    public RateLimitFilter(GatewayRateLimitProperties properties,
+                           ObjectProvider<RedissonReactiveClient> redissonReactiveClientProvider) {
         this.properties = properties;
+        this.redissonReactiveClient = redissonReactiveClientProvider.getIfAvailable();
     }
 
     @Override
@@ -45,7 +51,46 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
         }
 
         ServerHttpRequest request = exchange.getRequest();
-        String key = clientIp(request) + "|" + request.getMethod() + "|" + request.getURI().getPath();
+        if (redissonReactiveClient != null) {
+            return allowByRedisson(request)
+                    .flatMap(allowed -> allowed ? chain.filter(exchange) : writeError(exchange, ErrorCode.GATEWAY_TOO_MANY_REQUESTS))
+                    .onErrorResume(ex -> {
+                        log.warn("Redisson rate limit failed, falling back to local limiter: message={}", ex.getMessage());
+                        return allowByLocal(request) ? chain.filter(exchange) : writeError(exchange, ErrorCode.GATEWAY_TOO_MANY_REQUESTS);
+                    });
+        }
+
+        return allowByLocal(request) ? chain.filter(exchange) : writeError(exchange, ErrorCode.GATEWAY_TOO_MANY_REQUESTS);
+    }
+
+    @Override
+    public int getOrder() {
+        return -200;
+    }
+
+    private Mono<Boolean> allowByRedisson(ServerHttpRequest request) {
+        long now = System.currentTimeMillis();
+        int windowSeconds = Math.max(1, properties.getWindowSeconds());
+        int maxRequests = Math.max(1, properties.getMaxRequests());
+        long windowId = now / Duration.ofSeconds(windowSeconds).toMillis();
+        String key = "gateway:rate-limit:" + windowId + ":" + rateLimitKey(request);
+        RAtomicLongReactive counter = redissonReactiveClient.getAtomicLong(key);
+
+        return counter.incrementAndGet()
+                .flatMap(count -> {
+                    Mono<Boolean> expire = count == 1
+                            ? counter.expire(Duration.ofSeconds(windowSeconds + 1))
+                            : Mono.just(Boolean.TRUE);
+                    if (count > maxRequests) {
+                        log.warn("Gateway Redisson rate limit exceeded: key={}, count={}, maxRequests={}, windowSeconds={}",
+                                key, count, maxRequests, windowSeconds);
+                    }
+                    return expire.thenReturn(count <= maxRequests);
+                });
+    }
+
+    private boolean allowByLocal(ServerHttpRequest request) {
+        String key = rateLimitKey(request);
         long now = System.currentTimeMillis();
         long windowMillis = Duration.ofSeconds(Math.max(1, properties.getWindowSeconds())).toMillis();
         int maxRequests = Math.max(1, properties.getMaxRequests());
@@ -58,7 +103,7 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
                 currentCount = timestamps.size();
                 log.warn("Gateway rate limit exceeded: key={}, count={}, maxRequests={}, windowSeconds={}",
                         key, currentCount, maxRequests, properties.getWindowSeconds());
-                return writeError(exchange, ErrorCode.GATEWAY_TOO_MANY_REQUESTS);
+                return false;
             }
             timestamps.addLast(now);
             currentCount = timestamps.size();
@@ -67,12 +112,7 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
         if (currentCount == 1) {
             cleanupEmptyBuckets(now - windowMillis);
         }
-        return chain.filter(exchange);
-    }
-
-    @Override
-    public int getOrder() {
-        return -200;
+        return true;
     }
 
     private void purgeExpired(ArrayDeque<Long> timestamps, long threshold) {
@@ -100,6 +140,10 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
             return forwardedFor.split(",")[0].trim();
         }
         return request.getRemoteAddress() == null ? "unknown" : request.getRemoteAddress().getAddress().getHostAddress();
+    }
+
+    private String rateLimitKey(ServerHttpRequest request) {
+        return clientIp(request) + "|" + request.getMethod() + "|" + request.getURI().getPath();
     }
 
     private void addSecurityHeaders(ServerWebExchange exchange) {

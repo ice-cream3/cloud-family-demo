@@ -1,6 +1,13 @@
 server:
   port: ${MANAGER_SERVER_PORT:8083}
 
+spring:
+  data:
+    redis:
+      password: ${REDIS_PASSWORD:123456}
+      cluster:
+        nodes: ${REDIS_CLUSTER_NODES:127.0.0.1:7000,127.0.0.1:7001,127.0.0.1:7002,127.0.0.1:7003,127.0.0.1:7004,127.0.0.1:7005}
+
 demo:
   datasource:
     crypto:

@@ -41,6 +41,11 @@ demo:
       pool-name: fa-model
 
 spring:
+  data:
+    redis:
+      password: ${REDIS_PASSWORD:123456}
+      cluster:
+        nodes: ${REDIS_CLUSTER_NODES:127.0.0.1:7000,127.0.0.1:7001,127.0.0.1:7002,127.0.0.1:7003,127.0.0.1:7004,127.0.0.1:7005}
   cloud:
     gateway:
       server:

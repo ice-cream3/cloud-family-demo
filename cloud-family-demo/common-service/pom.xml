@@ -48,6 +48,11 @@
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- Redisson client and shared auto-configuration for Redis Cluster integration. -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson</artifactId>
+        </dependency>
         <!-- Optional metadata generation for IDE completion of common configuration properties. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -77,6 +77,11 @@
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-oauth2-resource-server</artifactId>
         </dependency>
+        <!-- Redisson client for Redis Cluster based distributed primitives. -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson</artifactId>
+        </dependency>
         <!-- Log4j2 logging backend and Spring Boot logging integration. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

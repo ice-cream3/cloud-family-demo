@@ -1,1 +1,2 @@
 com.kfpd.cloud.common.datasource.MultiDataSourceAutoConfiguration
+com.kfpd.cloud.common.redis.RedissonAutoConfiguration
