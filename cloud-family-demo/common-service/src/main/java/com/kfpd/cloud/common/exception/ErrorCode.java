@@ -18,6 +18,7 @@ public enum ErrorCode {
     AUTHORIZATION_METADATA_INCOMPLETE(100008, 401, "Authorization metadata is incomplete"),
     AUTH_TOO_MANY_API_LOGIN_ATTEMPTS(100009, 429, "Too many api login attempts"),
     AUTH_INVALID_ACCESS_TOKEN(100010, 401, "Invalid access token"),
+    AUTH_REDIS_SESSION_STORE_UNAVAILABLE(100011, 500, "Redis session store is unavailable"),
 
     PARTNER_VIP_USER_NOT_FOUND(200001, 404, "Vip user not found"),
 

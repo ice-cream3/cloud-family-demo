@@ -1,5 +1,6 @@
 package com.kfpd.cloud.auth.service.impl;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -12,10 +13,14 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kfpd.cloud.auth.base.config.AuthOAuth2JdbcConfig;
 import com.kfpd.cloud.auth.base.config.AuthLoginProperties;
+import com.kfpd.cloud.auth.base.config.AuthSessionProperties;
 import com.kfpd.cloud.auth.pojo.vo.LoginVO;
 import com.kfpd.cloud.auth.pojo.LoginResponse;
+import com.kfpd.cloud.auth.pojo.RedisLoginSession;
 import com.kfpd.cloud.auth.pojo.vo.KickOutVO;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
 import com.kfpd.cloud.auth.pojo.TokenValidation;
@@ -29,6 +34,10 @@ import com.kfpd.cloud.common.security.CommonJwtProperties;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.redisson.api.RBucket;
+import org.redisson.api.RSet;
+import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -66,6 +75,9 @@ public class AuthServiceImpl implements AuthService {
     private final OAuth2AuthorizationService authorizationService;
     private final AuthLoginAccountDao loginAccountDao;
     private final JdbcOperations jdbcOperations;
+    private final AuthSessionProperties sessionProperties;
+    private final ObjectProvider<RedissonClient> redissonClientProvider;
+    private final ObjectMapper objectMapper;
 
     public AuthServiceImpl(AuthLoginProperties loginProperties,
                            CommonJwtProperties jwtProperties,
@@ -74,7 +86,10 @@ public class AuthServiceImpl implements AuthService {
                            RegisteredClientRepository registeredClientRepository,
                            OAuth2AuthorizationService authorizationService,
                            AuthLoginAccountDao loginAccountDao,
-                           @Qualifier(MultiDataSourceNames.FA_CLOUD_JDBC_TEMPLATE) JdbcOperations jdbcOperations) {
+                           @Qualifier(MultiDataSourceNames.FA_CLOUD_JDBC_TEMPLATE) JdbcOperations jdbcOperations,
+                           AuthSessionProperties sessionProperties,
+                           ObjectProvider<RedissonClient> redissonClientProvider,
+                           ObjectMapper objectMapper) {
         this.loginProperties = loginProperties;
         this.jwtProperties = jwtProperties;
         this.jwtEncoder = jwtEncoder;
@@ -83,6 +98,9 @@ public class AuthServiceImpl implements AuthService {
         this.authorizationService = authorizationService;
         this.loginAccountDao = loginAccountDao;
         this.jdbcOperations = jdbcOperations;
+        this.sessionProperties = sessionProperties;
+        this.redissonClientProvider = redissonClientProvider;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -138,6 +156,9 @@ public class AuthServiceImpl implements AuthService {
                     account.username(), clientId, grantType.getValue());
             throw new BusinessException(ErrorCode.AUTH_CLIENT_NOT_INITIALIZED);
         }
+        if (sessionProperties.isRedis()) {
+            return loginWithRedis(account, registeredClient, grantType);
+        }
 
         Instant issuedAt = Instant.now();
         TokenSettings tokenSettings = registeredClient.getTokenSettings();
@@ -179,6 +200,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public LoginResponse refreshAccessToken(RefreshTokenVO request) {
         log.info("Refresh token attempt");
+        if (sessionProperties.isRedis()) {
+            return refreshAccessTokenWithRedis(request);
+        }
+
         OAuth2Authorization existingAuthorization = authorizationService.findByToken(request.refreshToken(), OAuth2TokenType.REFRESH_TOKEN);
         if (existingAuthorization == null || existingAuthorization.getRefreshToken() == null || !existingAuthorization.getRefreshToken().isActive()) {
             log.warn("Refresh token failed: reason=invalid_refresh_token");
@@ -243,6 +268,10 @@ public class AuthServiceImpl implements AuthService {
         }
         try {
             Jwt jwt = jwtDecoder.decode(token);
+            if (sessionProperties.isRedis()) {
+                return validateRedisAccessToken(token, jwt);
+            }
+
             OAuth2Authorization savedAuthorization = authorizationService.findByToken(token, OAuth2TokenType.ACCESS_TOKEN);
             if (savedAuthorization == null || savedAuthorization.getAccessToken() == null || !savedAuthorization.getAccessToken().isActive()) {
                 log.warn("Token validation failed: subject={}, reason=authorization_not_active", jwt.getSubject());
@@ -275,6 +304,10 @@ public class AuthServiceImpl implements AuthService {
             log.warn("Logout failed: reason=missing_bearer_token");
             throw new BusinessException(ErrorCode.AUTH_INVALID_ACCESS_TOKEN);
         }
+        if (sessionProperties.isRedis()) {
+            logoutWithRedis(token);
+            return;
+        }
 
         OAuth2Authorization savedAuthorization = authorizationService.findByToken(token, OAuth2TokenType.ACCESS_TOKEN);
         if (savedAuthorization == null) {
@@ -295,6 +328,12 @@ public class AuthServiceImpl implements AuthService {
                     operator.username(), request.username());
             throw new BusinessException(ErrorCode.AUTH_MANAGER_PERMISSION_REQUIRED);
         }
+        if (sessionProperties.isRedis()) {
+            int revokedCount = kickOutWithRedis(request.username());
+            log.info("Redis kick-out succeeded: operator={}, target={}, revokedCount={}",
+                    operator.username(), request.username(), revokedCount);
+            return revokedCount;
+        }
 
         List<String> authorizationIds = findAuthorizationIdsByPrincipalName(request.username());
         int revokedCount = 0;
@@ -309,6 +348,215 @@ public class AuthServiceImpl implements AuthService {
         log.info("Kick-out succeeded: operator={}, target={}, revokedCount={}",
                 operator.username(), request.username(), revokedCount);
         return revokedCount;
+    }
+
+    private LoginResponse loginWithRedis(AuthLoginAccount account,
+                                         RegisteredClient registeredClient,
+                                         AuthorizationGrantType grantType) {
+        Instant issuedAt = Instant.now();
+        TokenSettings tokenSettings = registeredClient.getTokenSettings();
+        Instant expiresAtInstant = issuedAt.plus(tokenSettings.getAccessTokenTimeToLive());
+        Instant refreshTokenExpiresAtInstant = issuedAt.plus(tokenSettings.getRefreshTokenTimeToLive());
+        Jwt jwt = issueAccessToken(account, registeredClient, issuedAt, expiresAtInstant);
+        String refreshToken = randomTokenValue();
+        RedisLoginSession session = new RedisLoginSession(
+                jwt.getTokenValue(),
+                refreshToken,
+                account.username(),
+                account.userType(),
+                account.roles(),
+                account.permissions(),
+                registeredClient.getClientId(),
+                grantType.getValue(),
+                issuedAt,
+                expiresAtInstant,
+                issuedAt,
+                refreshTokenExpiresAtInstant
+        );
+        saveRedisSession(session);
+        log.info("Redis token issued: username={}, userType={}, clientId={}, grantType={}, expiresAt={}, refreshTokenExpiresAt={}",
+                account.username(), account.userType(), registeredClient.getClientId(), grantType.getValue(),
+                expiresAtInstant, refreshTokenExpiresAtInstant);
+
+        return loginResponse(session);
+    }
+
+    private LoginResponse refreshAccessTokenWithRedis(RefreshTokenVO request) {
+        RedisLoginSession existingSession = readRedisSession(redisRefreshTokenKey(request.refreshToken()));
+        if (existingSession == null || existingSession.refreshTokenExpiresAt().isBefore(Instant.now())) {
+            log.warn("Redis refresh token failed: reason=invalid_refresh_token");
+            throw new BusinessException(ErrorCode.AUTH_INVALID_REFRESH_TOKEN);
+        }
+
+        RegisteredClient registeredClient = registeredClientRepository.findByClientId(existingSession.clientId());
+        if (registeredClient == null) {
+            log.warn("Redis refresh token failed: clientId={}, reason=registered_client_not_found",
+                    existingSession.clientId());
+            throw new BusinessException(ErrorCode.AUTH_REGISTERED_CLIENT_NOT_FOUND);
+        }
+
+        AuthLoginAccount account = new AuthLoginAccount(
+                existingSession.username(),
+                "",
+                existingSession.userType(),
+                existingSession.roles(),
+                existingSession.permissions()
+        );
+        Instant issuedAt = Instant.now();
+        Instant expiresAtInstant = issuedAt.plus(registeredClient.getTokenSettings().getAccessTokenTimeToLive());
+        Jwt jwt = issueAccessToken(account, registeredClient, issuedAt, expiresAtInstant);
+        deleteRedisAccessToken(existingSession.accessToken());
+
+        RedisLoginSession refreshedSession = new RedisLoginSession(
+                jwt.getTokenValue(),
+                existingSession.refreshToken(),
+                existingSession.username(),
+                existingSession.userType(),
+                existingSession.roles(),
+                existingSession.permissions(),
+                existingSession.clientId(),
+                existingSession.grantType(),
+                issuedAt,
+                expiresAtInstant,
+                existingSession.refreshTokenIssuedAt(),
+                existingSession.refreshTokenExpiresAt()
+        );
+        saveRedisSession(refreshedSession);
+        log.info("Redis access token refreshed: username={}, userType={}, clientId={}, expiresAt={}",
+                refreshedSession.username(), refreshedSession.userType(), refreshedSession.clientId(), expiresAtInstant);
+        return loginResponse(refreshedSession);
+    }
+
+    private TokenValidation validateRedisAccessToken(String token, Jwt jwt) {
+        RedisLoginSession session = readRedisSession(redisAccessTokenKey(token));
+        if (session == null || session.accessTokenExpiresAt().isBefore(Instant.now())) {
+            log.warn("Redis token validation failed: subject={}, reason=session_not_active", jwt.getSubject());
+            return new TokenValidation(false, null, null, List.of(), List.of(), Map.of());
+        }
+        if (!session.username().equals(jwt.getSubject())) {
+            log.warn("Redis token validation failed: subject={}, sessionUser={}, reason=subject_mismatch",
+                    jwt.getSubject(), session.username());
+            return new TokenValidation(false, null, null, List.of(), List.of(), Map.of());
+        }
+
+        log.debug("Redis token validation succeeded: username={}, userType={}, expiresAt={}",
+                session.username(), session.userType(), session.accessTokenExpiresAt());
+        return new TokenValidation(
+                true,
+                session.username(),
+                session.userType(),
+                session.roles(),
+                session.permissions(),
+                Map.of("expiresAt", session.accessTokenExpiresAt())
+        );
+    }
+
+    private void logoutWithRedis(String accessToken) {
+        RedisLoginSession session = readRedisSession(redisAccessTokenKey(accessToken));
+        if (session == null) {
+            log.warn("Redis logout skipped: reason=session_not_found");
+            throw new BusinessException(ErrorCode.AUTH_INVALID_ACCESS_TOKEN);
+        }
+        revokeRedisSession(session);
+        log.info("Redis logout succeeded: username={}", session.username());
+    }
+
+    private int kickOutWithRedis(String username) {
+        RSet<String> refreshTokens = redissonClient().getSet(redisUserSessionsKey(username));
+        Set<String> tokenSnapshot = new LinkedHashSet<>(refreshTokens.readAll());
+        int revokedCount = 0;
+        for (String refreshToken : tokenSnapshot) {
+            RedisLoginSession session = readRedisSession(redisRefreshTokenKey(refreshToken));
+            if (session == null) {
+                refreshTokens.remove(refreshToken);
+                continue;
+            }
+            revokeRedisSession(session);
+            revokedCount++;
+        }
+        refreshTokens.delete();
+        return revokedCount;
+    }
+
+    private void saveRedisSession(RedisLoginSession session) {
+        writeRedisSession(redisAccessTokenKey(session.accessToken()), session, session.accessTokenExpiresAt());
+        writeRedisSession(redisRefreshTokenKey(session.refreshToken()), session, session.refreshTokenExpiresAt());
+        redissonClient().getSet(redisUserSessionsKey(session.username())).add(session.refreshToken());
+    }
+
+    private void revokeRedisSession(RedisLoginSession session) {
+        deleteRedisAccessToken(session.accessToken());
+        redissonClient().getBucket(redisRefreshTokenKey(session.refreshToken())).delete();
+        redissonClient().getSet(redisUserSessionsKey(session.username())).remove(session.refreshToken());
+    }
+
+    private void deleteRedisAccessToken(String accessToken) {
+        redissonClient().getBucket(redisAccessTokenKey(accessToken)).delete();
+    }
+
+    private RedisLoginSession readRedisSession(String key) {
+        RBucket<String> bucket = redissonClient().getBucket(key);
+        String payload = bucket.get();
+        if (payload == null) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(payload, RedisLoginSession.class);
+        } catch (JsonProcessingException ex) {
+            log.warn("Redis session payload is invalid: key={}, message={}", key, ex.getMessage());
+            bucket.delete();
+            return null;
+        }
+    }
+
+    private void writeRedisSession(String key, RedisLoginSession session, Instant expiresAt) {
+        Duration ttl = Duration.between(Instant.now(), expiresAt);
+        if (ttl.isZero() || ttl.isNegative()) {
+            return;
+        }
+        try {
+            redissonClient().getBucket(key).set(objectMapper.writeValueAsString(session), ttl);
+        } catch (JsonProcessingException ex) {
+            throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, "Failed to serialize Redis login session");
+        }
+    }
+
+    private LoginResponse loginResponse(RedisLoginSession session) {
+        return new LoginResponse(
+                "Bearer",
+                session.accessToken(),
+                session.refreshToken(),
+                session.username(),
+                session.userType(),
+                session.roles(),
+                session.permissions(),
+                LocalDateTime.ofInstant(session.accessTokenExpiresAt(), ZoneId.systemDefault()),
+                LocalDateTime.ofInstant(session.refreshTokenExpiresAt(), ZoneId.systemDefault())
+        );
+    }
+
+    private RedissonClient redissonClient() {
+        RedissonClient redissonClient = redissonClientProvider.getIfAvailable();
+        if (redissonClient == null) {
+            throw new BusinessException(ErrorCode.AUTH_REDIS_SESSION_STORE_UNAVAILABLE);
+        }
+        return redissonClient;
+    }
+
+    private String redisAccessTokenKey(String accessToken) {
+        return redisKey("access", accessToken);
+    }
+
+    private String redisRefreshTokenKey(String refreshToken) {
+        return redisKey("refresh", refreshToken);
+    }
+
+    private String redisUserSessionsKey(String username) {
+        return redisKey("user", username);
+    }
+
+    private String redisKey(String namespace, String value) {
+        return sessionProperties.getRedisKeyPrefix() + ":" + namespace + ":" + value;
     }
 
     private String resolveToken(String authorization) {

@@ -27,6 +27,7 @@ System users, roles, permissions, menus, and their relationships are manager-ser
 - MyBatis-Plus and MyBatis Spring for database access.
 - MySQL with shared multi-data-source configuration.
 - Redisson for Redis Cluster client integration.
+- Optional Redis-backed auth sessions with `AUTH_SESSION_STORE=redis`.
 - Spring Boot Actuator for health and info endpoints.
 - Log4j2 for application logging.
 
@@ -49,6 +50,13 @@ mvn -pl gateway-service spring-boot:run
 
 In IntelliJ IDEA, use the shared `All Services` compound run configuration
 to start all services together.
+
+Auth sessions are stored in MySQL by default through Spring Authorization Server JDBC tables.
+To store login sessions in Redis instead, start `auth-service` with:
+
+```bash
+AUTH_SESSION_STORE=redis mvn -pl auth-service spring-boot:run
+```
 
 ## Try
 

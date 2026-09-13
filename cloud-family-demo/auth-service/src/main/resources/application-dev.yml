@@ -10,6 +10,9 @@ spring:
 
 demo:
   auth:
+    session:
+      store: ${AUTH_SESSION_STORE:jdbc}
+      redis-key-prefix: ${AUTH_SESSION_REDIS_KEY_PREFIX:cloud-family-demo:auth}
     jwt:
       issuer: ${JWT_ISSUER:cloud-family-demo}
       secret: ${JWT_SECRET:cloud-family-demo-jwt-signing-secret-please-change-in-production}
