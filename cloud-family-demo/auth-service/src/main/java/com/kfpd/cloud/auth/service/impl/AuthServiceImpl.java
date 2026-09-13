@@ -27,10 +27,10 @@ import com.kfpd.cloud.auth.pojo.TokenValidation;
 import com.kfpd.cloud.auth.dao.AuthLoginAccountDao;
 import com.kfpd.cloud.auth.service.AuthLoginAccount;
 import com.kfpd.cloud.auth.service.AuthService;
-import com.kfpd.cloud.common.datasource.MultiDataSourceNames;
+import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.common.exception.BusinessException;
 import com.kfpd.cloud.common.exception.ErrorCode;
-import com.kfpd.cloud.common.security.CommonJwtProperties;
+import com.kfpd.cloud.common.config.security.CommonJwtProperties;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

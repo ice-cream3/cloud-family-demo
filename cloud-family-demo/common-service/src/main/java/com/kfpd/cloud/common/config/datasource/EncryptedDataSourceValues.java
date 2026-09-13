@@ -1,4 +1,4 @@
-package com.kfpd.cloud.common.datasource;
+package com.kfpd.cloud.common.config.datasource;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;

@@ -1,4 +1,4 @@
-package com.kfpd.cloud.common.redis;
+package com.kfpd.cloud.common.config.redis;
 
 import java.util.List;
 

@@ -3,8 +3,8 @@ package com.kfpd.cloud.auth.base.config;
 import java.time.Duration;
 import java.util.Set;
 
-import com.kfpd.cloud.common.datasource.MultiDataSourceNames;
-import com.kfpd.cloud.common.security.CommonJwtProperties;
+import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
+import com.kfpd.cloud.common.config.security.CommonJwtProperties;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.ApplicationRunner;

@@ -1,4 +1,4 @@
-package com.kfpd.cloud.common.datasource;
+package com.kfpd.cloud.common.config.datasource;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

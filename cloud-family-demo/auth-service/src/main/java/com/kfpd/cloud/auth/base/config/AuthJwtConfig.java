@@ -2,8 +2,8 @@ package com.kfpd.cloud.auth.base.config;
 
 import java.nio.charset.StandardCharsets;
 
-import com.kfpd.cloud.common.security.CommonJwtProperties;
-import com.kfpd.cloud.common.security.JwtSecretKeys;
+import com.kfpd.cloud.common.config.security.CommonJwtProperties;
+import com.kfpd.cloud.common.config.security.JwtSecretKeys;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

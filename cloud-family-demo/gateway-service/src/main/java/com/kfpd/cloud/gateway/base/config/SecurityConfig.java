@@ -1,7 +1,7 @@
 package com.kfpd.cloud.gateway.base.config;
 
-import com.kfpd.cloud.common.security.CommonJwtProperties;
-import com.kfpd.cloud.common.security.JwtSecretKeys;
+import com.kfpd.cloud.common.config.security.CommonJwtProperties;
+import com.kfpd.cloud.common.config.security.JwtSecretKeys;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
