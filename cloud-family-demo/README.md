@@ -9,6 +9,7 @@ JDK 21 + Spring Boot 4.0.8 + Spring Cloud 2025.1.3 microservice demo.
 - `auth-service`: JWT issuing service on port `8081`.
 - `partner-service`: protected partner API service on port `8082`.
 - `manager-service`: protected manager API service on port `8083`.
+- `xxl-job-admin`: lightweight XXL-JOB admin-compatible service on port `8088`.
 - `job-service`: XXL-JOB executor service on HTTP port `8084` and executor port `9999`.
 
 System users, roles, permissions, menus, and their relationships are manager-service features backed by the `fa-cloud` MySQL database. API user profile data is stored in `fa-cloud.vip_user`.
@@ -19,7 +20,7 @@ System users, roles, permissions, menus, and their relationships are manager-ser
 - API user and manager user login flows with JWT access and refresh tokens.
 - Local JWT validation before protected requests are routed to backend services.
 - Manager dashboard and system management APIs for users, roles, permissions, and menus.
-- XXL-JOB scheduled task execution with a demo job handler.
+- Lightweight XXL-JOB admin, executor registration, manual trigger APIs, and demo job handlers.
 - Shared common module for cross-service configuration, constants, and infrastructure setup.
 
 ## Integrations
@@ -30,7 +31,7 @@ System users, roles, permissions, menus, and their relationships are manager-ser
 - MySQL with shared multi-data-source configuration.
 - Redisson for Redis Cluster client integration.
 - Optional Redis-backed auth sessions with `AUTH_SESSION_STORE=redis`.
-- XXL-JOB executor integration for scheduled jobs.
+- XXL-JOB admin-compatible APIs and executor integration for scheduled jobs.
 - Spring Boot Actuator for health and info endpoints.
 - Log4j2 for application logging.
 
@@ -48,6 +49,7 @@ Start each service in a separate terminal:
 mvn -pl auth-service spring-boot:run
 mvn -pl partner-service spring-boot:run
 mvn -pl manager-service spring-boot:run
+mvn -pl xxl-job-admin spring-boot:run
 mvn -pl job-service spring-boot:run
 mvn -pl gateway-service spring-boot:run
 ```
@@ -69,6 +71,18 @@ against `http://localhost:8088/xxl-job-admin` by default. Override it with:
 XXL_JOB_ADMIN_ADDRESSES=http://localhost:8088/xxl-job-admin \
 XXL_JOB_ACCESS_TOKEN=default_token \
 mvn -pl job-service spring-boot:run
+```
+
+`xxl-job-admin` is a lightweight local admin-compatible service for this demo. It accepts
+executor registry callbacks at `/xxl-job-admin/api/**` and provides manual trigger APIs:
+
+```bash
+curl -s http://localhost:8088/xxl-job-admin/executors
+
+curl -s -X POST http://localhost:8088/xxl-job-admin/jobs/trigger \
+  -H 'Content-Type: application/json' \
+  -H 'XXL-JOB-ACCESS-TOKEN: default_token' \
+  -d '{"appName":"cloud-family-job-service","handler":"demoJobHandler","param":"hello"}'
 ```
 
 The sample handler names for XXL-JOB admin are:

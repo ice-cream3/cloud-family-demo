@@ -20,6 +20,7 @@
         <module name="common-service" />
         <module name="manager-service" />
         <module name="gateway-service" />
+        <module name="xxl-job-admin" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
@@ -35,6 +36,7 @@
       <module name="job-service" options="-parameters" />
       <module name="manager-service" options="-parameters" />
       <module name="partner-service" options="-parameters" />
+      <module name="xxl-job-admin" options="-parameters" />
     </option>
   </component>
 </project>
