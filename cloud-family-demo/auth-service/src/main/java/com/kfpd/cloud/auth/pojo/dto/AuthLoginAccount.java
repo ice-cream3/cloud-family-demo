@@ -1,4 +1,4 @@
-package com.kfpd.cloud.auth.service;
+package com.kfpd.cloud.auth.pojo.dto;
 
 import java.util.List;
 

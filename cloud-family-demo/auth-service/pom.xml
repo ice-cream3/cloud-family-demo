@@ -67,6 +67,12 @@
             <groupId>org.mybatis</groupId>
             <artifactId>mybatis-spring</artifactId>
         </dependency>
+        <!-- Lombok generates boilerplate accessors for entity classes. -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
         <!-- OAuth2 core types; version is managed by Spring Boot. -->
         <dependency>
             <groupId>org.springframework.security</groupId>

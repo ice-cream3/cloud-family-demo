@@ -2,7 +2,7 @@ package com.kfpd.cloud.auth.dao;
 
 import java.util.List;
 
-import com.kfpd.cloud.auth.service.AuthLoginAccount;
+import com.kfpd.cloud.auth.pojo.dto.AuthLoginAccount;
 
 import org.apache.ibatis.annotations.Param;
 

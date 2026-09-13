@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfpd.cloud.auth.dao.ManagerLoginLogDao">
+
+    <insert id="insertLoginLog">
+        INSERT INTO manager_login_log
+            (username, user_type, client_id, grant_type, client_ip, user_agent,
+             device_type, browser, operating_system, login_at, login_result, failure_reason)
+        VALUES
+            (#{log.username}, #{log.userType}, #{log.clientId}, #{log.grantType},
+             #{log.clientIp}, #{log.userAgent}, #{log.deviceType}, #{log.browser},
+             #{log.operatingSystem}, #{log.loginAt}, #{log.loginResult}, #{log.failureReason})
+    </insert>
+</mapper>

@@ -1,10 +1,11 @@
 package com.kfpd.cloud.auth.controller;
 
 import com.kfpd.cloud.auth.pojo.vo.LoginVO;
-import com.kfpd.cloud.auth.pojo.LoginResponse;
+import com.kfpd.cloud.auth.pojo.dto.LoginRequestContext;
+import com.kfpd.cloud.auth.pojo.dto.LoginResponse;
 import com.kfpd.cloud.auth.pojo.vo.KickOutVO;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
-import com.kfpd.cloud.auth.pojo.TokenValidation;
+import com.kfpd.cloud.auth.pojo.dto.TokenValidation;
 import com.kfpd.cloud.auth.service.AuthService;
 import com.kfpd.cloud.common.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,13 +31,13 @@ public class AuthController {
     @PostMapping("/api/login")
     public ApiResponse<LoginResponse> apiLogin(@Valid @RequestBody LoginVO request, HttpServletRequest servletRequest) {
         // API users are rate-limited by username and client IP in AuthService.
-        return ApiResponse.success(authService.apiLogin(request, resolveClientIp(servletRequest)));
+        return ApiResponse.success(authService.apiLogin(request, resolveLoginRequestContext(servletRequest)));
     }
 
     @PostMapping("/manager/login")
     public ApiResponse<LoginResponse> managerLogin(@Valid @RequestBody LoginVO request, HttpServletRequest servletRequest) {
         // Manager login has stricter checks, including IP allowlist and login permission.
-        return ApiResponse.success(authService.managerLogin(request, resolveClientIp(servletRequest)));
+        return ApiResponse.success(authService.managerLogin(request, resolveLoginRequestContext(servletRequest)));
     }
 
     @PostMapping("/refresh")
@@ -61,6 +62,17 @@ public class AuthController {
         return ApiResponse.success(authService.validate(authorization));
     }
 
+    private LoginRequestContext resolveLoginRequestContext(HttpServletRequest request) {
+        String userAgent = request.getHeader(HttpHeaders.USER_AGENT);
+        return new LoginRequestContext(
+                resolveClientIp(request),
+                blankToNull(userAgent),
+                resolveDeviceType(userAgent),
+                resolveBrowser(userAgent),
+                resolveOperatingSystem(userAgent)
+        );
+    }
+
     private String resolveClientIp(HttpServletRequest request) {
         // When traffic comes through a proxy or gateway, the original client IP is usually forwarded here.
         String forwardedFor = request.getHeader("X-Forwarded-For");
@@ -68,5 +80,70 @@ public class AuthController {
             return forwardedFor.split(",")[0].trim();
         }
         return request.getRemoteAddr();
+    }
+
+    private String resolveDeviceType(String userAgent) {
+        String value = lower(userAgent);
+        if (value == null) {
+            return "UNKNOWN";
+        }
+        if (value.contains("ipad") || value.contains("tablet")) {
+            return "TABLET";
+        }
+        if (value.contains("mobile") || value.contains("android") || value.contains("iphone")) {
+            return "MOBILE";
+        }
+        return "DESKTOP";
+    }
+
+    private String resolveBrowser(String userAgent) {
+        String value = lower(userAgent);
+        if (value == null) {
+            return "UNKNOWN";
+        }
+        if (value.contains("edg/")) {
+            return "Edge";
+        }
+        if (value.contains("chrome/") || value.contains("crios/")) {
+            return "Chrome";
+        }
+        if (value.contains("firefox/") || value.contains("fxios/")) {
+            return "Firefox";
+        }
+        if (value.contains("safari/")) {
+            return "Safari";
+        }
+        return "Other";
+    }
+
+    private String resolveOperatingSystem(String userAgent) {
+        String value = lower(userAgent);
+        if (value == null) {
+            return "UNKNOWN";
+        }
+        if (value.contains("windows")) {
+            return "Windows";
+        }
+        if (value.contains("android")) {
+            return "Android";
+        }
+        if (value.contains("iphone") || value.contains("ipad") || value.contains("ios")) {
+            return "iOS";
+        }
+        if (value.contains("mac os") || value.contains("macintosh")) {
+            return "macOS";
+        }
+        if (value.contains("linux")) {
+            return "Linux";
+        }
+        return "Other";
+    }
+
+    private String lower(String value) {
+        return value == null || value.isBlank() ? null : value.toLowerCase();
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }

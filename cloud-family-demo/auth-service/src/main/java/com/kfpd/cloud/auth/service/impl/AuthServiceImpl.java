@@ -18,14 +18,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kfpd.cloud.auth.base.config.AuthOAuth2JdbcConfig;
 import com.kfpd.cloud.auth.base.config.AuthLoginProperties;
 import com.kfpd.cloud.auth.base.config.AuthSessionProperties;
+import com.kfpd.cloud.auth.dao.ManagerLoginLogDao;
+import com.kfpd.cloud.auth.dao.PartnerLoginLogDao;
+import com.kfpd.cloud.auth.pojo.dto.LoginRequestContext;
+import com.kfpd.cloud.auth.pojo.entity.ManagerLoginLog;
+import com.kfpd.cloud.auth.pojo.entity.PartnerLoginLog;
 import com.kfpd.cloud.auth.pojo.vo.LoginVO;
-import com.kfpd.cloud.auth.pojo.LoginResponse;
-import com.kfpd.cloud.auth.pojo.RedisLoginSession;
+import com.kfpd.cloud.auth.pojo.dto.LoginResponse;
+import com.kfpd.cloud.auth.pojo.dto.RedisLoginSession;
 import com.kfpd.cloud.auth.pojo.vo.KickOutVO;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
-import com.kfpd.cloud.auth.pojo.TokenValidation;
+import com.kfpd.cloud.auth.pojo.dto.TokenValidation;
 import com.kfpd.cloud.auth.dao.AuthLoginAccountDao;
-import com.kfpd.cloud.auth.service.AuthLoginAccount;
+import com.kfpd.cloud.auth.pojo.dto.AuthLoginAccount;
 import com.kfpd.cloud.auth.service.AuthService;
 import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.common.exception.BusinessException;
@@ -64,6 +69,8 @@ public class AuthServiceImpl implements AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
     private static final String MANAGER_LOGIN_PERMISSION = "manager:login";
+    private static final String LOGIN_RESULT_SUCCESS = "SUCCESS";
+    private static final String LOGIN_RESULT_FAILURE = "FAILURE";
 
     // Demo rate-limit storage. Replace with database/cache backed storage in production.
     private final Map<String, LoginAttempt> apiLoginAttempts = new ConcurrentHashMap<>();
@@ -74,6 +81,8 @@ public class AuthServiceImpl implements AuthService {
     private final RegisteredClientRepository registeredClientRepository;
     private final OAuth2AuthorizationService authorizationService;
     private final AuthLoginAccountDao loginAccountDao;
+    private final PartnerLoginLogDao partnerLoginLogDao;
+    private final ManagerLoginLogDao managerLoginLogDao;
     private final JdbcOperations jdbcOperations;
     private final AuthSessionProperties sessionProperties;
     private final ObjectProvider<RedissonClient> redissonClientProvider;
@@ -86,6 +95,8 @@ public class AuthServiceImpl implements AuthService {
                            RegisteredClientRepository registeredClientRepository,
                            OAuth2AuthorizationService authorizationService,
                            AuthLoginAccountDao loginAccountDao,
+                           PartnerLoginLogDao partnerLoginLogDao,
+                           ManagerLoginLogDao managerLoginLogDao,
                            @Qualifier(MultiDataSourceNames.FA_CLOUD_JDBC_TEMPLATE) JdbcOperations jdbcOperations,
                            AuthSessionProperties sessionProperties,
                            ObjectProvider<RedissonClient> redissonClientProvider,
@@ -97,6 +108,8 @@ public class AuthServiceImpl implements AuthService {
         this.registeredClientRepository = registeredClientRepository;
         this.authorizationService = authorizationService;
         this.loginAccountDao = loginAccountDao;
+        this.partnerLoginLogDao = partnerLoginLogDao;
+        this.managerLoginLogDao = managerLoginLogDao;
         this.jdbcOperations = jdbcOperations;
         this.sessionProperties = sessionProperties;
         this.redissonClientProvider = redissonClientProvider;
@@ -104,8 +117,9 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public LoginResponse apiLogin(LoginVO request, String clientIp) {
+    public LoginResponse apiLogin(LoginVO request, LoginRequestContext context) {
         // API login protects public clients from brute-force attempts by username and source IP.
+        String clientIp = context.clientIp();
         String attemptKey = request.username() + "@" + clientIp;
         log.info("API login attempt: username={}, clientIp={}", request.username(), clientIp);
         assertApiLoginNotLocked(attemptKey);
@@ -113,6 +127,8 @@ public class AuthServiceImpl implements AuthService {
         Optional<AuthLoginAccount> account = Optional.ofNullable(loginAccountDao.findApiByUsername(request.username()));
         if (account.isEmpty() || !matches(account.get(), request)) {
             recordApiLoginFailure(attemptKey);
+            recordLoginFailure(request.username(), "API", AuthOAuth2JdbcConfig.API_CLIENT_ID,
+                    AuthOAuth2JdbcConfig.API_LOGIN_GRANT_TYPE, context, "INVALID_CREDENTIALS");
             log.warn("API login failed: username={}, clientIp={}, reason=invalid_credentials",
                     request.username(), clientIp);
             throw new BusinessException(ErrorCode.AUTH_INVALID_API_CREDENTIALS);
@@ -120,14 +136,17 @@ public class AuthServiceImpl implements AuthService {
 
         apiLoginAttempts.remove(attemptKey);
         log.info("API login authenticated: username={}, clientIp={}", request.username(), clientIp);
-        return login(account.get(), AuthOAuth2JdbcConfig.API_CLIENT_ID, AuthOAuth2JdbcConfig.API_LOGIN_GRANT_TYPE);
+        return login(account.get(), AuthOAuth2JdbcConfig.API_CLIENT_ID, AuthOAuth2JdbcConfig.API_LOGIN_GRANT_TYPE, context);
     }
 
     @Override
-    public LoginResponse managerLogin(LoginVO request, String clientIp) {
+    public LoginResponse managerLogin(LoginVO request, LoginRequestContext context) {
         // Manager login is checked by network boundary first, then credentials, then explicit permission.
+        String clientIp = context.clientIp();
         log.info("Manager login attempt: username={}, clientIp={}", request.username(), clientIp);
         if (!isManagerIpAllowed(clientIp)) {
+            recordLoginFailure(request.username(), "MANAGER", AuthOAuth2JdbcConfig.MANAGER_CLIENT_ID,
+                    AuthOAuth2JdbcConfig.MANAGER_LOGIN_GRANT_TYPE, context, "IP_NOT_ALLOWED");
             log.warn("Manager login rejected: username={}, clientIp={}, reason=ip_not_allowed",
                     request.username(), clientIp);
             throw new BusinessException(ErrorCode.AUTH_MANAGER_IP_FORBIDDEN);
@@ -135,21 +154,28 @@ public class AuthServiceImpl implements AuthService {
 
         Optional<AuthLoginAccount> account = Optional.ofNullable(loginAccountDao.findManagerByUsername(request.username()));
         if (account.isEmpty() || !matches(account.get(), request)) {
+            recordLoginFailure(request.username(), "MANAGER", AuthOAuth2JdbcConfig.MANAGER_CLIENT_ID,
+                    AuthOAuth2JdbcConfig.MANAGER_LOGIN_GRANT_TYPE, context, "INVALID_CREDENTIALS");
             log.warn("Manager login failed: username={}, clientIp={}, reason=invalid_credentials",
                     request.username(), clientIp);
             throw new BusinessException(ErrorCode.AUTH_INVALID_MANAGER_CREDENTIALS);
         }
         if (!"MANAGER".equalsIgnoreCase(account.get().userType()) || !account.get().permissions().contains(MANAGER_LOGIN_PERMISSION)) {
+            recordLoginFailure(request.username(), "MANAGER", AuthOAuth2JdbcConfig.MANAGER_CLIENT_ID,
+                    AuthOAuth2JdbcConfig.MANAGER_LOGIN_GRANT_TYPE, context, "PERMISSION_REQUIRED");
             log.warn("Manager login rejected: username={}, clientIp={}, userType={}, reason=permission_required",
                     request.username(), clientIp, account.get().userType());
             throw new BusinessException(ErrorCode.AUTH_MANAGER_PERMISSION_REQUIRED);
         }
 
         log.info("Manager login authenticated: username={}, clientIp={}", request.username(), clientIp);
-        return login(account.get(), AuthOAuth2JdbcConfig.MANAGER_CLIENT_ID, AuthOAuth2JdbcConfig.MANAGER_LOGIN_GRANT_TYPE);
+        return login(account.get(), AuthOAuth2JdbcConfig.MANAGER_CLIENT_ID, AuthOAuth2JdbcConfig.MANAGER_LOGIN_GRANT_TYPE, context);
     }
 
-    private LoginResponse login(AuthLoginAccount account, String clientId, AuthorizationGrantType grantType) {
+    private LoginResponse login(AuthLoginAccount account,
+                                String clientId,
+                                AuthorizationGrantType grantType,
+                                LoginRequestContext context) {
         RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
         if (registeredClient == null) {
             log.error("Login failed: username={}, clientId={}, grantType={}, reason=client_not_initialized",
@@ -157,7 +183,7 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.AUTH_CLIENT_NOT_INITIALIZED);
         }
         if (sessionProperties.isRedis()) {
-            return loginWithRedis(account, registeredClient, grantType);
+            return loginWithRedis(account, registeredClient, grantType, context);
         }
 
         Instant issuedAt = Instant.now();
@@ -179,6 +205,7 @@ public class AuthServiceImpl implements AuthService {
                 .attribute("permissions", String.join(",", account.permissions()))
                 .build();
         authorizationService.save(authorization);
+        recordLoginLog(account, registeredClient.getClientId(), grantType, context, issuedAt);
         log.info("Token issued: username={}, userType={}, clientId={}, grantType={}, scopes={}, expiresAt={}, refreshTokenExpiresAt={}",
                 account.username(), account.userType(), clientId, grantType.getValue(), scopes, expiresAtInstant, refreshTokenExpiresAtInstant);
 
@@ -352,7 +379,8 @@ public class AuthServiceImpl implements AuthService {
 
     private LoginResponse loginWithRedis(AuthLoginAccount account,
                                          RegisteredClient registeredClient,
-                                         AuthorizationGrantType grantType) {
+                                         AuthorizationGrantType grantType,
+                                         LoginRequestContext context) {
         Instant issuedAt = Instant.now();
         TokenSettings tokenSettings = registeredClient.getTokenSettings();
         Instant expiresAtInstant = issuedAt.plus(tokenSettings.getAccessTokenTimeToLive());
@@ -374,6 +402,7 @@ public class AuthServiceImpl implements AuthService {
                 refreshTokenExpiresAtInstant
         );
         saveRedisSession(session);
+        recordLoginLog(account, registeredClient.getClientId(), grantType, context, issuedAt);
         log.info("Redis token issued: username={}, userType={}, clientId={}, grantType={}, expiresAt={}, refreshTokenExpiresAt={}",
                 account.username(), account.userType(), registeredClient.getClientId(), grantType.getValue(),
                 expiresAtInstant, refreshTokenExpiresAtInstant);
@@ -638,6 +667,140 @@ public class AuthServiceImpl implements AuthService {
 
     private boolean hasManagerAccess(List<String> roles) {
         return roles.contains("MANAGER") || roles.contains("SUPER_ADMIN");
+    }
+
+    private void recordLoginLog(AuthLoginAccount account,
+                                String clientId,
+                                AuthorizationGrantType grantType,
+                                LoginRequestContext context,
+                                Instant loginAt) {
+        try {
+            insertLoginLog(
+                    account.userType(),
+                    account.username(),
+                    clientId,
+                    grantType.getValue(),
+                    context,
+                    LocalDateTime.ofInstant(loginAt, ZoneId.systemDefault()),
+                    LOGIN_RESULT_SUCCESS,
+                    null
+            );
+        } catch (Exception ex) {
+            log.error("Login log write failed: username={}, userType={}, clientId={}, message={}",
+                    account.username(), account.userType(), clientId, ex.getMessage(), ex);
+        }
+    }
+
+    private void recordLoginFailure(String username,
+                                    String userType,
+                                    String clientId,
+                                    AuthorizationGrantType grantType,
+                                    LoginRequestContext context,
+                                    String failureReason) {
+        try {
+            insertLoginLog(
+                    userType,
+                    username,
+                    clientId,
+                    grantType.getValue(),
+                    context,
+                    LocalDateTime.now(),
+                    LOGIN_RESULT_FAILURE,
+                    failureReason
+            );
+        } catch (Exception ex) {
+            log.error("Login failure log write failed: username={}, userType={}, clientId={}, failureReason={}, message={}",
+                    username, userType, clientId, failureReason, ex.getMessage(), ex);
+        }
+    }
+
+    private void insertLoginLog(String userType,
+                                String username,
+                                String clientId,
+                                String grantType,
+                                LoginRequestContext context,
+                                LocalDateTime loginAt,
+                                String loginResult,
+                                String failureReason) {
+        if ("MANAGER".equalsIgnoreCase(userType)) {
+            managerLoginLogDao.insertLoginLog(managerLoginLog(
+                    username, userType, clientId, grantType, context, loginAt, loginResult, failureReason));
+            return;
+        }
+        partnerLoginLogDao.insertLoginLog(partnerLoginLog(
+                username, userType, clientId, grantType, context, loginAt, loginResult, failureReason));
+    }
+
+    private PartnerLoginLog partnerLoginLog(String username,
+                                            String userType,
+                                            String clientId,
+                                            String grantType,
+                                            LoginRequestContext context,
+                                            LocalDateTime loginAt,
+                                            String loginResult,
+                                            String failureReason) {
+        PartnerLoginLog loginLog = new PartnerLoginLog();
+        fillLoginLog(loginLog, username, userType, clientId, grantType, context, loginAt, loginResult, failureReason);
+        return loginLog;
+    }
+
+    private ManagerLoginLog managerLoginLog(String username,
+                                            String userType,
+                                            String clientId,
+                                            String grantType,
+                                            LoginRequestContext context,
+                                            LocalDateTime loginAt,
+                                            String loginResult,
+                                            String failureReason) {
+        ManagerLoginLog loginLog = new ManagerLoginLog();
+        fillLoginLog(loginLog, username, userType, clientId, grantType, context, loginAt, loginResult, failureReason);
+        return loginLog;
+    }
+
+    private void fillLoginLog(PartnerLoginLog loginLog,
+                              String username,
+                              String userType,
+                              String clientId,
+                              String grantType,
+                              LoginRequestContext context,
+                              LocalDateTime loginAt,
+                              String loginResult,
+                              String failureReason) {
+        loginLog.setUsername(username);
+        loginLog.setUserType(userType);
+        loginLog.setClientId(clientId);
+        loginLog.setGrantType(grantType);
+        loginLog.setClientIp(context.clientIp());
+        loginLog.setUserAgent(context.userAgent());
+        loginLog.setDeviceType(context.deviceType());
+        loginLog.setBrowser(context.browser());
+        loginLog.setOperatingSystem(context.operatingSystem());
+        loginLog.setLoginAt(loginAt);
+        loginLog.setLoginResult(loginResult);
+        loginLog.setFailureReason(failureReason);
+    }
+
+    private void fillLoginLog(ManagerLoginLog loginLog,
+                              String username,
+                              String userType,
+                              String clientId,
+                              String grantType,
+                              LoginRequestContext context,
+                              LocalDateTime loginAt,
+                              String loginResult,
+                              String failureReason) {
+        loginLog.setUsername(username);
+        loginLog.setUserType(userType);
+        loginLog.setClientId(clientId);
+        loginLog.setGrantType(grantType);
+        loginLog.setClientIp(context.clientIp());
+        loginLog.setUserAgent(context.userAgent());
+        loginLog.setDeviceType(context.deviceType());
+        loginLog.setBrowser(context.browser());
+        loginLog.setOperatingSystem(context.operatingSystem());
+        loginLog.setLoginAt(loginAt);
+        loginLog.setLoginResult(loginResult);
+        loginLog.setFailureReason(failureReason);
     }
 
     private List<String> findAuthorizationIdsByPrincipalName(String username) {

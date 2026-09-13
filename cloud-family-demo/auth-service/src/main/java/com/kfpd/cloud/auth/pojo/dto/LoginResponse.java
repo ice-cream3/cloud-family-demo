@@ -1,4 +1,4 @@
-package com.kfpd.cloud.auth.pojo;
+package com.kfpd.cloud.auth.pojo.dto;
 
 import java.time.LocalDateTime;
 import java.util.List;

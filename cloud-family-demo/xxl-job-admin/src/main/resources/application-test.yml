@@ -1,7 +1,0 @@
-server:
-  port: ${XXL_JOB_ADMIN_TEST_SERVER_PORT:8088}
-
-demo:
-  xxl-job-admin:
-    access-token: ${XXL_JOB_TEST_ACCESS_TOKEN:default_token}
-    executor-timeout-seconds: ${XXL_JOB_ADMIN_TEST_EXECUTOR_TIMEOUT_SECONDS:10}

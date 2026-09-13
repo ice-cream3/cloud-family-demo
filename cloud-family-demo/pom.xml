@@ -26,7 +26,6 @@
         <module>auth-service</module>
         <module>partner-service</module>
         <module>manager-service</module>
-        <module>xxl-job-admin</module>
         <module>job-service</module>
     </modules>
 

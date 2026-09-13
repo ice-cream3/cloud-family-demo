@@ -5,7 +5,7 @@ demo:
   xxl-job:
     enabled: ${XXL_JOB_ENABLED:true}
     admin-addresses: ${XXL_JOB_ADMIN_ADDRESSES:http://localhost:8088/xxl-job-admin}
-    access-token: ${XXL_JOB_ACCESS_TOKEN:default_token}
+    access-token: ${XXL_JOB_ACCESS_TOKEN:cloud_family_token}
     executor:
       app-name: ${XXL_JOB_EXECUTOR_APP_NAME:cloud-family-job-service}
       address: ${XXL_JOB_EXECUTOR_ADDRESS:}

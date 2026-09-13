@@ -58,6 +58,8 @@ In IntelliJ IDEA, use the shared `All Services` compound run configuration
 to start all services together.
 
 Auth sessions are stored in MySQL by default through Spring Authorization Server JDBC tables.
+API login events are stored in `fa-cloud.partner_login_log`, and manager login events are stored in
+`fa-cloud.manager_login_log`. Create both tables with `auth-service/src/main/resources/db/fa-cloud/auth-login-log-schema.sql`.
 To store login sessions in Redis instead, start `auth-service` with:
 
 ```bash
