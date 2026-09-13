@@ -22,12 +22,13 @@ public class ManagerLoginStatsJobHandler {
 
     @XxlJob("managerLoginStats10mJobHandler")
     public void managerLoginStats10mJobHandler() {
-        ManagerLoginStatsSummaryDTO summary = null;
+        ManagerLoginStatsSummaryDTO summary;
         try {
             summary = managerLoginStatsService.calculate10mStats(XxlJobHelper.getJobParam());
         } catch (Exception e) {
             log.error("统计管理端用户失败,e:{}", e.getMessage(), e);
             XxlJobHelper.handleFail("统计管理端用户失败.");
+            return;
         }
 
         log.info("Manager login stats completed: windowStart={}, windowEnd={}, rowCount={}, savedCount={}",

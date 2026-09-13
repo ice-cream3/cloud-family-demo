@@ -7,7 +7,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
-import com.kfpd.cloud.job.dao.cloud.ManagerLoginAuthStatsDao;
+import com.kfpd.cloud.job.dao.cloud.ManagerLoginLogStatsDao;
 import com.kfpd.cloud.job.dao.model.ManagerLoginStatsDao;
 import com.kfpd.cloud.job.pojo.dto.ManagerLoginStatDTO;
 import com.kfpd.cloud.job.pojo.dto.ManagerLoginStatsSummaryDTO;
@@ -19,14 +19,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ManagerLoginStatsServiceImpl implements ManagerLoginStatsService {
 
-    private static final String MANAGER_LOGIN_GRANT_TYPE = "demo_manager_login";
-
-    private final ManagerLoginAuthStatsDao managerLoginAuthStatsDao;
+    private final ManagerLoginLogStatsDao managerLoginLogStatsDao;
     private final ManagerLoginStatsDao managerLoginStatsDao;
 
-    public ManagerLoginStatsServiceImpl(ManagerLoginAuthStatsDao managerLoginAuthStatsDao,
+    public ManagerLoginStatsServiceImpl(ManagerLoginLogStatsDao managerLoginLogStatsDao,
                                         ManagerLoginStatsDao managerLoginStatsDao) {
-        this.managerLoginAuthStatsDao = managerLoginAuthStatsDao;
+        this.managerLoginLogStatsDao = managerLoginLogStatsDao;
         this.managerLoginStatsDao = managerLoginStatsDao;
     }
 
@@ -34,8 +32,7 @@ public class ManagerLoginStatsServiceImpl implements ManagerLoginStatsService {
     @Transactional(transactionManager = MultiDataSourceNames.FA_MODEL_TRANSACTION_MANAGER)
     public ManagerLoginStatsSummaryDTO calculate10mStats(String jobParam) {
         TimeWindow window = resolveWindow(jobParam);
-        List<ManagerLoginStatDTO> rows = managerLoginAuthStatsDao.countManagerLogins(
-                MANAGER_LOGIN_GRANT_TYPE,
+        List<ManagerLoginStatDTO> rows = managerLoginLogStatsDao.countManagerLogins(
                 window.start(),
                 window.end()
         );

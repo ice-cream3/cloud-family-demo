@@ -92,12 +92,16 @@ The sample handler names for XXL-JOB admin are:
 - `demoJobHandler`: normal demo job.
 - `paramDemoJobHandler`: job parameter demo, reads comma-separated values from XXL-JOB Admin job params.
 - `shardingDemoJobHandler`: sharding demo job, intended for the `SHARDING_BROADCAST` route strategy.
-- `managerLoginStats10mJobHandler`: aggregates manager login counts into `fa-model.manager_login_10m_stats` by 10-minute windows.
+- `managerLoginStats10mJobHandler`: aggregates successful manager login log records into `fa-model.manager_login_10m_stats` by 10-minute windows.
+- `partnerLoginStats5mJobHandler`: aggregates successful partner login log records into `fa-model.partner_login_5m_stats` by 5-minute windows.
 
 For `managerLoginStats10mJobHandler`, use a 10-minute cron such as `0 0/10 * * * ?`.
 Without a job param it calculates the previous complete 10-minute window. To recalculate
 a specific window, pass the window end as an ISO timestamp, for example `2026-09-13T10:20:00Z`.
-Create the target table manually with `job-service/src/main/resources/db/fa-model/manager-login-stats-schema.sql`.
+For `partnerLoginStats5mJobHandler`, use a 5-minute cron such as `0 0/5 * * * ?`.
+Create the source login log tables with `auth-service/src/main/resources/db/fa-cloud/auth-login-log-schema.sql`
+and the target stats tables with `job-service/src/main/resources/db/fa-model/manager-login-stats-schema.sql`
+and `job-service/src/main/resources/db/fa-model/partner-login-stats-schema.sql`.
 
 ## Try
 

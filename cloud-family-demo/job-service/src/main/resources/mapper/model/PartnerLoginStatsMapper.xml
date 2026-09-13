@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfpd.cloud.job.dao.model.PartnerLoginStatsDao">
+
+    <insert id="upsertPartnerLoginStat">
+        INSERT INTO partner_login_5m_stats
+            (window_start_at, window_end_at, username, login_count, first_login_at, last_login_at, calculated_at)
+        VALUES
+            (#{windowStart}, #{windowEnd}, #{stat.username}, #{stat.loginCount},
+             #{stat.firstLoginAt}, #{stat.lastLoginAt}, #{calculatedAt})
+        ON DUPLICATE KEY UPDATE
+            window_end_at = VALUES(window_end_at),
+            login_count = VALUES(login_count),
+            first_login_at = VALUES(first_login_at),
+            last_login_at = VALUES(last_login_at),
+            calculated_at = VALUES(calculated_at)
+    </insert>
+</mapper>
