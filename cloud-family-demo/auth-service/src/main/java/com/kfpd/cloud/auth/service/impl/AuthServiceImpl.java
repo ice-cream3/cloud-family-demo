@@ -19,6 +19,7 @@ import com.kfpd.cloud.auth.base.config.AuthOAuth2JdbcConfig;
 import com.kfpd.cloud.auth.base.config.AuthLoginProperties;
 import com.kfpd.cloud.auth.base.config.AuthSessionProperties;
 import com.kfpd.cloud.auth.dao.ManagerLoginLogDao;
+import com.kfpd.cloud.auth.dao.OAuth2AuthorizationDao;
 import com.kfpd.cloud.auth.dao.PartnerLoginLogDao;
 import com.kfpd.cloud.auth.pojo.dto.LoginRequestContext;
 import com.kfpd.cloud.auth.pojo.entity.ManagerLoginLog;
@@ -32,7 +33,6 @@ import com.kfpd.cloud.auth.pojo.dto.TokenValidation;
 import com.kfpd.cloud.auth.dao.AuthLoginAccountDao;
 import com.kfpd.cloud.auth.pojo.dto.AuthLoginAccount;
 import com.kfpd.cloud.auth.service.AuthService;
-import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.common.exception.BusinessException;
 import com.kfpd.cloud.common.exception.ErrorCode;
 import com.kfpd.cloud.common.config.security.CommonJwtProperties;
@@ -43,8 +43,6 @@ import org.redisson.api.RBucket;
 import org.redisson.api.RSet;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
@@ -83,7 +81,7 @@ public class AuthServiceImpl implements AuthService {
     private final AuthLoginAccountDao loginAccountDao;
     private final PartnerLoginLogDao partnerLoginLogDao;
     private final ManagerLoginLogDao managerLoginLogDao;
-    private final JdbcOperations jdbcOperations;
+    private final OAuth2AuthorizationDao oAuth2AuthorizationDao;
     private final AuthSessionProperties sessionProperties;
     private final ObjectProvider<RedissonClient> redissonClientProvider;
     private final ObjectMapper objectMapper;
@@ -97,7 +95,7 @@ public class AuthServiceImpl implements AuthService {
                            AuthLoginAccountDao loginAccountDao,
                            PartnerLoginLogDao partnerLoginLogDao,
                            ManagerLoginLogDao managerLoginLogDao,
-                           @Qualifier(MultiDataSourceNames.FA_CLOUD_JDBC_TEMPLATE) JdbcOperations jdbcOperations,
+                           OAuth2AuthorizationDao oAuth2AuthorizationDao,
                            AuthSessionProperties sessionProperties,
                            ObjectProvider<RedissonClient> redissonClientProvider,
                            ObjectMapper objectMapper) {
@@ -110,7 +108,7 @@ public class AuthServiceImpl implements AuthService {
         this.loginAccountDao = loginAccountDao;
         this.partnerLoginLogDao = partnerLoginLogDao;
         this.managerLoginLogDao = managerLoginLogDao;
-        this.jdbcOperations = jdbcOperations;
+        this.oAuth2AuthorizationDao = oAuth2AuthorizationDao;
         this.sessionProperties = sessionProperties;
         this.redissonClientProvider = redissonClientProvider;
         this.objectMapper = objectMapper;
@@ -804,11 +802,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private List<String> findAuthorizationIdsByPrincipalName(String username) {
-        return jdbcOperations.queryForList(
-                "select id from oauth2_authorization where principal_name = ?",
-                String.class,
-                username
-        );
+        return oAuth2AuthorizationDao.findIdsByPrincipalName(username);
     }
 
     private record LoginAttempt(int failedCount, LocalDateTime lockedUntil) {
