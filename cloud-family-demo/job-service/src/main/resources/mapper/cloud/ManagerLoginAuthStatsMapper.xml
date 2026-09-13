@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfpd.cloud.job.dao.cloud.ManagerLoginAuthStatsDao">
+
+    <resultMap id="ManagerLoginStatResultMap" type="com.kfpd.cloud.job.pojo.dto.ManagerLoginStatDTO">
+        <result property="username" column="principal_name"/>
+        <result property="loginCount" column="login_count"/>
+        <result property="firstLoginAt" column="first_login_at"/>
+        <result property="lastLoginAt" column="last_login_at"/>
+    </resultMap>
+
+    <select id="countManagerLogins" resultMap="ManagerLoginStatResultMap">
+        SELECT principal_name,
+               COUNT(*) AS login_count,
+               MIN(access_token_issued_at) AS first_login_at,
+               MAX(access_token_issued_at) AS last_login_at
+        FROM oauth2_authorization
+        WHERE authorization_grant_type = #{grantType}
+          AND access_token_issued_at <![CDATA[>=]]> #{windowStart}
+          AND access_token_issued_at <![CDATA[<]]> #{windowEnd}
+        GROUP BY principal_name
+    </select>
+</mapper>

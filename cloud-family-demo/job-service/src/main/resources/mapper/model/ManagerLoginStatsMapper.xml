@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfpd.cloud.job.dao.model.ManagerLoginStatsDao">
+
+    <update id="createManagerLoginStatsTable">
+        CREATE TABLE IF NOT EXISTS manager_login_10m_stats (
+            id bigint NOT NULL AUTO_INCREMENT,
+            window_start_at timestamp NOT NULL,
+            window_end_at timestamp NOT NULL,
+            username varchar(200) NOT NULL,
+            login_count bigint NOT NULL DEFAULT 0,
+            first_login_at timestamp NULL DEFAULT NULL,
+            last_login_at timestamp NULL DEFAULT NULL,
+            calculated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uk_manager_login_10m_stats_window_user (window_start_at, username),
+            KEY idx_manager_login_10m_stats_window (window_start_at, window_end_at),
+            KEY idx_manager_login_10m_stats_username (username)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    </update>
+
+    <insert id="upsertManagerLoginStat">
+        INSERT INTO manager_login_10m_stats
+            (window_start_at, window_end_at, username, login_count, first_login_at, last_login_at, calculated_at)
+        VALUES
+            (#{windowStart}, #{windowEnd}, #{stat.username}, #{stat.loginCount},
+             #{stat.firstLoginAt}, #{stat.lastLoginAt}, #{calculatedAt})
+        ON DUPLICATE KEY UPDATE
+            window_end_at = VALUES(window_end_at),
+            login_count = VALUES(login_count),
+            first_login_at = VALUES(first_login_at),
+            last_login_at = VALUES(last_login_at),
+            calculated_at = VALUES(calculated_at)
+    </insert>
+</mapper>

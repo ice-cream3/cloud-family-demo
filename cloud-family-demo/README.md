@@ -76,6 +76,11 @@ The sample handler names for XXL-JOB admin are:
 - `demoJobHandler`: normal demo job.
 - `paramDemoJobHandler`: job parameter demo, reads comma-separated values from XXL-JOB Admin job params.
 - `shardingDemoJobHandler`: sharding demo job, intended for the `SHARDING_BROADCAST` route strategy.
+- `managerLoginStats10mJobHandler`: aggregates manager login counts into `fa-model.manager_login_10m_stats` by 10-minute windows.
+
+For `managerLoginStats10mJobHandler`, use a 10-minute cron such as `0 0/10 * * * ?`.
+Without a job param it calculates the previous complete 10-minute window. To recalculate
+a specific window, pass the window end as an ISO timestamp, for example `2026-09-13T10:20:00Z`.
 
 ## Try
 
