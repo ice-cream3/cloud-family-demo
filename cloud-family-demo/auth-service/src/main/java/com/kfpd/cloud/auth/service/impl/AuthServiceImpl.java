@@ -16,17 +16,21 @@ import com.kfpd.cloud.auth.base.config.AuthOAuth2JdbcConfig;
 import com.kfpd.cloud.auth.base.config.AuthLoginProperties;
 import com.kfpd.cloud.auth.pojo.vo.LoginVO;
 import com.kfpd.cloud.auth.pojo.LoginResponse;
+import com.kfpd.cloud.auth.pojo.vo.KickOutVO;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
 import com.kfpd.cloud.auth.pojo.TokenValidation;
 import com.kfpd.cloud.auth.dao.AuthLoginAccountDao;
 import com.kfpd.cloud.auth.service.AuthLoginAccount;
 import com.kfpd.cloud.auth.service.AuthService;
+import com.kfpd.cloud.common.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.common.exception.BusinessException;
 import com.kfpd.cloud.common.exception.ErrorCode;
 import com.kfpd.cloud.common.security.CommonJwtProperties;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
@@ -61,6 +65,7 @@ public class AuthServiceImpl implements AuthService {
     private final RegisteredClientRepository registeredClientRepository;
     private final OAuth2AuthorizationService authorizationService;
     private final AuthLoginAccountDao loginAccountDao;
+    private final JdbcOperations jdbcOperations;
 
     public AuthServiceImpl(AuthLoginProperties loginProperties,
                            CommonJwtProperties jwtProperties,
@@ -68,7 +73,8 @@ public class AuthServiceImpl implements AuthService {
                            JwtDecoder jwtDecoder,
                            RegisteredClientRepository registeredClientRepository,
                            OAuth2AuthorizationService authorizationService,
-                           AuthLoginAccountDao loginAccountDao) {
+                           AuthLoginAccountDao loginAccountDao,
+                           @Qualifier(MultiDataSourceNames.FA_CLOUD_JDBC_TEMPLATE) JdbcOperations jdbcOperations) {
         this.loginProperties = loginProperties;
         this.jwtProperties = jwtProperties;
         this.jwtEncoder = jwtEncoder;
@@ -76,6 +82,7 @@ public class AuthServiceImpl implements AuthService {
         this.registeredClientRepository = registeredClientRepository;
         this.authorizationService = authorizationService;
         this.loginAccountDao = loginAccountDao;
+        this.jdbcOperations = jdbcOperations;
     }
 
     @Override
@@ -261,6 +268,49 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    @Override
+    public void logout(String authorization) {
+        String token = resolveToken(authorization);
+        if (token == null) {
+            log.warn("Logout failed: reason=missing_bearer_token");
+            throw new BusinessException(ErrorCode.AUTH_INVALID_ACCESS_TOKEN);
+        }
+
+        OAuth2Authorization savedAuthorization = authorizationService.findByToken(token, OAuth2TokenType.ACCESS_TOKEN);
+        if (savedAuthorization == null) {
+            log.warn("Logout skipped: reason=authorization_not_found");
+            throw new BusinessException(ErrorCode.AUTH_INVALID_ACCESS_TOKEN);
+        }
+
+        authorizationService.remove(savedAuthorization);
+        log.info("Logout succeeded: username={}, authorizationId={}",
+                savedAuthorization.getPrincipalName(), savedAuthorization.getId());
+    }
+
+    @Override
+    public int kickOut(KickOutVO request, String operatorAuthorization) {
+        TokenValidation operator = validate(operatorAuthorization);
+        if (!operator.valid() || !hasManagerAccess(operator.roles())) {
+            log.warn("Kick-out rejected: operator={}, target={}, reason=manager_role_required",
+                    operator.username(), request.username());
+            throw new BusinessException(ErrorCode.AUTH_MANAGER_PERMISSION_REQUIRED);
+        }
+
+        List<String> authorizationIds = findAuthorizationIdsByPrincipalName(request.username());
+        int revokedCount = 0;
+        for (String authorizationId : authorizationIds) {
+            OAuth2Authorization authorization = authorizationService.findById(authorizationId);
+            if (authorization != null) {
+                authorizationService.remove(authorization);
+                revokedCount++;
+            }
+        }
+
+        log.info("Kick-out succeeded: operator={}, target={}, revokedCount={}",
+                operator.username(), request.username(), revokedCount);
+        return revokedCount;
+    }
+
     private String resolveToken(String authorization) {
         if (authorization == null || !authorization.startsWith("Bearer ")) {
             return null;
@@ -336,6 +386,18 @@ public class AuthServiceImpl implements AuthService {
         // "*" can be used for local/demo environments where manager IP filtering is intentionally disabled.
         Set<String> allowedIps = loginProperties.getManager().getAllowedIps();
         return allowedIps.contains("*") || allowedIps.contains(clientIp);
+    }
+
+    private boolean hasManagerAccess(List<String> roles) {
+        return roles.contains("MANAGER") || roles.contains("SUPER_ADMIN");
+    }
+
+    private List<String> findAuthorizationIdsByPrincipalName(String username) {
+        return jdbcOperations.queryForList(
+                "select id from oauth2_authorization where principal_name = ?",
+                String.class,
+                username
+        );
     }
 
     private record LoginAttempt(int failedCount, LocalDateTime lockedUntil) {

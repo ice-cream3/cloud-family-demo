@@ -3,21 +3,28 @@ package com.kfpd.cloud.gateway.base.filter;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import com.kfpd.cloud.common.exception.ErrorCode;
+import com.kfpd.cloud.common.web.ApiResponse;
 import com.kfpd.cloud.common.web.GatewayHeaders;
+import com.kfpd.cloud.gateway.pojo.TokenValidation;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
 
 import reactor.core.publisher.Mono;
@@ -26,9 +33,19 @@ import reactor.core.publisher.Mono;
 public class AuthenticationFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(AuthenticationFilter.class);
+    private static final TokenValidation INVALID_TOKEN = new TokenValidation(false, null, null, List.of(), List.of(), Map.of());
+    private static final ParameterizedTypeReference<ApiResponse<TokenValidation>> TOKEN_VALIDATION_RESPONSE =
+            new ParameterizedTypeReference<>() {
+            };
 
     // Login and actuator health endpoints must be reachable before a token exists.
     private final List<String> publicPaths = List.of("/auth/api/login", "/auth/manager/login", "/auth/refresh", "/actuator/health");
+    private final WebClient authWebClient;
+
+    public AuthenticationFilter(WebClient.Builder webClientBuilder,
+                                @Value("${demo.auth-service-url:http://localhost:8081}") String authServiceUrl) {
+        this.authWebClient = webClientBuilder.baseUrl(authServiceUrl).build();
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -42,18 +59,9 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                 .cast(JwtAuthenticationToken.class)
                 .flatMap(authentication -> {
                     Jwt jwt = authentication.getToken();
-                    List<String> roles = claimAsStringList(jwt, "roles");
-                    List<String> permissions = claimAsStringList(jwt, "permissions");
-                    if (path.startsWith("/api/manager/") && !hasManagerAccess(roles)) {
-                        return writeError(exchange, ErrorCode.GATEWAY_MANAGER_ROLE_REQUIRED);
-                    }
-                    ServerHttpRequest authenticatedRequest = request.mutate()
-                            .header(GatewayHeaders.USER_NAME, claimOrSubject(jwt, "username"))
-                            .header(GatewayHeaders.USER_TYPE, jwt.getClaimAsString("user_type"))
-                            .header(GatewayHeaders.USER_ROLES, String.join(",", roles))
-                            .header(GatewayHeaders.USER_PERMISSIONS, String.join(",", permissions))
-                            .build();
-                    return chain.filter(exchange.mutate().request(authenticatedRequest).build());
+                    String authorization = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+                    return validateWithAuthService(authorization)
+                            .flatMap(validation -> routeAuthenticatedRequest(exchange, chain, request, path, jwt, validation));
                 })
                 .switchIfEmpty(Mono.defer(() -> writeError(exchange, ErrorCode.GATEWAY_MISSING_AUTHENTICATED_JWT)));
     }
@@ -90,8 +98,47 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
         return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
-    private List<String> claimAsStringList(Jwt jwt, String claimName) {
-        List<String> values = jwt.getClaimAsStringList(claimName);
+    private Mono<Void> routeAuthenticatedRequest(ServerWebExchange exchange,
+                                                 GatewayFilterChain chain,
+                                                 ServerHttpRequest request,
+                                                 String path,
+                                                 Jwt jwt,
+                                                 TokenValidation validation) {
+        if (validation == null || !validation.valid()) {
+            log.warn("Gateway token rejected by auth-service: method={}, path={}, subject={}",
+                    request.getMethod(), path, jwt.getSubject());
+            return writeError(exchange, ErrorCode.GATEWAY_INVALID_ACCESS_TOKEN);
+        }
+
+        List<String> roles = emptyIfNull(validation.roles());
+        List<String> permissions = emptyIfNull(validation.permissions());
+        if (path.startsWith("/api/manager/") && !hasManagerAccess(roles)) {
+            return writeError(exchange, ErrorCode.GATEWAY_MANAGER_ROLE_REQUIRED);
+        }
+        ServerHttpRequest authenticatedRequest = request.mutate()
+                .header(GatewayHeaders.USER_NAME, validation.username() == null ? claimOrSubject(jwt, "username") : validation.username())
+                .header(GatewayHeaders.USER_TYPE, validation.userType() == null ? jwt.getClaimAsString("user_type") : validation.userType())
+                .header(GatewayHeaders.USER_ROLES, String.join(",", roles))
+                .header(GatewayHeaders.USER_PERMISSIONS, String.join(",", permissions))
+                .build();
+        return chain.filter(exchange.mutate().request(authenticatedRequest).build());
+    }
+
+    private Mono<TokenValidation> validateWithAuthService(String authorization) {
+        return authWebClient.post()
+                .uri("/auth/validate")
+                .header(HttpHeaders.AUTHORIZATION, authorization == null ? "" : authorization)
+                .retrieve()
+                .bodyToMono(TOKEN_VALIDATION_RESPONSE)
+                .map(ApiResponse::data)
+                .defaultIfEmpty(INVALID_TOKEN)
+                .onErrorResume(ex -> {
+                    log.warn("Gateway auth-service validation failed: message={}", ex.getMessage());
+                    return Mono.just(INVALID_TOKEN);
+                });
+    }
+
+    private List<String> emptyIfNull(List<String> values) {
         return values == null ? List.of() : values;
     }
 

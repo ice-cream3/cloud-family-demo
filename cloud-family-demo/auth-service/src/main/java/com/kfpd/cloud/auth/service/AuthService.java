@@ -2,6 +2,7 @@ package com.kfpd.cloud.auth.service;
 
 import com.kfpd.cloud.auth.pojo.LoginResponse;
 import com.kfpd.cloud.auth.pojo.TokenValidation;
+import com.kfpd.cloud.auth.pojo.vo.KickOutVO;
 import com.kfpd.cloud.auth.pojo.vo.LoginVO;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
 
@@ -14,4 +15,8 @@ public interface AuthService {
     LoginResponse refreshAccessToken(RefreshTokenVO request);
 
     TokenValidation validate(String authorization);
+
+    void logout(String authorization);
+
+    int kickOut(KickOutVO request, String operatorAuthorization);
 }

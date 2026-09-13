@@ -17,6 +17,7 @@ public enum ErrorCode {
     AUTH_REGISTERED_CLIENT_NOT_FOUND(100007, 401, "Registered client not found"),
     AUTHORIZATION_METADATA_INCOMPLETE(100008, 401, "Authorization metadata is incomplete"),
     AUTH_TOO_MANY_API_LOGIN_ATTEMPTS(100009, 429, "Too many api login attempts"),
+    AUTH_INVALID_ACCESS_TOKEN(100010, 401, "Invalid access token"),
 
     PARTNER_VIP_USER_NOT_FOUND(200001, 404, "Vip user not found"),
 
@@ -24,7 +25,8 @@ public enum ErrorCode {
 
     GATEWAY_MISSING_AUTHENTICATED_JWT(400001, 401, "Missing authenticated JWT"),
     GATEWAY_MANAGER_ROLE_REQUIRED(400002, 403, "Manager role required"),
-    GATEWAY_TOO_MANY_REQUESTS(400003, 429, "Too many requests");
+    GATEWAY_TOO_MANY_REQUESTS(400003, 429, "Too many requests"),
+    GATEWAY_INVALID_ACCESS_TOKEN(400004, 401, "Invalid access token");
 
     private final int code;
     private final int httpStatus;

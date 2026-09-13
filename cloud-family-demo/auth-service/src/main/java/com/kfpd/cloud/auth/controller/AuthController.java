@@ -2,6 +2,7 @@ package com.kfpd.cloud.auth.controller;
 
 import com.kfpd.cloud.auth.pojo.vo.LoginVO;
 import com.kfpd.cloud.auth.pojo.LoginResponse;
+import com.kfpd.cloud.auth.pojo.vo.KickOutVO;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
 import com.kfpd.cloud.auth.pojo.TokenValidation;
 import com.kfpd.cloud.auth.service.AuthService;
@@ -41,6 +42,18 @@ public class AuthController {
     @PostMapping("/refresh")
     public ApiResponse<LoginResponse> refresh(@Valid @RequestBody RefreshTokenVO request) {
         return ApiResponse.success(authService.refreshAccessToken(request));
+    }
+
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+        authService.logout(authorization);
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/manager/kick-out")
+    public ApiResponse<Integer> kickOut(@Valid @RequestBody KickOutVO request,
+                                        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+        return ApiResponse.success(authService.kickOut(request, authorization));
     }
 
     @PostMapping("/validate")

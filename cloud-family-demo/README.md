@@ -12,6 +12,24 @@ JDK 21 + Spring Boot 4.0.8 + Spring Cloud 2025.1.3 microservice demo.
 
 System users, roles, permissions, menus, and their relationships are manager-service features backed by the `fa-cloud` MySQL database. API user profile data is stored in `fa-cloud.vip_user`.
 
+## Features
+
+- Gateway-first API access with protected API and manager routes.
+- API user and manager user login flows with JWT access and refresh tokens.
+- Local JWT validation before protected requests are routed to backend services.
+- Manager dashboard and system management APIs for users, roles, permissions, and menus.
+- Shared common module for cross-service configuration, constants, and infrastructure setup.
+
+## Integrations
+
+- Spring Cloud Gateway WebFlux for API routing.
+- Spring Security OAuth2, Authorization Server, Resource Server, and JOSE/JWT support.
+- MyBatis-Plus and MyBatis Spring for database access.
+- MySQL with shared multi-data-source configuration.
+- Redisson for Redis Cluster client integration.
+- Spring Boot Actuator for health and info endpoints.
+- Log4j2 for application logging.
+
 ## Build
 
 ```bash
@@ -59,6 +77,13 @@ curl -s -X POST http://localhost:8080/auth/refresh \
   -d '{"refreshToken":"<refreshToken>"}'
 ```
 
+Logout revokes the current access token and its refresh token:
+
+```bash
+curl -s -X POST http://localhost:8080/auth/logout \
+  -H 'Authorization: Bearer <accessToken>'
+```
+
 Login as a manager user:
 
 ```bash
@@ -72,6 +97,15 @@ Use the manager token to access manager APIs:
 ```bash
 curl -s http://localhost:8080/api/manager/dashboard \
   -H 'Authorization: Bearer <accessToken>'
+```
+
+Kick a user offline by revoking all of their active sessions:
+
+```bash
+curl -s -X POST http://localhost:8080/auth/manager/kick-out \
+  -H 'Authorization: Bearer <managerAccessToken>' \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"alice"}'
 ```
 
 System management endpoints are available through the manager service prefix:
