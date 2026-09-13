@@ -71,7 +71,11 @@ XXL_JOB_ACCESS_TOKEN=default_token \
 mvn -pl job-service spring-boot:run
 ```
 
-The sample handler name for XXL-JOB admin is `demoJobHandler`.
+The sample handler names for XXL-JOB admin are:
+
+- `demoJobHandler`: normal demo job.
+- `paramDemoJobHandler`: job parameter demo, reads comma-separated values from XXL-JOB Admin job params.
+- `shardingDemoJobHandler`: sharding demo job, intended for the `SHARDING_BROADCAST` route strategy.
 
 ## Try
 
