@@ -81,6 +81,7 @@ The sample handler names for XXL-JOB admin are:
 For `managerLoginStats10mJobHandler`, use a 10-minute cron such as `0 0/10 * * * ?`.
 Without a job param it calculates the previous complete 10-minute window. To recalculate
 a specific window, pass the window end as an ISO timestamp, for example `2026-09-13T10:20:00Z`.
+Create the target table manually with `job-service/src/main/resources/db/fa-model/manager-login-stats-schema.sql`.
 
 ## Try
 

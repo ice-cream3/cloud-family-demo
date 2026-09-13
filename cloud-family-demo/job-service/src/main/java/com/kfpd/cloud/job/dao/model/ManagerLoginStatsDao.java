@@ -8,8 +8,6 @@ import org.apache.ibatis.annotations.Param;
 
 public interface ManagerLoginStatsDao {
 
-    void createManagerLoginStatsTable();
-
     int upsertManagerLoginStat(@Param("windowStart") Instant windowStart,
                                @Param("windowEnd") Instant windowEnd,
                                @Param("stat") ManagerLoginStatDTO stat,

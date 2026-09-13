@@ -31,11 +31,6 @@ public class ManagerLoginStatsServiceImpl implements ManagerLoginStatsService {
     }
 
     @Override
-    public void initializeSchema() {
-        managerLoginStatsDao.createManagerLoginStatsTable();
-    }
-
-    @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_MODEL_TRANSACTION_MANAGER)
     public ManagerLoginStatsSummaryDTO calculate10mStats(String jobParam) {
         TimeWindow window = resolveWindow(jobParam);
