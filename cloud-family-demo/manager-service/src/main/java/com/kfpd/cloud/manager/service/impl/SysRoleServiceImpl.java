@@ -16,6 +16,7 @@ import com.kfpd.cloud.manager.pojo.vo.SysRoleRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysMenu;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
 import com.kfpd.cloud.manager.pojo.entity.SysRole;
+import com.kfpd.cloud.manager.service.OperationLogService;
 import com.kfpd.cloud.manager.service.SysPermissionService;
 import com.kfpd.cloud.manager.service.SysRoleService;
 
@@ -28,15 +29,25 @@ import org.springframework.transaction.annotation.Transactional;
 public class SysRoleServiceImpl implements SysRoleService {
 
     private static final Logger log = LoggerFactory.getLogger(SysRoleServiceImpl.class);
+    private static final String MODULE_SYSTEM = "SYSTEM";
+    private static final String BUSINESS_ROLE = "SYS_ROLE";
+    private static final String BUSINESS_ROLE_PERMISSION = "SYS_ROLE_PERMISSION";
+    private static final String BUSINESS_ROLE_MENU = "SYS_ROLE_MENU";
+    private static final String BUSINESS_MENU = "SYS_MENU";
 
     private final SysRoleDao roleDao;
     private final SysMenuDao menuDao;
     private final SysPermissionService permissionService;
+    private final OperationLogService operationLogService;
 
-    public SysRoleServiceImpl(SysRoleDao roleDao, SysMenuDao menuDao, SysPermissionService permissionService) {
+    public SysRoleServiceImpl(SysRoleDao roleDao,
+                              SysMenuDao menuDao,
+                              SysPermissionService permissionService,
+                              OperationLogService operationLogService) {
         this.roleDao = roleDao;
         this.menuDao = menuDao;
         this.permissionService = permissionService;
+        this.operationLogService = operationLogService;
     }
 
     @Override
@@ -71,7 +82,9 @@ public class SysRoleServiceImpl implements SysRoleService {
         SysRole role = new SysRole();
         apply(role, request);
         roleDao.insert(role);
-        return findRoleById(role.getId());
+        SysRole created = findRoleById(role.getId());
+        operationLogService.recordCreate(MODULE_SYSTEM, BUSINESS_ROLE, created.getId(), created.getRoleCode(), created);
+        return created;
     }
 
     @Override
@@ -79,6 +92,7 @@ public class SysRoleServiceImpl implements SysRoleService {
     public SysRole updateRole(Long id, SysRoleRequestVO request) {
         SystemManagementSupport.requireText(request.roleCode(), "roleCode is required");
         SystemManagementSupport.requireText(request.roleName(), "roleName is required");
+        SysRole before = findRoleById(id);
         SysRole role = new SysRole();
         role.setId(id);
         apply(role, request);
@@ -86,16 +100,20 @@ public class SysRoleServiceImpl implements SysRoleService {
             log.warn("Role service exception: action=updateRole, id={}, message=Role not found", id);
             throw SystemManagementSupport.notFound("Role not found");
         }
-        return findRoleById(id);
+        SysRole updated = findRoleById(id);
+        operationLogService.recordUpdate(MODULE_SYSTEM, BUSINESS_ROLE, id, updated.getRoleCode(), before, updated);
+        return updated;
     }
 
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void deleteRole(Long id) {
+        SysRole before = findRoleById(id);
         if (roleDao.deleteById(id) == 0) {
             log.warn("Role service exception: action=deleteRole, id={}, message=Role not found", id);
             throw SystemManagementSupport.notFound("Role not found");
         }
+        operationLogService.recordDelete(MODULE_SYSTEM, BUSINESS_ROLE, id, before.getRoleCode(), before);
     }
 
     @Override
@@ -110,9 +128,12 @@ public class SysRoleServiceImpl implements SysRoleService {
         findRoleById(id);
         List<Long> permissionIds = SystemManagementSupport.ids(request);
         permissionIds.forEach(permissionService::findPermissionById);
+        List<SysPermission> before = roleDao.findPermissionsByRoleId(id);
         roleDao.deleteRolePermissions(id);
         permissionIds.forEach(permissionId -> roleDao.insertRolePermission(id, permissionId));
-        return roleDao.findPermissionsByRoleId(id);
+        List<SysPermission> updated = roleDao.findPermissionsByRoleId(id);
+        operationLogService.recordUpdate(MODULE_SYSTEM, BUSINESS_ROLE_PERMISSION, id, String.valueOf(id), before, updated);
+        return updated;
     }
 
     @Override
@@ -147,7 +168,9 @@ public class SysRoleServiceImpl implements SysRoleService {
         SysMenu menu = new SysMenu();
         apply(menu, request);
         menuDao.insert(menu);
-        return findMenuById(menu.getId());
+        SysMenu created = findMenuById(menu.getId());
+        operationLogService.recordCreate(MODULE_SYSTEM, BUSINESS_MENU, created.getId(), created.getMenuCode(), created);
+        return created;
     }
 
     @Override
@@ -155,6 +178,7 @@ public class SysRoleServiceImpl implements SysRoleService {
     public SysMenu updateMenu(Long id, SysMenuRequestVO request) {
         SystemManagementSupport.requireText(request.menuCode(), "menuCode is required");
         SystemManagementSupport.requireText(request.menuName(), "menuName is required");
+        SysMenu before = findMenuById(id);
         SysMenu menu = new SysMenu();
         menu.setId(id);
         apply(menu, request);
@@ -162,16 +186,20 @@ public class SysRoleServiceImpl implements SysRoleService {
             log.warn("Role service exception: action=updateMenu, id={}, message=Menu not found", id);
             throw SystemManagementSupport.notFound("Menu not found");
         }
-        return findMenuById(id);
+        SysMenu updated = findMenuById(id);
+        operationLogService.recordUpdate(MODULE_SYSTEM, BUSINESS_MENU, id, updated.getMenuCode(), before, updated);
+        return updated;
     }
 
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void deleteMenu(Long id) {
+        SysMenu before = findMenuById(id);
         if (menuDao.deleteById(id) == 0) {
             log.warn("Role service exception: action=deleteMenu, id={}, message=Menu not found", id);
             throw SystemManagementSupport.notFound("Menu not found");
         }
+        operationLogService.recordDelete(MODULE_SYSTEM, BUSINESS_MENU, id, before.getMenuCode(), before);
     }
 
     @Override
@@ -186,9 +214,12 @@ public class SysRoleServiceImpl implements SysRoleService {
         findRoleById(id);
         List<Long> menuIds = SystemManagementSupport.ids(request);
         menuIds.forEach(this::findMenuById);
+        List<SysMenu> before = roleDao.findMenusByRoleId(id);
         roleDao.deleteRoleMenus(id);
         menuIds.forEach(menuId -> roleDao.insertRoleMenu(id, menuId));
-        return roleDao.findMenusByRoleId(id);
+        List<SysMenu> updated = roleDao.findMenusByRoleId(id);
+        operationLogService.recordUpdate(MODULE_SYSTEM, BUSINESS_ROLE_MENU, id, String.valueOf(id), before, updated);
+        return updated;
     }
 
     private void apply(SysRole role, SysRoleRequestVO request) {

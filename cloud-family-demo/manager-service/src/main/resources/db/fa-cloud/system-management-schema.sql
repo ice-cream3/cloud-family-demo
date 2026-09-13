@@ -91,6 +91,28 @@ CREATE TABLE IF NOT EXISTS sys_role_menu (
     CONSTRAINT fk_sys_role_menu_menu FOREIGN KEY (menu_id) REFERENCES sys_menu (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE IF NOT EXISTS operation_log (
+    id bigint NOT NULL AUTO_INCREMENT,
+    operator_username varchar(64) DEFAULT NULL,
+    operator_user_type varchar(32) DEFAULT NULL,
+    operation_type varchar(32) NOT NULL,
+    business_module varchar(64) NOT NULL,
+    business_type varchar(64) NOT NULL,
+    business_id varchar(128) DEFAULT NULL,
+    business_name varchar(255) DEFAULT NULL,
+    before_data json DEFAULT NULL,
+    after_data json DEFAULT NULL,
+    client_ip varchar(64) DEFAULT NULL,
+    request_uri varchar(255) DEFAULT NULL,
+    request_method varchar(16) DEFAULT NULL,
+    operation_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_operation_log_operator_time (operator_username, operation_at),
+    KEY idx_operation_log_business (business_module, business_type, business_id),
+    KEY idx_operation_log_type_time (operation_type, operation_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 INSERT IGNORE INTO sys_user (username, password_hash, display_name, email, status)
 VALUES
     ('alice', 'demo', 'API Demo User', 'alice@example.com', 'ENABLED'),

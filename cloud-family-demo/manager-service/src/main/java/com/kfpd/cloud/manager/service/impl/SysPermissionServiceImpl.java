@@ -11,6 +11,7 @@ import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.manager.pojo.vo.PageVO;
 import com.kfpd.cloud.manager.pojo.vo.SysPermissionRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
+import com.kfpd.cloud.manager.service.OperationLogService;
 import com.kfpd.cloud.manager.service.SysPermissionService;
 
 import org.slf4j.Logger;
@@ -22,11 +23,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class SysPermissionServiceImpl implements SysPermissionService {
 
     private static final Logger log = LoggerFactory.getLogger(SysPermissionServiceImpl.class);
+    private static final String MODULE_SYSTEM = "SYSTEM";
+    private static final String BUSINESS_PERMISSION = "SYS_PERMISSION";
 
     private final SysPermissionDao permissionDao;
+    private final OperationLogService operationLogService;
 
-    public SysPermissionServiceImpl(SysPermissionDao permissionDao) {
+    public SysPermissionServiceImpl(SysPermissionDao permissionDao, OperationLogService operationLogService) {
         this.permissionDao = permissionDao;
+        this.operationLogService = operationLogService;
     }
 
     @Override
@@ -61,7 +66,9 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         SysPermission permission = new SysPermission();
         apply(permission, request);
         permissionDao.insert(permission);
-        return findPermissionById(permission.getId());
+        SysPermission created = findPermissionById(permission.getId());
+        operationLogService.recordCreate(MODULE_SYSTEM, BUSINESS_PERMISSION, created.getId(), created.getPermissionCode(), created);
+        return created;
     }
 
     @Override
@@ -69,6 +76,7 @@ public class SysPermissionServiceImpl implements SysPermissionService {
     public SysPermission updatePermission(Long id, SysPermissionRequestVO request) {
         SystemManagementSupport.requireText(request.permissionCode(), "permissionCode is required");
         SystemManagementSupport.requireText(request.permissionName(), "permissionName is required");
+        SysPermission before = findPermissionById(id);
         SysPermission permission = new SysPermission();
         permission.setId(id);
         apply(permission, request);
@@ -76,16 +84,20 @@ public class SysPermissionServiceImpl implements SysPermissionService {
             log.warn("Permission service exception: action=updatePermission, id={}, message=Permission not found", id);
             throw SystemManagementSupport.notFound("Permission not found");
         }
-        return findPermissionById(id);
+        SysPermission updated = findPermissionById(id);
+        operationLogService.recordUpdate(MODULE_SYSTEM, BUSINESS_PERMISSION, id, updated.getPermissionCode(), before, updated);
+        return updated;
     }
 
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void deletePermission(Long id) {
+        SysPermission before = findPermissionById(id);
         if (permissionDao.deleteById(id) == 0) {
             log.warn("Permission service exception: action=deletePermission, id={}, message=Permission not found", id);
             throw SystemManagementSupport.notFound("Permission not found");
         }
+        operationLogService.recordDelete(MODULE_SYSTEM, BUSINESS_PERMISSION, id, before.getPermissionCode(), before);
     }
 
     private void apply(SysPermission permission, SysPermissionRequestVO request) {

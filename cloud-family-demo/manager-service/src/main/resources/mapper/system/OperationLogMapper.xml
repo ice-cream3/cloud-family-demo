@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfpd.cloud.manager.dao.OperationLogDao">
+
+    <insert id="insert" parameterType="com.kfpd.cloud.manager.pojo.entity.OperationLog"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO operation_log
+            (operator_username, operator_user_type, operation_type, business_module,
+             business_type, business_id, business_name, before_data, after_data,
+             client_ip, request_uri, request_method, operation_at)
+        VALUES
+            (#{operatorUsername}, #{operatorUserType}, #{operationType}, #{businessModule},
+             #{businessType}, #{businessId}, #{businessName}, #{beforeData}, #{afterData},
+             #{clientIp}, #{requestUri}, #{requestMethod}, #{operationAt})
+    </insert>
+</mapper>
