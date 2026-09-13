@@ -1,0 +1,15 @@
+server:
+  port: ${JOB_SERVER_PORT:8084}
+
+demo:
+  xxl-job:
+    enabled: ${XXL_JOB_ENABLED:true}
+    admin-addresses: ${XXL_JOB_ADMIN_ADDRESSES:http://localhost:8088/xxl-job-admin}
+    access-token: ${XXL_JOB_ACCESS_TOKEN:default_token}
+    executor:
+      app-name: ${XXL_JOB_EXECUTOR_APP_NAME:cloud-family-job-service}
+      address: ${XXL_JOB_EXECUTOR_ADDRESS:}
+      ip: ${XXL_JOB_EXECUTOR_IP:}
+      port: ${XXL_JOB_EXECUTOR_PORT:9999}
+      log-path: ${XXL_JOB_EXECUTOR_LOG_PATH:logs/xxl-job/jobhandler}
+      log-retention-days: ${XXL_JOB_EXECUTOR_LOG_RETENTION_DAYS:30}

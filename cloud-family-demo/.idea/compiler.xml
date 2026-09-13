@@ -14,6 +14,7 @@
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
+        <module name="job-service" />
         <module name="partner-service" />
         <module name="auth-service" />
         <module name="common-service" />
@@ -31,6 +32,7 @@
       <module name="cloud-family-demo" options="-parameters" />
       <module name="common-service" options="-parameters" />
       <module name="gateway-service" options="-parameters" />
+      <module name="job-service" options="-parameters" />
       <module name="manager-service" options="-parameters" />
       <module name="partner-service" options="-parameters" />
     </option>
