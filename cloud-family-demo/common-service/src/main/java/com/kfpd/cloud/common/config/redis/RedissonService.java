@@ -10,12 +10,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * @author mario
@@ -128,20 +127,6 @@ public class RedissonService {
     }
 
     /**
-     * 设置红包列表
-     * @param key
-     * @param amounts
-     * @param seconds
-     */
-    public void initRedPacketList(String key, List<BigDecimal> amounts, long seconds) {
-        RList<BigDecimal> list = redissonClient.getList(key);
-        list.clear();
-        list.addAll(amounts);
-        // 设置过期时间
-        list.expire(seconds,TimeUnit.SECONDS);
-    }
-
-    /**
      * 尝试获取锁
      *  【启动锁续期】机制,默认加锁时长30秒
      * @param key 锁key
@@ -174,7 +159,7 @@ public class RedissonService {
      * @param time 默认秒
      */
     public void set(String key, Object value, long time) {
-        redissonClient.getBucket(key).set(value, time, TimeUnit.SECONDS);
+        redissonClient.getBucket(key).set(value, Duration.ofSeconds(time));
     }
 
     /**
@@ -183,7 +168,7 @@ public class RedissonService {
      * @param time 默认秒
      */
     public void setLong(String key, Object value, long time) {
-        redissonClient.getBucket(key, LongCodec.INSTANCE).set(value, time, TimeUnit.SECONDS);
+        redissonClient.getBucket(key, LongCodec.INSTANCE).set(value, Duration.ofSeconds(time));
     }
 
     /**
@@ -286,11 +271,11 @@ public class RedissonService {
     }
 
     public Boolean expire(String key, long time) {
-        return redissonClient.getBucket(key).expire(time, TimeUnit.SECONDS);
+        return expire(key, time, TimeUnit.SECONDS);
     }
 
     public Boolean expire(String key, long time, TimeUnit timeUnit) {
-        return redissonClient.getBucket(key).expire(time, timeUnit);
+        return expireObject(redissonClient.getBucket(key), time, timeUnit);
     }
 
     /**
@@ -368,8 +353,9 @@ public class RedissonService {
     public Long incr(String key, long val, long time) {
         Long result = null;
         try {
-            result = redissonClient.getAtomicLong(key).addAndGet(val);
-            redissonClient.getBucket(key).expire(time, TimeUnit.SECONDS);
+            RAtomicLong atomicLong = redissonClient.getAtomicLong(key);
+            result = atomicLong.addAndGet(val);
+            expireObject(atomicLong, time, TimeUnit.SECONDS);
         } catch (Exception e) {
             del(key);
         }
@@ -387,8 +373,9 @@ public class RedissonService {
     public Long decr(String key, long val, long time) {
         long result = 0;
         try {
-            result = redissonClient.getAtomicLong(key).addAndGet(-val);
-            redissonClient.getBucket(key).expire(time, TimeUnit.SECONDS);
+            RAtomicLong atomicLong = redissonClient.getAtomicLong(key);
+            result = atomicLong.addAndGet(-val);
+            expireObject(atomicLong, time, TimeUnit.SECONDS);
         } catch (Exception e) {
             del(key);
         }
@@ -400,8 +387,9 @@ public class RedissonService {
     }
 
     public Boolean hSet(String key, String hashKey, Object value, long time) {
-        redissonClient.getMap(key).put(hashKey, value);
-        return redissonClient.getMap(key).expire(time, TimeUnit.SECONDS);
+        RMap<Object, Object> map = redissonClient.getMap(key);
+        map.put(hashKey, value);
+        return expireObject(map, time, TimeUnit.SECONDS);
     }
 
     public Object hSet(String key, String hashKey, Object value) {
@@ -413,8 +401,9 @@ public class RedissonService {
     }
 
     public Boolean hSetAll(String key, Map<String, Object> map, long time) {
-        redissonClient.getMap(key).putAll(map);
-        return redissonClient.getMap(key).expire(time, TimeUnit.SECONDS);
+        RMap<Object, Object> redisMap = redissonClient.getMap(key);
+        redisMap.putAll(map);
+        return expireObject(redisMap, time, TimeUnit.SECONDS);
     }
 
     public void hSetAll(String key, Map<String, ?> map) {
@@ -446,13 +435,15 @@ public class RedissonService {
     }
 
     public boolean sAdd(String key, Object val, long time) {
-        redissonClient.getSet(key).add(val);
-        return redissonClient.getSet(key).expire(time, TimeUnit.SECONDS);
+        RSet<Object> set = redissonClient.getSet(key);
+        set.add(val);
+        return expireObject(set, time, TimeUnit.SECONDS);
     }
 
     public void sAddAll(String key, Set<Object> vals, long time) {
-        redissonClient.getSet(key).addAll(vals);
-        redissonClient.getSet(key).expire(time, TimeUnit.SECONDS);
+        RSet<Object> set = redissonClient.getSet(key);
+        set.addAll(vals);
+        expireObject(set, time, TimeUnit.SECONDS);
     }
 
     public Boolean sIsMember(String key, Object value) {
@@ -500,7 +491,7 @@ public class RedissonService {
         try {
             add = redissonClient.getScoredSortedSet(key).add(score, value);
             if (add) {
-                add = redissonClient.getScoredSortedSet(key).expire(time, TimeUnit.SECONDS);
+                add = expireObject(redissonClient.getScoredSortedSet(key), time, TimeUnit.SECONDS);
             }
         } catch (Exception e) {
             log.error("add zset:{} error:{}", key, e.getMessage());
@@ -523,7 +514,7 @@ public class RedissonService {
         try {
             add = redissonClient.getScoredSortedSet(key).add(score, value);
             if (add) {
-                add = redissonClient.getScoredSortedSet(key).expire(time, timeUnit);
+                add = expireObject(redissonClient.getScoredSortedSet(key), time, timeUnit);
             }
         } catch (Exception e) {
             log.error("add zset:{} error:{}", key, e.getMessage());
@@ -547,7 +538,7 @@ public class RedissonService {
             try {
                 add = redissonClient.getScoredSortedSet(key).add(score, value);
                 if (add) {
-                    add = redissonClient.getScoredSortedSet(key).expire(time, TimeUnit.SECONDS);
+                    add = expireObject(redissonClient.getScoredSortedSet(key), time, TimeUnit.SECONDS);
                 }
                 if (retryTime /10 > 0) {
                     Thread.sleep(retryTime * 10 * 1000L);
@@ -575,7 +566,7 @@ public class RedissonService {
             try {
                 add = redissonClient.getScoredSortedSet(key).add(score, value);
                 if (add) {
-                    add = redissonClient.getScoredSortedSet(key).expire(Duration.ofSeconds(time));
+                    add = expireObject(redissonClient.getScoredSortedSet(key), time, TimeUnit.SECONDS);
                 }
                 if (retryTime /10 > 0) {
                     Thread.sleep(retryTime * 10 * 1000L);
@@ -605,7 +596,7 @@ public class RedissonService {
             try {
                 add = redissonClient.getScoredSortedSet(key).add(score, value);
                 if (add) {
-                    add = redissonClient.getScoredSortedSet(key).expire(time, timeUnit);
+                    add = expireObject(redissonClient.getScoredSortedSet(key), time, timeUnit);
                 }
                 if (retryTime /10 > 0) {
                     Thread.sleep(retryTime * 10 * 1000L);
@@ -694,7 +685,7 @@ public class RedissonService {
         boolean add = false;
         try {
             add = redissonClient.getList(key).add(value);
-            return redissonClient.getList(key).expire(Duration.ofSeconds(time));
+            return expireObject(redissonClient.getList(key), time, TimeUnit.SECONDS);
         } catch (Exception e){
             del(key);
         }
@@ -764,6 +755,18 @@ public class RedissonService {
         String normalizedName = org.springframework.util.StringUtils.hasText(name) ? name.trim() : "default";
         String prefix = org.springframework.util.StringUtils.hasText(properties.getKeyPrefix()) ? properties.getKeyPrefix().trim() : "lock";
         return prefix + ":" + normalizedName;
+    }
+
+    private boolean expireObject(RExpirable expirable, long time, TimeUnit timeUnit) {
+        if (time <= 0) {
+            return expirable.delete();
+        }
+        return expirable.expire(toDuration(time, timeUnit));
+    }
+
+    private Duration toDuration(long time, TimeUnit timeUnit) {
+        TimeUnit unit = timeUnit == null ? TimeUnit.SECONDS : timeUnit;
+        return Duration.ofNanos(unit.toNanos(time));
     }
 
 }
