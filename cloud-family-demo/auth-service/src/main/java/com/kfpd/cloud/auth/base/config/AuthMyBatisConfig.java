@@ -28,7 +28,7 @@ public class AuthMyBatisConfig {
     ) throws Exception {
         MybatisSqlSessionFactoryBean factoryBean = new MybatisSqlSessionFactoryBean();
         factoryBean.setDataSource(dataSource);
-        factoryBean.setMapperLocations(applicationContext.getResources("classpath*:mapper/**/*.xml"));
+        factoryBean.setMapperLocations(applicationContext.getResources("classpath*:mapper/cloud/**/*.xml"));
         factoryBean.setPlugins(authMybatisPlusInterceptor);
         return factoryBean.getObject();
     }
@@ -45,7 +45,7 @@ public class AuthMyBatisConfig {
     @Bean
     static MapperScannerConfigurer authMapperScannerConfigurer() {
         MapperScannerConfigurer configurer = new MapperScannerConfigurer();
-        configurer.setBasePackage("com.kfpd.cloud.auth.dao");
+        configurer.setBasePackage("com.kfpd.cloud.auth.dao.cloud");
         configurer.setSqlSessionFactoryBeanName("authSqlSessionFactory");
         return configurer;
     }

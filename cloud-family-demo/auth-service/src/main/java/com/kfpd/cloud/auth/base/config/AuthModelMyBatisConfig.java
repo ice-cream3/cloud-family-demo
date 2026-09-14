@@ -1,4 +1,4 @@
-package com.kfpd.cloud.job.base.config.mybatis;
+package com.kfpd.cloud.auth.base.config;
 
 import javax.sql.DataSource;
 
@@ -18,23 +18,23 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-public class JobCloudMyBatisConfig {
+public class AuthModelMyBatisConfig {
 
     @Bean
-    SqlSessionFactory jobCloudSqlSessionFactory(
-            @Qualifier(MultiDataSourceNames.FA_CLOUD) DataSource dataSource,
+    SqlSessionFactory authModelSqlSessionFactory(
+            @Qualifier(MultiDataSourceNames.FA_MODEL) DataSource dataSource,
             ApplicationContext applicationContext,
-            MybatisPlusInterceptor jobCloudMybatisPlusInterceptor
+            MybatisPlusInterceptor authModelMybatisPlusInterceptor
     ) throws Exception {
         MybatisSqlSessionFactoryBean factoryBean = new MybatisSqlSessionFactoryBean();
         factoryBean.setDataSource(dataSource);
-        factoryBean.setMapperLocations(applicationContext.getResources("classpath*:mapper/cloud/**/*.xml"));
-        factoryBean.setPlugins(jobCloudMybatisPlusInterceptor);
+        factoryBean.setMapperLocations(applicationContext.getResources("classpath*:mapper/model/**/*.xml"));
+        factoryBean.setPlugins(authModelMybatisPlusInterceptor);
         return factoryBean.getObject();
     }
 
     @Bean
-    MybatisPlusInterceptor jobCloudMybatisPlusInterceptor() {
+    MybatisPlusInterceptor authModelMybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
         interceptor.addInnerInterceptor(new IllegalSQLInnerInterceptor());
         interceptor.addInnerInterceptor(new BlockAttackInnerInterceptor());
@@ -43,10 +43,10 @@ public class JobCloudMyBatisConfig {
     }
 
     @Bean
-    static MapperScannerConfigurer jobCloudMapperScannerConfigurer() {
+    static MapperScannerConfigurer authModelMapperScannerConfigurer() {
         MapperScannerConfigurer configurer = new MapperScannerConfigurer();
-        configurer.setBasePackage("com.kfpd.cloud.job.dao.cloud");
-        configurer.setSqlSessionFactoryBeanName("jobCloudSqlSessionFactory");
+        configurer.setBasePackage("com.kfpd.cloud.auth.dao.model");
+        configurer.setSqlSessionFactoryBeanName("authModelSqlSessionFactory");
         return configurer;
     }
 }

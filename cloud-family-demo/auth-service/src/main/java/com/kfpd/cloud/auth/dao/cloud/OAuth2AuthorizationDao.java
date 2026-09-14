@@ -1,4 +1,4 @@
-package com.kfpd.cloud.auth.dao;
+package com.kfpd.cloud.auth.dao.cloud;
 
 import java.util.List;
 

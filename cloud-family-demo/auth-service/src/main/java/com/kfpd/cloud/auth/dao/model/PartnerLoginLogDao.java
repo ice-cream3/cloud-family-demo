@@ -1,4 +1,4 @@
-package com.kfpd.cloud.auth.dao;
+package com.kfpd.cloud.auth.dao.model;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.kfpd.cloud.auth.pojo.entity.PartnerLoginLog;

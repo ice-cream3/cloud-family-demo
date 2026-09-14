@@ -3,7 +3,6 @@
     <toRun name="Auth Service" type="SpringBootApplicationConfigurationType" />
     <toRun name="Partner Service" type="SpringBootApplicationConfigurationType" />
     <toRun name="Manager Service" type="SpringBootApplicationConfigurationType" />
-    <toRun name="XXL Job Admin" type="SpringBootApplicationConfigurationType" />
     <toRun name="Job Service" type="SpringBootApplicationConfigurationType" />
     <toRun name="Gateway Service" type="SpringBootApplicationConfigurationType" />
     <method v="2" />

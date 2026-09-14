@@ -1,8 +1,8 @@
-CREATE DATABASE IF NOT EXISTS `fa-cloud`
+CREATE DATABASE IF NOT EXISTS `fa-model`
     DEFAULT CHARACTER SET utf8mb4
     DEFAULT COLLATE utf8mb4_0900_ai_ci;
 
-USE `fa-cloud`;
+USE `fa-model`;
 
 CREATE TABLE IF NOT EXISTS partner_login_log (
     id bigint NOT NULL AUTO_INCREMENT,

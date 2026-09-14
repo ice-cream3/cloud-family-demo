@@ -2,21 +2,21 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.kfpd.cloud.job.dao.cloud.ManagerLoginLogStatsDao">
+<mapper namespace="com.kfpd.cloud.job.dao.model.PartnerLoginLogStatsDao">
 
-    <resultMap id="ManagerLoginStatResultMap" type="com.kfpd.cloud.job.pojo.dto.ManagerLoginStatDTO">
+    <resultMap id="PartnerLoginStatResultMap" type="com.kfpd.cloud.job.pojo.dto.PartnerLoginStatDTO">
         <result property="username" column="username"/>
         <result property="loginCount" column="login_count"/>
         <result property="firstLoginAt" column="first_login_at"/>
         <result property="lastLoginAt" column="last_login_at"/>
     </resultMap>
 
-    <select id="countManagerLogins" resultMap="ManagerLoginStatResultMap">
+    <select id="countPartnerLogins" resultMap="PartnerLoginStatResultMap">
         SELECT username,
                COUNT(*) AS login_count,
                MIN(login_at) AS first_login_at,
                MAX(login_at) AS last_login_at
-        FROM manager_login_log
+        FROM partner_login_log
         WHERE login_result = 'SUCCESS'
           AND login_at <![CDATA[>=]]> #{windowStart}
           AND login_at <![CDATA[<]]> #{windowEnd}

@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.kfpd.cloud.auth.dao.ManagerLoginLogDao">
+<mapper namespace="com.kfpd.cloud.auth.dao.model.ManagerLoginLogDao">
 
     <insert id="insertLoginLog">
         INSERT INTO manager_login_log

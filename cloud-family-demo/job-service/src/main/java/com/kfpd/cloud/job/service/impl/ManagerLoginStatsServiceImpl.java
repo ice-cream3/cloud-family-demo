@@ -7,8 +7,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
-import com.kfpd.cloud.job.dao.cloud.ManagerLoginLogStatsDao;
 import com.kfpd.cloud.job.dao.model.ManagerLoginStatsDao;
+import com.kfpd.cloud.job.dao.model.ManagerLoginLogStatsDao;
 import com.kfpd.cloud.job.pojo.dto.ManagerLoginStatDTO;
 import com.kfpd.cloud.job.pojo.dto.ManagerLoginStatsSummaryDTO;
 import com.kfpd.cloud.job.service.ManagerLoginStatsService;

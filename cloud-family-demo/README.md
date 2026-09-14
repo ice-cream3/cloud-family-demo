@@ -9,7 +9,6 @@ JDK 21 + Spring Boot 4.0.8 + Spring Cloud 2025.1.3 microservice demo.
 - `auth-service`: JWT issuing service on port `8081`.
 - `partner-service`: protected partner API service on port `8082`.
 - `manager-service`: protected manager API service on port `8083`.
-- `xxl-job-admin`: lightweight XXL-JOB admin-compatible service on port `8088`, located in the sibling `../xxl-job-admin` project.
 - `job-service`: XXL-JOB executor service on HTTP port `8084` and executor port `9999`.
 
 System users, roles, permissions, menus, and their relationships are manager-service features backed by the `fa-cloud` MySQL database. API user profile data is stored in `fa-cloud.vip_user`.
@@ -55,7 +54,6 @@ Start each service in a separate terminal:
 mvn -pl auth-service spring-boot:run
 mvn -pl partner-service spring-boot:run
 mvn -pl manager-service spring-boot:run
-(cd ../xxl-job-admin && mvn spring-boot:run)
 mvn -pl job-service spring-boot:run
 mvn -pl gateway-service spring-boot:run
 ```
@@ -64,8 +62,8 @@ In IntelliJ IDEA, use the shared `All Services` compound run configuration
 to start all services together.
 
 Auth sessions are stored in MySQL by default through Spring Authorization Server JDBC tables.
-API login events are stored in `fa-cloud.partner_login_log`, and manager login events are stored in
-`fa-cloud.manager_login_log`. Create both tables with `auth-service/src/main/resources/db/fa-cloud/auth-login-log-schema.sql`.
+API login events are stored in `fa-model.partner_login_log`, and manager login events are stored in
+`fa-model.manager_login_log`. Create both tables with `auth-service/src/main/resources/db/fa-model/auth-login-log-schema.sql`.
 To store login sessions in Redis instead, start `auth-service` with:
 
 ```bash
@@ -105,7 +103,7 @@ For `managerLoginStats10mJobHandler`, use a 10-minute cron such as `0 0/10 * * *
 Without a job param it calculates the previous complete 10-minute window. To recalculate
 a specific window, pass the window end as an ISO timestamp, for example `2026-09-13T10:20:00Z`.
 For `partnerLoginStats5mJobHandler`, use a 5-minute cron such as `0 0/5 * * * ?`.
-Create the source login log tables with `auth-service/src/main/resources/db/fa-cloud/auth-login-log-schema.sql`
+Create the source login log tables with `auth-service/src/main/resources/db/fa-model/auth-login-log-schema.sql`
 and the target stats tables with `job-service/src/main/resources/db/fa-model/manager-login-stats-schema.sql`
 and `job-service/src/main/resources/db/fa-model/partner-login-stats-schema.sql`.
 
