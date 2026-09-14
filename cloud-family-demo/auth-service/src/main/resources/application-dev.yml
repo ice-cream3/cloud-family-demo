@@ -9,6 +9,11 @@ spring:
         nodes: ${REDIS_CLUSTER_NODES:127.0.0.1:7000,127.0.0.1:7001,127.0.0.1:7002,127.0.0.1:7003,127.0.0.1:7004,127.0.0.1:7005}
 
 demo:
+  redisson:
+    lock:
+      key-prefix: ${REDIS_LOCK_KEY_PREFIX:cloud-family-demo:lock}
+      wait-time-seconds: ${REDIS_LOCK_WAIT_TIME_SECONDS:5}
+      lease-time-seconds: ${REDIS_LOCK_LEASE_TIME_SECONDS:30}
   auth:
     session:
       store: ${AUTH_SESSION_STORE:jdbc}

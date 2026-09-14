@@ -71,6 +71,8 @@ common-service/src/main/java/com/kfpd/cloud/common
 ├── exception
 │   ├── BusinessException.java
 │   └── ErrorCode.java
+├── utils
+│   └── RedisUtils.java
 └── web
     ├── ApiResponse.java
     └── GatewayHeaders.java
@@ -357,8 +359,113 @@ spring:
 | --- | --- |
 | `RedissonClient` | 阻塞式 Redisson 客户端。 |
 | `RedissonReactiveClient` | Reactive Redisson 客户端。 |
+| `RedissonService` | 基于 Redisson 的缓存、集合、计数器和分布式锁封装。 |
+| `RedisUtils` | 基于 Redisson 的常用 Redis 操作工具类。 |
 
 `nodes` 可以写 `host:port`，自动补成 `redis://host:port`；也可以显式写 `redis://` 或 `rediss://`。
+
+## Redis 工具类
+
+类：`com.kfpd.cloud.common.utils.RedisUtils`
+
+当前封装的操作：
+
+| 方法 | 说明 |
+| --- | --- |
+| `get` / `set` | 读写普通 key/value。 |
+| `set(key, value, ttl)` | 写入普通 key/value 并设置 TTL。 |
+| `exists` / `delete` / `expire` | 判断、删除、设置过期时间。 |
+| `addToSet` / `removeFromSet` / `readSet` / `deleteSet` | Set 类型常用操作。 |
+| `incrementAndGet` / `addAndGet` / `getAtomicLong` | 原子计数器操作。 |
+| `expireAtomicLong` / `deleteAtomicLong` | 原子计数器过期和删除。 |
+
+使用示例：
+
+```java
+import java.time.Duration;
+
+import com.kfpd.cloud.common.utils.RedisUtils;
+import org.springframework.stereotype.Service;
+
+@Service
+public class DemoCacheService {
+
+    private final RedisUtils redisUtils;
+
+    public DemoCacheService(RedisUtils redisUtils) {
+        this.redisUtils = redisUtils;
+    }
+
+    public void cacheProfile(String username, String payload) {
+        redisUtils.set("profile:" + username, payload, Duration.ofMinutes(10));
+    }
+}
+```
+
+## Redisson 分布式锁
+
+类：
+
+- `com.kfpd.cloud.common.config.redis.RedissonProperties`
+- `com.kfpd.cloud.common.config.redis.RedissonService`
+
+配置前缀：
+
+```yaml
+demo:
+  redisson:
+    lock:
+      key-prefix: ${REDIS_LOCK_KEY_PREFIX:cloud-family-demo:lock}
+      wait-time-seconds: ${REDIS_LOCK_WAIT_TIME_SECONDS:5}
+      lease-time-seconds: ${REDIS_LOCK_LEASE_TIME_SECONDS:30}
+```
+
+字段说明：
+
+| 字段 | 默认值 | 说明 |
+| --- | --- | --- |
+| `key-prefix` | `cloud-family-demo:lock` | 锁 key 前缀，最终 key 形如 `cloud-family-demo:lock:<name>`。 |
+| `wait-time-seconds` | `5` | 默认尝试获取锁的最长等待时间。 |
+| `lease-time-seconds` | `30` | 默认锁租约时间，到期后 Redisson 自动释放锁。 |
+
+使用示例：
+
+```java
+import com.kfpd.cloud.common.config.redis.RedissonService;
+import org.springframework.stereotype.Service;
+
+@Service
+public class DemoLockedService {
+
+    private final RedissonService redissonService;
+
+    public DemoLockedService(RedissonService redissonService) {
+        this.redissonService = redissonService;
+    }
+
+    public void rebuildStats(Long userId) {
+        redissonService.execute("rebuild-stats:" + userId, () -> {
+            // 需要互斥执行的业务逻辑。
+        });
+    }
+}
+```
+
+如果不希望获取锁失败时抛异常，可以使用 `tryExecute`：
+
+```java
+redissonService.tryExecute("daily-job", () -> {
+    runDailyJob();
+    return true;
+});
+```
+
+注意事项：
+
+- 锁名称要包含业务维度，例如 `vip-user:update:<id>`，避免无关业务互相阻塞。
+- `lease-time-seconds` 应大于正常业务执行时间；长任务应拆分或显式设置更长租约。
+- `execute` 获取锁失败会抛 `IllegalStateException`；`tryExecute` 获取失败会返回 `Optional.empty()`。
+- 使用手动 `tryLock` 时，必须在 `finally` 中调用 `unlock`。
 
 ## OAuth2 授权表
 
@@ -414,6 +521,12 @@ Redis 变量：
 | `REDIS_PASSWORD` | dev Redis 密码。 |
 | `REDIS_TEST_CLUSTER_NODES` | test Redis Cluster 节点列表。 |
 | `REDIS_TEST_PASSWORD` | test Redis 密码。 |
+| `REDIS_LOCK_KEY_PREFIX` | dev Redisson 锁 key 前缀。 |
+| `REDIS_LOCK_WAIT_TIME_SECONDS` | dev Redisson 锁默认等待时间。 |
+| `REDIS_LOCK_LEASE_TIME_SECONDS` | dev Redisson 锁默认租约时间。 |
+| `REDIS_TEST_LOCK_KEY_PREFIX` | test Redisson 锁 key 前缀。 |
+| `REDIS_TEST_LOCK_WAIT_TIME_SECONDS` | test Redisson 锁默认等待时间。 |
+| `REDIS_TEST_LOCK_LEASE_TIME_SECONDS` | test Redisson 锁默认租约时间。 |
 
 ## 当前服务使用方式
 

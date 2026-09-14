@@ -32,6 +32,11 @@ demo:
       enabled: ${GATEWAY_TEST_RATE_LIMIT_ENABLED:true}
       max-requests: ${GATEWAY_TEST_RATE_LIMIT_MAX_REQUESTS:120}
       window-seconds: ${GATEWAY_TEST_RATE_LIMIT_WINDOW_SECONDS:60}
+  redisson:
+    lock:
+      key-prefix: ${REDIS_TEST_LOCK_KEY_PREFIX:cloud-family-demo:test:lock}
+      wait-time-seconds: ${REDIS_TEST_LOCK_WAIT_TIME_SECONDS:5}
+      lease-time-seconds: ${REDIS_TEST_LOCK_LEASE_TIME_SECONDS:30}
   auth:
     jwt:
       issuer: ${JWT_TEST_ISSUER:cloud-family-demo-test}

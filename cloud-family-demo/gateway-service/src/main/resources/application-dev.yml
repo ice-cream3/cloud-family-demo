@@ -8,6 +8,11 @@ demo:
       enabled: ${GATEWAY_RATE_LIMIT_ENABLED:true}
       max-requests: ${GATEWAY_RATE_LIMIT_MAX_REQUESTS:120}
       window-seconds: ${GATEWAY_RATE_LIMIT_WINDOW_SECONDS:60}
+  redisson:
+    lock:
+      key-prefix: ${REDIS_LOCK_KEY_PREFIX:cloud-family-demo:lock}
+      wait-time-seconds: ${REDIS_LOCK_WAIT_TIME_SECONDS:5}
+      lease-time-seconds: ${REDIS_LOCK_LEASE_TIME_SECONDS:30}
   auth:
     jwt:
       issuer: ${JWT_ISSUER:cloud-family-demo}

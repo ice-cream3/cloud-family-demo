@@ -14,8 +14,8 @@
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
-        <module name="partner-service" />
         <module name="job-service" />
+        <module name="partner-service" />
         <module name="auth-service" />
         <module name="common-service" />
         <module name="manager-service" />

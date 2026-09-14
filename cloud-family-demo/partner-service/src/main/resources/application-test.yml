@@ -9,6 +9,11 @@ spring:
         nodes: ${REDIS_TEST_CLUSTER_NODES:127.0.0.1:7000,127.0.0.1:7001,127.0.0.1:7002,127.0.0.1:7003,127.0.0.1:7004,127.0.0.1:7005}
 
 demo:
+  redisson:
+    lock:
+      key-prefix: ${REDIS_TEST_LOCK_KEY_PREFIX:cloud-family-demo:test:lock}
+      wait-time-seconds: ${REDIS_TEST_LOCK_WAIT_TIME_SECONDS:5}
+      lease-time-seconds: ${REDIS_TEST_LOCK_LEASE_TIME_SECONDS:30}
   datasource:
     crypto:
       secret: ${DATASOURCE_TEST_CRYPTO_SECRET:cloud-family-demo-test-datasource-crypto-secret}
