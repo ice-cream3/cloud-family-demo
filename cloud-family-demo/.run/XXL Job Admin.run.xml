@@ -1,9 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="XXL Job Admin" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
-    <module name="xxl-job-admin" />
-    <option name="SPRING_BOOT_MAIN_CLASS" value="com.kfpd.cloud.xxljobadmin.XxlJobAdminApplication" />
-    <method v="2">
-      <option name="Make" enabled="true" />
-    </method>
-  </configuration>
-</component>
