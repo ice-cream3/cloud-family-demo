@@ -1,6 +1,6 @@
 package com.kfpd.cloud.common.utils;
 
-import com.kfpd.cloud.common.constant.CacheKeyConsts;
+import com.kfpd.cloud.common.constant.RedisKeyConsts;
 
 /**
  * @ClassName: RedisKeyUtil
@@ -9,7 +9,7 @@ import com.kfpd.cloud.common.constant.CacheKeyConsts;
 public class RedisKeyUtil {
 
     public static String redisKeyDemo(Integer sign) {
-        return CacheKeyUtil.getJoinKey(CacheKeyConsts.DEMO_KEY, ":", String.valueOf(sign));
+        return RedisKeyConsts.getJoinKey(RedisKeyConsts.DEMO_KEY, ":", String.valueOf(sign));
     }
 
 }

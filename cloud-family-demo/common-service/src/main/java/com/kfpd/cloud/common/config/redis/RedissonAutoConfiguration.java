@@ -3,7 +3,6 @@ package com.kfpd.cloud.common.config.redis;
 import java.util.List;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kfpd.cloud.common.utils.RedisUtils;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.api.RedissonReactiveClient;
@@ -53,12 +52,6 @@ public class RedissonAutoConfiguration {
                                     ObjectMapper objectMapper,
                                     RedissonProperties properties) {
         return new RedissonService(redissonClient, redisTemplate, objectMapper, properties);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    RedisUtils redisUtils(RedissonClient redissonClient) {
-        return new RedisUtils(redissonClient);
     }
 
     private String redisAddress(String node) {

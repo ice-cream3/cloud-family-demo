@@ -1,15 +1,47 @@
-package com.kfpd.cloud.common.utils;
+package com.kfpd.cloud.common.constant;
 
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.Arrays;
 
 /**
- * CacheKeyUtil
- * @Description 缓存工具类
+ * CacheConsts
+ * @Description 缓存KEY常量接口
  */
-public class CacheKeyUtil {
+public class RedisKeyConsts {
 
+    // redis锁key --------------------------------业务分隔线-----------------------------------------------
+    public static final String DEMO_KEY = "DEMO:KEY";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
     /**
      * @param keys 数组类型
      *             按照顺序放置需要拼装的成员，例如：new String[]{"val1","val2","val3"},结果：val1+val2+val3
@@ -54,5 +86,4 @@ public class CacheKeyUtil {
         buffer.append(orderNo);
         return buffer.toString().toUpperCase();
     }
-
 }

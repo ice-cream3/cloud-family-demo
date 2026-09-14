@@ -72,7 +72,8 @@ common-service/src/main/java/com/kfpd/cloud/common
 │   ├── BusinessException.java
 │   └── ErrorCode.java
 ├── utils
-│   └── RedisUtils.java
+│   ├── CacheKeyUtil.java
+│   └── RedisKeyUtil.java
 └── web
     ├── ApiResponse.java
     └── GatewayHeaders.java
@@ -360,44 +361,44 @@ spring:
 | `RedissonClient` | 阻塞式 Redisson 客户端。 |
 | `RedissonReactiveClient` | Reactive Redisson 客户端。 |
 | `RedissonService` | 基于 Redisson 的缓存、集合、计数器和分布式锁封装。 |
-| `RedisUtils` | 基于 Redisson 的常用 Redis 操作工具类。 |
 
 `nodes` 可以写 `host:port`，自动补成 `redis://host:port`；也可以显式写 `redis://` 或 `rediss://`。
 
-## Redis 工具类
+## RedissonService
 
-类：`com.kfpd.cloud.common.utils.RedisUtils`
+类：`com.kfpd.cloud.common.config.redis.RedissonService`
 
 当前封装的操作：
 
 | 方法 | 说明 |
 | --- | --- |
 | `get` / `set` | 读写普通 key/value。 |
-| `set(key, value, ttl)` | 写入普通 key/value 并设置 TTL。 |
-| `exists` / `delete` / `expire` | 判断、删除、设置过期时间。 |
-| `addToSet` / `removeFromSet` / `readSet` / `deleteSet` | Set 类型常用操作。 |
-| `incrementAndGet` / `addAndGet` / `getAtomicLong` | 原子计数器操作。 |
-| `expireAtomicLong` / `deleteAtomicLong` | 原子计数器过期和删除。 |
+| `set(key, value, time)` | 写入普通 key/value 并设置秒级 TTL。 |
+| `hasKey` / `del` / `expire` | 判断、删除、设置过期时间。 |
+| `hGet` / `hSet` / `hGetAll` / `hDel` | Hash 类型常用操作。 |
+| `sAdd` / `sMembers` / `sRemove` | Set 类型常用操作。 |
+| `lAdd` / `lReadAll` / `lRemove` | List 类型常用操作。 |
+| `zsetAdd` / `zsetGet` / `zsetRemoveMember` | Sorted Set 类型常用操作。 |
+| `incrAndGet` / `decrAndGet` / `incr` / `decr` | 原子计数器操作。 |
+| `tryLock` / `lock` / `unlock` / `execute` | 分布式锁操作。 |
 
 使用示例：
 
 ```java
-import java.time.Duration;
-
-import com.kfpd.cloud.common.utils.RedisUtils;
+import com.kfpd.cloud.common.config.redis.RedissonService;
 import org.springframework.stereotype.Service;
 
 @Service
 public class DemoCacheService {
 
-    private final RedisUtils redisUtils;
+    private final RedissonService redissonService;
 
-    public DemoCacheService(RedisUtils redisUtils) {
-        this.redisUtils = redisUtils;
+    public DemoCacheService(RedissonService redissonService) {
+        this.redissonService = redissonService;
     }
 
     public void cacheProfile(String username, String payload) {
-        redisUtils.set("profile:" + username, payload, Duration.ofMinutes(10));
+        redissonService.set("profile:" + username, payload, 600);
     }
 }
 ```
