@@ -30,7 +30,7 @@ public class RedissonService {
 
     private final RedissonClient redissonClient;
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<Object, Object> redisTemplate;
 
     private final ObjectMapper objectMapper;
 
@@ -246,7 +246,7 @@ public class RedissonService {
      * @return list 缓存对象
      */
     public List<Object> get(List<String> keys) {
-        return redisTemplate.opsForValue().multiGet(keys);
+        return redisTemplate.opsForValue().multiGet(new ArrayList<>(keys));
     }
 
     /**

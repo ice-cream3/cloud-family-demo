@@ -9,7 +9,7 @@ JDK 21 + Spring Boot 4.0.8 + Spring Cloud 2025.1.3 microservice demo.
 - `auth-service`: JWT issuing service on port `8081`.
 - `partner-service`: protected partner API service on port `8082`.
 - `manager-service`: protected manager API service on port `8083`.
-- `xxl-job-admin`: lightweight XXL-JOB admin-compatible service on port `8088`.
+- `xxl-job-admin`: lightweight XXL-JOB admin-compatible service on port `8088`, located in the sibling `../xxl-job-admin` project.
 - `job-service`: XXL-JOB executor service on HTTP port `8084` and executor port `9999`.
 
 System users, roles, permissions, menus, and their relationships are manager-service features backed by the `fa-cloud` MySQL database. API user profile data is stored in `fa-cloud.vip_user`.
@@ -43,13 +43,19 @@ mvn clean package
 
 ## Run
 
+Install the shared module once before starting individual services from the Maven reactor:
+
+```bash
+mvn -pl common-service install
+```
+
 Start each service in a separate terminal:
 
 ```bash
 mvn -pl auth-service spring-boot:run
 mvn -pl partner-service spring-boot:run
 mvn -pl manager-service spring-boot:run
-mvn -pl xxl-job-admin spring-boot:run
+(cd ../xxl-job-admin && mvn spring-boot:run)
 mvn -pl job-service spring-boot:run
 mvn -pl gateway-service spring-boot:run
 ```

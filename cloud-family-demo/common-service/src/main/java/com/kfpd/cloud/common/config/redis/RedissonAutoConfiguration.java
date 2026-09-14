@@ -15,7 +15,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.util.StringUtils;
 
 @AutoConfiguration
@@ -47,8 +50,30 @@ public class RedissonAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    ObjectMapper objectMapper() {
+        return new ObjectMapper();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(name = "redisTemplate")
+    RedisTemplate<Object, Object> redisTemplate(RedisConnectionFactory redisConnectionFactory,
+                                                ObjectMapper objectMapper) {
+        RedisTemplate<Object, Object> redisTemplate = new RedisTemplate<>();
+        StringRedisSerializer stringSerializer = new StringRedisSerializer();
+        GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer(objectMapper);
+        redisTemplate.setConnectionFactory(redisConnectionFactory);
+        redisTemplate.setKeySerializer(stringSerializer);
+        redisTemplate.setHashKeySerializer(stringSerializer);
+        redisTemplate.setValueSerializer(jsonSerializer);
+        redisTemplate.setHashValueSerializer(jsonSerializer);
+        redisTemplate.afterPropertiesSet();
+        return redisTemplate;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     RedissonService redissonService(RedissonClient redissonClient,
-                                    RedisTemplate<String, Object> redisTemplate,
+                                    RedisTemplate<Object, Object> redisTemplate,
                                     ObjectMapper objectMapper,
                                     RedissonProperties properties) {
         return new RedissonService(redissonClient, redisTemplate, objectMapper, properties);
