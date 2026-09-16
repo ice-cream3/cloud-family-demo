@@ -41,10 +41,13 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     // Login and actuator health endpoints must be reachable before a token exists.
     private final List<String> publicPaths = List.of("/auth/api/login", "/auth/manager/login", "/auth/refresh", "/actuator/health");
     private final WebClient authWebClient;
+    private final String internalToken;
 
     public AuthenticationFilter(WebClient.Builder webClientBuilder,
-                                @Value("${demo.auth-service-url:http://localhost:8081}") String authServiceUrl) {
+                                @Value("${demo.auth-service-url:http://localhost:8081}") String authServiceUrl,
+                                @Value("${demo.gateway.internal-token:cloud-family-demo-gateway-internal-token}") String internalToken) {
         this.authWebClient = webClientBuilder.baseUrl(authServiceUrl).build();
+        this.internalToken = internalToken;
     }
 
     @Override
@@ -116,10 +119,13 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
             return writeError(exchange, ErrorCode.GATEWAY_MANAGER_ROLE_REQUIRED);
         }
         ServerHttpRequest authenticatedRequest = request.mutate()
-                .header(GatewayHeaders.USER_NAME, validation.username() == null ? claimOrSubject(jwt, "username") : validation.username())
-                .header(GatewayHeaders.USER_TYPE, validation.userType() == null ? jwt.getClaimAsString("user_type") : validation.userType())
-                .header(GatewayHeaders.USER_ROLES, String.join(",", roles))
-                .header(GatewayHeaders.USER_PERMISSIONS, String.join(",", permissions))
+                .headers(headers -> {
+                    headers.set(GatewayHeaders.USER_NAME, validation.username() == null ? claimOrSubject(jwt, "username") : validation.username());
+                    headers.set(GatewayHeaders.USER_TYPE, validation.userType() == null ? jwt.getClaimAsString("user_type") : validation.userType());
+                    headers.set(GatewayHeaders.USER_ROLES, String.join(",", roles));
+                    headers.set(GatewayHeaders.USER_PERMISSIONS, String.join(",", permissions));
+                    headers.set(GatewayHeaders.INTERNAL_TOKEN, internalToken);
+                })
                 .build();
         return chain.filter(exchange.mutate().request(authenticatedRequest).build());
     }
