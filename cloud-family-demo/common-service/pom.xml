@@ -53,6 +53,11 @@
             <groupId>org.redisson</groupId>
             <artifactId>redisson</artifactId>
         </dependency>
+        <!-- RocketMQ client used by shared RocketMQ producer auto-configuration. -->
+        <dependency>
+            <groupId>org.apache.rocketmq</groupId>
+            <artifactId>rocketmq-client</artifactId>
+        </dependency>
         <!-- Apache Commons Lang string and object utility methods. -->
         <dependency>
             <groupId>org.apache.commons</groupId>

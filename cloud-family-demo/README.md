@@ -29,6 +29,7 @@ System users, roles, permissions, menus, and their relationships are manager-ser
 - MyBatis-Plus and MyBatis Spring for database access.
 - MySQL with shared multi-data-source configuration.
 - Redisson for Redis Cluster client integration.
+- RocketMQ producer integration with configurable NameServer address.
 - Optional Redis-backed auth sessions with `AUTH_SESSION_STORE=redis`.
 - XXL-JOB admin-compatible APIs and executor integration for scheduled jobs.
 - Spring Boot Actuator for health and info endpoints.
@@ -77,6 +78,24 @@ against `http://localhost:8088/xxl-job-admin` by default. Override it with:
 XXL_JOB_ADMIN_ADDRESSES=http://localhost:8088/xxl-job-admin \
 XXL_JOB_ACCESS_TOKEN=default_token \
 mvn -pl job-service spring-boot:run
+```
+
+RocketMQ producer auto-configuration is available in every service through `common-service`.
+It is disabled by default so services can start without a local broker. Enable it with:
+
+```bash
+ROCKETMQ_ENABLED=true \
+ROCKETMQ_NAMESRV_ADDR=localhost:9876 \
+mvn -pl manager-service spring-boot:run
+```
+
+Equivalent YAML:
+
+```yaml
+demo:
+  rocketmq:
+    enabled: true
+    namesrv-addr: localhost:9876
 ```
 
 `xxl-job-admin` is a lightweight local admin-compatible service for this demo. It accepts
