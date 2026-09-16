@@ -27,10 +27,10 @@ public class RocketMqAutoConfiguration {
         return producer;
     }
 
-    @Bean
+    @Bean(destroyMethod = "shutdown")
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "demo.rocketmq", name = "enabled", havingValue = "true")
-    RocketMqService rocketMqService(DefaultMQProducer producer) {
-        return new RocketMqService(producer);
+    RocketMqService rocketMqService(DefaultMQProducer producer, RocketMqProperties properties) {
+        return new RocketMqService(producer, properties);
     }
 }

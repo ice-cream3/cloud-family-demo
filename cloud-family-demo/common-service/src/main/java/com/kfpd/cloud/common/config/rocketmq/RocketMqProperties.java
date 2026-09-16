@@ -14,9 +14,17 @@ public class RocketMqProperties {
 
     private String producerGroup = "cloud-family-demo-producer";
 
+    private String consumerGroup = "cloud-family-demo-consumer";
+
     private int sendMessageTimeoutMillis = 3000;
 
     private int retryTimesWhenSendFailed = 2;
+
+    private int consumeThreadMin = 1;
+
+    private int consumeThreadMax = 4;
+
+    private int consumeMessageBatchMaxSize = 1;
 
     public boolean isEnabled() {
         return enabled;
@@ -42,6 +50,14 @@ public class RocketMqProperties {
         this.producerGroup = producerGroup;
     }
 
+    public String getConsumerGroup() {
+        return consumerGroup;
+    }
+
+    public void setConsumerGroup(String consumerGroup) {
+        this.consumerGroup = consumerGroup;
+    }
+
     public int getSendMessageTimeoutMillis() {
         return sendMessageTimeoutMillis;
     }
@@ -56,5 +72,29 @@ public class RocketMqProperties {
 
     public void setRetryTimesWhenSendFailed(int retryTimesWhenSendFailed) {
         this.retryTimesWhenSendFailed = retryTimesWhenSendFailed;
+    }
+
+    public int getConsumeThreadMin() {
+        return consumeThreadMin;
+    }
+
+    public void setConsumeThreadMin(int consumeThreadMin) {
+        this.consumeThreadMin = consumeThreadMin;
+    }
+
+    public int getConsumeThreadMax() {
+        return consumeThreadMax;
+    }
+
+    public void setConsumeThreadMax(int consumeThreadMax) {
+        this.consumeThreadMax = consumeThreadMax;
+    }
+
+    public int getConsumeMessageBatchMaxSize() {
+        return consumeMessageBatchMaxSize;
+    }
+
+    public void setConsumeMessageBatchMaxSize(int consumeMessageBatchMaxSize) {
+        this.consumeMessageBatchMaxSize = consumeMessageBatchMaxSize;
     }
 }
