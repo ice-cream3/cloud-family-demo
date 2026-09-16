@@ -30,6 +30,11 @@ final class SystemManagementSupport {
         return new BusinessException(ErrorCode.MANAGER_RESOURCE_NOT_FOUND, message);
     }
 
+    static BusinessException badRequest(String message) {
+        log.warn("Manager service exception: code={}, message={}", ErrorCode.COMMON_BAD_REQUEST.getCode(), message);
+        return new BusinessException(ErrorCode.COMMON_BAD_REQUEST, message);
+    }
+
     static void requireText(String value, String message) {
         if (value == null || value.isBlank()) {
             log.warn("Manager service exception: code={}, message={}", ErrorCode.COMMON_BAD_REQUEST.getCode(), message);

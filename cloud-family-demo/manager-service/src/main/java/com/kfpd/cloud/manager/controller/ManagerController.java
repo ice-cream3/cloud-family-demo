@@ -7,7 +7,7 @@ import com.kfpd.cloud.common.web.GatewayHeaders;
 import com.kfpd.cloud.manager.pojo.vo.ManagerDashboardVO;
 import com.kfpd.cloud.manager.service.ManagerService;
 
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,7 +22,7 @@ public class ManagerController {
         this.managerService = managerService;
     }
 
-    @GetMapping("/dashboard")
+    @PostMapping("/dashboard")
     public ApiResponse<ManagerDashboardVO> dashboard(@RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
                                       @RequestHeader(value = GatewayHeaders.USER_ROLES, defaultValue = "") String roles,
                                       @RequestHeader(value = GatewayHeaders.USER_PERMISSIONS, defaultValue = "") String permissions) {
@@ -30,7 +30,7 @@ public class ManagerController {
         return ApiResponse.success(managerService.dashboard(username, roles, permissions));
     }
 
-    @GetMapping("/health")
+    @PostMapping("/health")
     public ApiResponse<Map<String, String>> health() {
         return ApiResponse.success(Map.of("status", "UP", "service", "manager-service"));
     }

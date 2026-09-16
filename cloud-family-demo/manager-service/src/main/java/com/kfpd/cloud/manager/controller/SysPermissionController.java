@@ -9,18 +9,15 @@ import com.kfpd.cloud.manager.service.SysPermissionService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/manager/system/permissions")
+@RequestMapping("/api/manager/system")
 public class SysPermissionController {
 
     private final SysPermissionService permissionService;
@@ -29,27 +26,27 @@ public class SysPermissionController {
         this.permissionService = permissionService;
     }
 
-    @GetMapping
+    @PostMapping("/permissions/page")
     public ApiResponse<PageVO<SysPermission>> permissions(@ModelAttribute PageQueryVO query) {
         return ApiResponse.success(permissionService.findPermissions(query));
     }
 
-    @GetMapping("/{id}")
+    @PostMapping("/permissions/detail/{id}")
     public ApiResponse<SysPermission> permission(@PathVariable Long id) {
         return ApiResponse.success(permissionService.findPermissionById(id));
     }
 
-    @PostMapping
+    @PostMapping("/permissions")
     public ResponseEntity<ApiResponse<SysPermission>> createPermission(@RequestBody SysPermissionRequestVO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(permissionService.createPermission(request)));
     }
 
-    @PutMapping("/{id}")
+    @PostMapping("/permissions/update/{id}")
     public ApiResponse<SysPermission> updatePermission(@PathVariable Long id, @RequestBody SysPermissionRequestVO request) {
         return ApiResponse.success(permissionService.updatePermission(id, request));
     }
 
-    @DeleteMapping("/{id}")
+    @PostMapping("/permissions/delete/{id}")
     public ApiResponse<Void> deletePermission(@PathVariable Long id) {
         permissionService.deletePermission(id);
         return ApiResponse.success();

@@ -14,18 +14,15 @@ import com.kfpd.cloud.manager.service.SysRoleService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/manager/system/roles")
+@RequestMapping("/api/manager/system")
 public class SysRoleController {
 
     private final SysRoleService roleService;
@@ -34,48 +31,48 @@ public class SysRoleController {
         this.roleService = roleService;
     }
 
-    @GetMapping
+    @PostMapping("/roles/page")
     public ApiResponse<PageVO<SysRole>> roles(@ModelAttribute PageQueryVO query) {
         return ApiResponse.success(roleService.findRoles(query));
     }
 
-    @GetMapping("/{id}")
+    @PostMapping("/roles/detail/{id}")
     public ApiResponse<SysRole> role(@PathVariable Long id) {
         return ApiResponse.success(roleService.findRoleById(id));
     }
 
-    @PostMapping
+    @PostMapping("/roles")
     public ResponseEntity<ApiResponse<SysRole>> createRole(@RequestBody SysRoleRequestVO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(roleService.createRole(request)));
     }
 
-    @PutMapping("/{id}")
+    @PostMapping("/roles/update/{id}")
     public ApiResponse<SysRole> updateRole(@PathVariable Long id, @RequestBody SysRoleRequestVO request) {
         return ApiResponse.success(roleService.updateRole(id, request));
     }
 
-    @DeleteMapping("/{id}")
+    @PostMapping("/roles/delete/{id}")
     public ApiResponse<Void> deleteRole(@PathVariable Long id) {
         roleService.deleteRole(id);
         return ApiResponse.success();
     }
 
-    @GetMapping("/{id}/permissions")
+    @PostMapping("/roles/permissions/{id}")
     public ApiResponse<List<SysPermission>> rolePermissions(@PathVariable Long id) {
         return ApiResponse.success(roleService.findRolePermissions(id));
     }
 
-    @PutMapping("/{id}/permissions")
+    @PostMapping("/roles/permissions/replace/{id}")
     public ApiResponse<List<SysPermission>> replaceRolePermissions(@PathVariable Long id, @RequestBody IdListVO request) {
         return ApiResponse.success(roleService.replaceRolePermissions(id, request));
     }
 
-    @GetMapping("/{id}/menus")
+    @PostMapping("/roles/menus/{id}")
     public ApiResponse<List<SysMenu>> roleMenus(@PathVariable Long id) {
         return ApiResponse.success(roleService.findRoleMenus(id));
     }
 
-    @PutMapping("/{id}/menus")
+    @PostMapping("/roles/menus/replace/{id}")
     public ApiResponse<List<SysMenu>> replaceRoleMenus(@PathVariable Long id, @RequestBody IdListVO request) {
         return ApiResponse.success(roleService.replaceRoleMenus(id, request));
     }

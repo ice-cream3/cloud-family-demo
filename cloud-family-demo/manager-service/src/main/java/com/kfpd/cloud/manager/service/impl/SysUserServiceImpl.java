@@ -13,6 +13,7 @@ import com.kfpd.cloud.manager.pojo.dto.SysUserAccessDTO;
 import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.manager.pojo.vo.PageVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserRequestVO;
+import com.kfpd.cloud.manager.pojo.vo.SysUserVO;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
 import com.kfpd.cloud.manager.pojo.entity.SysRole;
 import com.kfpd.cloud.manager.pojo.entity.SysUser;
@@ -44,23 +45,32 @@ public class SysUserServiceImpl implements SysUserService {
     }
 
     @Override
-    public List<SysUser> findUsers() {
-        return userDao.findAll();
+    public List<SysUserVO> findUsers() {
+        return userDao.findAll().stream().map(this::toVO).toList();
     }
 
     @Override
-    public PageVO<SysUser> findUsers(PageQueryVO query) {
+    public PageVO<SysUserVO> findUsers(PageQueryVO query) {
         int normalizedPageNum = SystemManagementSupport.pageNum(query);
         int normalizedPageSize = SystemManagementSupport.pageSize(query);
         Page<SysUser> page = userDao.selectPage(
                 new Page<>(normalizedPageNum, normalizedPageSize),
                 Wrappers.lambdaQuery(SysUser.class).orderByDesc(SysUser::getId)
         );
-        return SystemManagementSupport.pageVO(page, normalizedPageNum, normalizedPageSize);
+        return new PageVO<>(
+                page.getTotal(),
+                normalizedPageNum,
+                normalizedPageSize,
+                page.getRecords().stream().map(this::toVO).toList()
+        );
     }
 
     @Override
-    public SysUser findUserById(Long id) {
+    public SysUserVO findUserById(Long id) {
+        return toVO(findUserEntityById(id));
+    }
+
+    private SysUser findUserEntityById(Long id) {
         return Optional.ofNullable(userDao.findById(id)).orElseThrow(() -> {
             log.warn("User service exception: action=findUserById, id={}, message=User not found", id);
             return SystemManagementSupport.notFound("User not found");
@@ -69,9 +79,9 @@ public class SysUserServiceImpl implements SysUserService {
 
     @Override
     public SysUserAccessDTO findUserAccess(Long id) {
-        SysUser user = findUserById(id);
+        SysUser user = findUserEntityById(id);
         return new SysUserAccessDTO(
-                user,
+                toVO(user),
                 userDao.findRolesByUserId(id),
                 userDao.findPermissionsByUserId(id),
                 userDao.findMenusByUserId(id)
@@ -108,23 +118,26 @@ public class SysUserServiceImpl implements SysUserService {
 
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
-    public SysUser createUser(SysUserRequestVO request) {
+    public SysUserVO createUser(SysUserRequestVO request) {
+        requireRequest(request);
         SystemManagementSupport.requireText(request.username(), "username is required");
         SystemManagementSupport.requireText(request.displayName(), "displayName is required");
         SysUser user = new SysUser();
         apply(user, request);
         userDao.insert(user);
-        SysUser created = findUserById(user.getId());
-        operationLogService.recordCreate(MODULE_SYSTEM, BUSINESS_USER, created.getId(), created.getUsername(), created);
-        return created;
+        SysUser created = findUserEntityById(user.getId());
+        SysUserVO createdVO = toVO(created);
+        operationLogService.recordCreate(MODULE_SYSTEM, BUSINESS_USER, createdVO.id(), createdVO.username(), createdVO);
+        return createdVO;
     }
 
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
-    public SysUser updateUser(Long id, SysUserRequestVO request) {
+    public SysUserVO updateUser(Long id, SysUserRequestVO request) {
+        requireRequest(request);
         SystemManagementSupport.requireText(request.username(), "username is required");
         SystemManagementSupport.requireText(request.displayName(), "displayName is required");
-        SysUser before = findUserById(id);
+        SysUser before = findUserEntityById(id);
         SysUser user = new SysUser();
         user.setId(id);
         apply(user, request);
@@ -132,32 +145,33 @@ public class SysUserServiceImpl implements SysUserService {
             log.warn("User service exception: action=updateUser, id={}, message=User not found", id);
             throw SystemManagementSupport.notFound("User not found");
         }
-        SysUser updated = findUserById(id);
-        operationLogService.recordUpdate(MODULE_SYSTEM, BUSINESS_USER, id, updated.getUsername(), before, updated);
-        return updated;
+        SysUser updated = findUserEntityById(id);
+        SysUserVO updatedVO = toVO(updated);
+        operationLogService.recordUpdate(MODULE_SYSTEM, BUSINESS_USER, id, updatedVO.username(), toVO(before), updatedVO);
+        return updatedVO;
     }
 
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void deleteUser(Long id) {
-        SysUser before = findUserById(id);
+        SysUser before = findUserEntityById(id);
         if (userDao.deleteById(id) == 0) {
             log.warn("User service exception: action=deleteUser, id={}, message=User not found", id);
             throw SystemManagementSupport.notFound("User not found");
         }
-        operationLogService.recordDelete(MODULE_SYSTEM, BUSINESS_USER, id, before.getUsername(), before);
+        operationLogService.recordDelete(MODULE_SYSTEM, BUSINESS_USER, id, before.getUsername(), toVO(before));
     }
 
     @Override
     public List<SysRole> findUserRoles(Long id) {
-        findUserById(id);
+        findUserEntityById(id);
         return userDao.findRolesByUserId(id);
     }
 
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public List<SysRole> replaceUserRoles(Long id, IdListVO request) {
-        findUserById(id);
+        findUserEntityById(id);
         List<Long> roleIds = SystemManagementSupport.ids(request);
         roleIds.forEach(roleService::findRoleById);
         List<SysRole> before = userDao.findRolesByUserId(id);
@@ -170,10 +184,28 @@ public class SysUserServiceImpl implements SysUserService {
 
     private void apply(SysUser user, SysUserRequestVO request) {
         user.setUsername(request.username());
-        user.setPasswordHash(request.passwordHash());
+        user.setPasswordHash(request.resolvedPasswordHash());
         user.setDisplayName(request.displayName());
         user.setEmail(request.email());
         user.setStatus(SystemManagementSupport.defaultStatus(request.status()));
+    }
+
+    private void requireRequest(SysUserRequestVO request) {
+        if (request == null) {
+            throw SystemManagementSupport.badRequest("request body is required");
+        }
+    }
+
+    private SysUserVO toVO(SysUser user) {
+        return new SysUserVO(
+                user.getId(),
+                user.getUsername(),
+                user.getDisplayName(),
+                user.getEmail(),
+                user.getStatus(),
+                user.getCreatedAt(),
+                user.getUpdatedAt()
+        );
     }
 
     private String accountType(List<SysRole> roles) {

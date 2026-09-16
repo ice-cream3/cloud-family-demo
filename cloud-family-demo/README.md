@@ -120,7 +120,7 @@ curl -s -X POST http://localhost:8080/auth/api/login \
 Use the returned `accessToken`:
 
 ```bash
-curl -s http://localhost:8080/api/users/me \
+curl -s -X POST http://localhost:8080/api/users/me \
   -H 'Authorization: Bearer <accessToken>'
 ```
 
@@ -152,7 +152,7 @@ curl -s -X POST http://localhost:8080/auth/manager/login \
 Use the manager token to access manager APIs:
 
 ```bash
-curl -s http://localhost:8080/api/manager/dashboard \
+curl -s -X POST http://localhost:8080/api/manager/dashboard \
   -H 'Authorization: Bearer <accessToken>'
 ```
 
@@ -168,25 +168,112 @@ curl -s -X POST http://localhost:8080/auth/manager/kick-out \
 System management endpoints are available through the manager service prefix:
 
 ```bash
-curl -s http://localhost:8080/api/manager/system/users \
+curl -s -X POST http://localhost:8080/api/manager/system/users/page \
   -H 'Authorization: Bearer <accessToken>'
 ```
 
 Relationship endpoints use `{"ids":[...]}` request bodies:
 
 ```bash
-curl -s -X PUT http://localhost:8080/api/manager/system/users/1/roles \
+curl -s -X POST http://localhost:8080/api/manager/system/users/roles/replace/1 \
   -H 'Authorization: Bearer <accessToken>' \
   -H 'Content-Type: application/json' \
   -d '{"ids":[1,2]}'
 
-curl -s -X PUT http://localhost:8080/api/manager/system/roles/1/permissions \
+curl -s -X POST http://localhost:8080/api/manager/system/roles/permissions/replace/1 \
   -H 'Authorization: Bearer <accessToken>' \
   -H 'Content-Type: application/json' \
   -d '{"ids":[1,2,3]}'
 
-curl -s -X PUT http://localhost:8080/api/manager/system/roles/1/menus \
+curl -s -X POST http://localhost:8080/api/manager/system/roles/menus/replace/1 \
   -H 'Authorization: Bearer <accessToken>' \
   -H 'Content-Type: application/json' \
   -d '{"ids":[1,2]}'
 ```
+
+## API endpoints
+
+Gateway base URL: `http://localhost:8080`.
+
+Auth service endpoints:
+
+| Method | Request URL | Description |
+| --- | --- | --- |
+| POST | `http://localhost:8080/auth/api/login` | API user login |
+| POST | `http://localhost:8080/auth/manager/login` | Manager user login |
+| POST | `http://localhost:8080/auth/refresh` | Refresh access token |
+| POST | `http://localhost:8080/auth/logout` | Logout and revoke token |
+| POST | `http://localhost:8080/auth/manager/kick-out` | Kick a user offline |
+| POST | `http://localhost:8080/auth/validate` | Validate access token |
+
+Partner service endpoints:
+
+| Method | Request URL | Description |
+| --- | --- | --- |
+| POST | `http://localhost:8080/api/users/me` | Current API user profile |
+| POST | `http://localhost:8080/api/users/my` | Current API user profile alias |
+| POST | `http://localhost:8080/api/users/vip-users/page?pageNum=1&pageSize=10` | List VIP users |
+| POST | `http://localhost:8080/api/users/vip-users/detail/{id}` | Get VIP user detail |
+| POST | `http://localhost:8080/api/users/vip-users` | Create VIP user |
+| POST | `http://localhost:8080/api/users/vip-users/update/{id}` | Update VIP user |
+| POST | `http://localhost:8080/api/users/vip-users/delete/{id}` | Delete VIP user |
+| POST | `http://localhost:8080/api/users/health` | Partner service health |
+
+Manager service endpoints:
+
+| Method | Request URL | Description |
+| --- | --- | --- |
+| POST | `http://localhost:8080/api/manager/dashboard` | Manager dashboard |
+| POST | `http://localhost:8080/api/manager/health` | Manager service health |
+| POST | `http://localhost:8080/api/manager/vip-users/page?pageNum=1&pageSize=10` | List VIP users for manager |
+| POST | `http://localhost:8080/api/manager/vip-users/detail/{id}` | Get VIP user detail for manager |
+| POST | `http://localhost:8080/api/manager/vip-users` | Create VIP user for manager |
+| POST | `http://localhost:8080/api/manager/vip-users/update/{id}` | Update VIP user for manager |
+| POST | `http://localhost:8080/api/manager/vip-users/delete/{id}` | Delete VIP user for manager |
+
+System user endpoints:
+
+| Method | Request URL | Description |
+| --- | --- | --- |
+| POST | `http://localhost:8080/api/manager/system/users/page?pageNum=1&pageSize=10` | List system users |
+| POST | `http://localhost:8080/api/manager/system/users/detail/{id}` | Get system user detail |
+| POST | `http://localhost:8080/api/manager/system/users/access/{id}` | Get system user roles, permissions, and menus |
+| POST | `http://localhost:8080/api/manager/system/users` | Create system user |
+| POST | `http://localhost:8080/api/manager/system/users/update/{id}` | Update system user |
+| POST | `http://localhost:8080/api/manager/system/users/delete/{id}` | Delete system user |
+| POST | `http://localhost:8080/api/manager/system/users/roles/{id}` | Get system user roles |
+| POST | `http://localhost:8080/api/manager/system/users/roles/replace/{id}` | Replace system user roles |
+
+System role endpoints:
+
+| Method | Request URL | Description |
+| --- | --- | --- |
+| POST | `http://localhost:8080/api/manager/system/roles/page?pageNum=1&pageSize=10` | List roles |
+| POST | `http://localhost:8080/api/manager/system/roles/detail/{id}` | Get role detail |
+| POST | `http://localhost:8080/api/manager/system/roles` | Create role |
+| POST | `http://localhost:8080/api/manager/system/roles/update/{id}` | Update role |
+| POST | `http://localhost:8080/api/manager/system/roles/delete/{id}` | Delete role |
+| POST | `http://localhost:8080/api/manager/system/roles/permissions/{id}` | Get role permissions |
+| POST | `http://localhost:8080/api/manager/system/roles/permissions/replace/{id}` | Replace role permissions |
+| POST | `http://localhost:8080/api/manager/system/roles/menus/{id}` | Get role menus |
+| POST | `http://localhost:8080/api/manager/system/roles/menus/replace/{id}` | Replace role menus |
+
+System permission endpoints:
+
+| Method | Request URL | Description |
+| --- | --- | --- |
+| POST | `http://localhost:8080/api/manager/system/permissions/page?pageNum=1&pageSize=10` | List permissions |
+| POST | `http://localhost:8080/api/manager/system/permissions/detail/{id}` | Get permission detail |
+| POST | `http://localhost:8080/api/manager/system/permissions` | Create permission |
+| POST | `http://localhost:8080/api/manager/system/permissions/update/{id}` | Update permission |
+| POST | `http://localhost:8080/api/manager/system/permissions/delete/{id}` | Delete permission |
+
+System menu endpoints:
+
+| Method | Request URL | Description |
+| --- | --- | --- |
+| POST | `http://localhost:8080/api/manager/system/menus/page?pageNum=1&pageSize=10` | List menus |
+| POST | `http://localhost:8080/api/manager/system/menus/detail/{id}` | Get menu detail |
+| POST | `http://localhost:8080/api/manager/system/menus` | Create menu |
+| POST | `http://localhost:8080/api/manager/system/menus/update/{id}` | Update menu |
+| POST | `http://localhost:8080/api/manager/system/menus/delete/{id}` | Delete menu |

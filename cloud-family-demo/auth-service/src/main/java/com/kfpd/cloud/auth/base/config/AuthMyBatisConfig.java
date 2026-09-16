@@ -36,7 +36,7 @@ public class AuthMyBatisConfig {
     @Bean
     MybatisPlusInterceptor authMybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
-        interceptor.addInnerInterceptor(new IllegalSQLInnerInterceptor());
+//        interceptor.addInnerInterceptor(new IllegalSQLInnerInterceptor());
         interceptor.addInnerInterceptor(new BlockAttackInnerInterceptor());
         interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
         return interceptor;

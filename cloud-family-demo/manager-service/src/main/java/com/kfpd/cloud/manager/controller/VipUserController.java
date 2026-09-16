@@ -9,18 +9,15 @@ import com.kfpd.cloud.manager.service.VipUserService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/manager/vip-users")
+@RequestMapping("/api/manager")
 public class VipUserController {
 
     private final VipUserService vipUserService;
@@ -29,27 +26,27 @@ public class VipUserController {
         this.vipUserService = vipUserService;
     }
 
-    @GetMapping
+    @PostMapping("/vip-users/page")
     public ApiResponse<PageVO<VipUserVO>> vipUsers(@ModelAttribute VipUserPageQueryVO query) {
         return ApiResponse.success(vipUserService.findVipUsers(query));
     }
 
-    @GetMapping("/{id}")
+    @PostMapping("/vip-users/detail/{id}")
     public ApiResponse<VipUserVO> vipUser(@PathVariable Long id) {
         return ApiResponse.success(vipUserService.findVipUserById(id));
     }
 
-    @PostMapping
+    @PostMapping("/vip-users")
     public ResponseEntity<ApiResponse<VipUserVO>> createVipUser(@RequestBody VipUserRequestVO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(vipUserService.createVipUser(request)));
     }
 
-    @PutMapping("/{id}")
+    @PostMapping("/vip-users/update/{id}")
     public ApiResponse<VipUserVO> updateVipUser(@PathVariable Long id, @RequestBody VipUserRequestVO request) {
         return ApiResponse.success(vipUserService.updateVipUser(id, request));
     }
 
-    @DeleteMapping("/{id}")
+    @PostMapping("/vip-users/delete/{id}")
     public ApiResponse<Void> deleteVipUser(@PathVariable Long id) {
         vipUserService.deleteVipUser(id);
         return ApiResponse.success();
