@@ -7,6 +7,7 @@ import com.kfpd.cloud.manager.pojo.dto.LoginAccountDTO;
 import com.kfpd.cloud.manager.pojo.dto.SysUserAccessDTO;
 import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.manager.pojo.vo.PageVO;
+import com.kfpd.cloud.manager.pojo.vo.SysMenuTreeVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserVO;
 import com.kfpd.cloud.manager.pojo.entity.SysRole;
@@ -20,6 +21,8 @@ public interface SysUserService {
     SysUserVO findUserById(Long id);
 
     SysUserAccessDTO findUserAccess(Long id);
+
+    List<SysMenuTreeVO> findUserMenuTree(String username);
 
     LoginAccountDTO findLoginAccount(String username);
 

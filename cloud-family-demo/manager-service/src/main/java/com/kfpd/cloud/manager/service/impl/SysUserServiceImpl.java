@@ -1,6 +1,9 @@
 package com.kfpd.cloud.manager.service.impl;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -12,8 +15,10 @@ import com.kfpd.cloud.manager.pojo.dto.LoginAccountDTO;
 import com.kfpd.cloud.manager.pojo.dto.SysUserAccessDTO;
 import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.manager.pojo.vo.PageVO;
+import com.kfpd.cloud.manager.pojo.vo.SysMenuTreeVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserVO;
+import com.kfpd.cloud.manager.pojo.entity.SysMenu;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
 import com.kfpd.cloud.manager.pojo.entity.SysRole;
 import com.kfpd.cloud.manager.pojo.entity.SysUser;
@@ -85,6 +90,21 @@ public class SysUserServiceImpl implements SysUserService {
                 userDao.findRolesByUserId(id),
                 userDao.findPermissionsByUserId(id),
                 userDao.findMenusByUserId(id)
+        );
+    }
+
+    @Override
+    public List<SysMenuTreeVO> findUserMenuTree(String username) {
+        SystemManagementSupport.requireText(username, "username is required");
+        SysUser user = Optional.ofNullable(userDao.findByUsername(username)).orElseThrow(() -> {
+            log.warn("User service exception: action=findUserMenuTree, username={}, message=User not found", username);
+            return SystemManagementSupport.notFound("User not found");
+        });
+        return buildMenuTree(
+                userDao.findMenusByUserId(user.getId()).stream()
+                        .filter(menu -> Boolean.TRUE.equals(menu.getVisible()))
+                        .filter(menu -> "ENABLED".equalsIgnoreCase(menu.getStatus()))
+                        .toList()
         );
     }
 
@@ -208,7 +228,55 @@ public class SysUserServiceImpl implements SysUserService {
         );
     }
 
+    private List<SysMenuTreeVO> buildMenuTree(List<SysMenu> menus) {
+        Map<Long, MutableMenuTreeNode> nodeMap = new LinkedHashMap<>();
+        for (SysMenu menu : menus) {
+            nodeMap.put(menu.getId(), new MutableMenuTreeNode(menu));
+        }
+
+        List<MutableMenuTreeNode> roots = new ArrayList<>();
+        for (MutableMenuTreeNode node : nodeMap.values()) {
+            Long parentId = node.menu.getParentId();
+            MutableMenuTreeNode parent = parentId == null ? null : nodeMap.get(parentId);
+            if (parent == null) {
+                roots.add(node);
+            } else {
+                parent.children.add(node);
+            }
+        }
+        return roots.stream().map(this::toTreeVO).toList();
+    }
+
+    private SysMenuTreeVO toTreeVO(MutableMenuTreeNode node) {
+        SysMenu menu = node.menu;
+        return new SysMenuTreeVO(
+                menu.getId(),
+                menu.getParentId(),
+                menu.getMenuCode(),
+                menu.getMenuName(),
+                menu.getPath(),
+                menu.getComponent(),
+                menu.getIcon(),
+                menu.getSortOrder(),
+                menu.getVisible(),
+                menu.getStatus(),
+                menu.getCreatedAt(),
+                menu.getUpdatedAt(),
+                node.children.stream().map(this::toTreeVO).toList()
+        );
+    }
+
     private String accountType(List<SysRole> roles) {
         return roles.stream().anyMatch(role -> "MANAGER".equalsIgnoreCase(role.getRoleCode())) ? "MANAGER" : "API";
+    }
+
+    private static final class MutableMenuTreeNode {
+
+        private final SysMenu menu;
+        private final List<MutableMenuTreeNode> children = new ArrayList<>();
+
+        private MutableMenuTreeNode(SysMenu menu) {
+            this.menu = menu;
+        }
     }
 }

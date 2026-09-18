@@ -1,6 +1,9 @@
 package com.kfpd.cloud.manager.service.impl;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -12,6 +15,7 @@ import com.kfpd.cloud.manager.pojo.vo.IdListVO;
 import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.manager.pojo.vo.PageVO;
 import com.kfpd.cloud.manager.pojo.vo.SysMenuRequestVO;
+import com.kfpd.cloud.manager.pojo.vo.SysMenuTreeVO;
 import com.kfpd.cloud.manager.pojo.vo.SysRoleRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysMenu;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
@@ -142,6 +146,26 @@ public class SysRoleServiceImpl implements SysRoleService {
     }
 
     @Override
+    public List<SysMenuTreeVO> findMenuTree() {
+        Map<Long, MutableMenuTreeNode> nodeMap = new LinkedHashMap<>();
+        for (SysMenu menu : menuDao.findAll()) {
+            nodeMap.put(menu.getId(), new MutableMenuTreeNode(menu));
+        }
+
+        List<MutableMenuTreeNode> roots = new ArrayList<>();
+        for (MutableMenuTreeNode node : nodeMap.values()) {
+            Long parentId = node.menu.getParentId();
+            MutableMenuTreeNode parent = parentId == null ? null : nodeMap.get(parentId);
+            if (parent == null) {
+                roots.add(node);
+            } else {
+                parent.children.add(node);
+            }
+        }
+        return roots.stream().map(this::toTreeVO).toList();
+    }
+
+    @Override
     public PageVO<SysMenu> findMenus(PageQueryVO query) {
         int normalizedPageNum = SystemManagementSupport.pageNum(query);
         int normalizedPageSize = SystemManagementSupport.pageSize(query);
@@ -239,5 +263,34 @@ public class SysRoleServiceImpl implements SysRoleService {
         menu.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
         menu.setVisible(request.visible() == null ? Boolean.TRUE : request.visible());
         menu.setStatus(SystemManagementSupport.defaultStatus(request.status()));
+    }
+
+    private SysMenuTreeVO toTreeVO(MutableMenuTreeNode node) {
+        SysMenu menu = node.menu;
+        return new SysMenuTreeVO(
+                menu.getId(),
+                menu.getParentId(),
+                menu.getMenuCode(),
+                menu.getMenuName(),
+                menu.getPath(),
+                menu.getComponent(),
+                menu.getIcon(),
+                menu.getSortOrder(),
+                menu.getVisible(),
+                menu.getStatus(),
+                menu.getCreatedAt(),
+                menu.getUpdatedAt(),
+                node.children.stream().map(this::toTreeVO).toList()
+        );
+    }
+
+    private static final class MutableMenuTreeNode {
+
+        private final SysMenu menu;
+        private final List<MutableMenuTreeNode> children = new ArrayList<>();
+
+        private MutableMenuTreeNode(SysMenu menu) {
+            this.menu = menu;
+        }
     }
 }

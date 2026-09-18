@@ -1,5 +1,5 @@
 server:
-  port: ${MANAGER_TEST_SERVER_PORT:8083}
+  port: ${MANAGER_TEST_SERVER_PORT:38083}
 
 spring:
   data:

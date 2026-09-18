@@ -6,6 +6,7 @@ import com.kfpd.cloud.manager.pojo.vo.IdListVO;
 import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.manager.pojo.vo.PageVO;
 import com.kfpd.cloud.manager.pojo.vo.SysMenuRequestVO;
+import com.kfpd.cloud.manager.pojo.vo.SysMenuTreeVO;
 import com.kfpd.cloud.manager.pojo.vo.SysRoleRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysMenu;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
@@ -30,6 +31,8 @@ public interface SysRoleService {
     List<SysPermission> replaceRolePermissions(Long id, IdListVO request);
 
     List<SysMenu> findMenus();
+
+    List<SysMenuTreeVO> findMenuTree();
 
     PageVO<SysMenu> findMenus(PageQueryVO query);
 

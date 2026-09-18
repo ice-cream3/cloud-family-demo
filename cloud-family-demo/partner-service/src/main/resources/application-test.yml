@@ -1,5 +1,5 @@
 server:
-  port: ${PARTNER_TEST_SERVER_PORT:8082}
+  port: ${PARTNER_TEST_SERVER_PORT:38082}
 
 spring:
   data:

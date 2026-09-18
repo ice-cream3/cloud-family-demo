@@ -1,8 +1,8 @@
 server:
-  port: ${GATEWAY_SERVER_PORT:8080}
+  port: ${GATEWAY_SERVER_PORT:38080}
 
 demo:
-  auth-service-url: ${AUTH_SERVICE_URL:http://localhost:8081}
+  auth-service-url: ${AUTH_SERVICE_URL:http://localhost:38081}
   gateway:
     rate-limit:
       enabled: ${GATEWAY_RATE_LIMIT_ENABLED:true}
@@ -57,14 +57,14 @@ spring:
         webflux:
           routes:
             - id: auth-service
-              uri: ${AUTH_SERVICE_URI:http://localhost:8081}
+              uri: ${AUTH_SERVICE_URI:http://localhost:38081}
               predicates:
                 - Path=/auth/**
             - id: partner-service
-              uri: ${PARTNER_SERVICE_URI:http://localhost:8082}
+              uri: ${PARTNER_SERVICE_URI:http://localhost:38082}
               predicates:
                 - Path=/api/users/**
             - id: manager-service
-              uri: ${MANAGER_SERVICE_URI:http://localhost:8083}
+              uri: ${MANAGER_SERVICE_URI:http://localhost:38083}
               predicates:
                 - Path=/api/manager/**
