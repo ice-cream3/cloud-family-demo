@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { ChevronRight, FolderTree, KeyRound, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { ChevronRight, Eye, EyeOff, FolderTree, KeyRound, Layers3, ListTree, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import type { ManagerDashboard, MenuTreeNode, PageQuery, PageResult, SysPermission, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
 import type { Session } from '../services/tokenStore';
+import { loadSystemMenuTree } from '../services/dashboardService';
 
 type DashboardProps = {
   session: Session;
@@ -285,11 +286,15 @@ function SystemPagePanel({
   onReplaceMenuPermissions: (id: number, ids: number[]) => Promise<void>;
 }) {
   const config = getSystemPageConfig(menu?.path);
+  const isMenuManagement = menu?.path === '/api/manager/system/menus';
+  const isOperationLogPage = menu?.path === '/api/manager/system/operation-logs';
+  const readOnly = isOperationLogPage;
   const records = page?.records || [];
   const pageNum = page?.pageNum || 1;
   const pageSize = page?.pageSize || 10;
   const total = page?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const [viewMode, setViewMode] = useState<'table' | 'tree'>('table');
   const [editorRecord, setEditorRecord] = useState<SystemPageRecord | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -301,6 +306,42 @@ function SystemPagePanel({
   const [selectedPermissionIds, setSelectedPermissionIds] = useState<Set<number>>(() => new Set());
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [operationMessage, setOperationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [treeNodes, setTreeNodes] = useState<MenuTreeNode[]>([]);
+  const [treeLoading, setTreeLoading] = useState(false);
+  const [treeError, setTreeError] = useState<string | null>(null);
+  const [selectedTreeMenu, setSelectedTreeMenu] = useState<MenuTreeNode | null>(null);
+
+  useEffect(() => {
+    setViewMode('table');
+    setSelectedTreeMenu(null);
+    setTreeNodes([]);
+    setTreeError(null);
+  }, [menu?.path]);
+
+  useEffect(() => {
+    if (isMenuManagement && viewMode === 'tree' && treeNodes.length === 0 && !treeLoading) {
+      void reloadMenuTree();
+    }
+  }, [isMenuManagement, viewMode, treeNodes.length, treeLoading]);
+
+  async function reloadMenuTree() {
+    setTreeLoading(true);
+    setTreeError(null);
+    try {
+      const nodes = await loadSystemMenuTree();
+      setTreeNodes(nodes);
+      setSelectedTreeMenu((current) => {
+        if (!current) {
+          return nodes[0] || null;
+        }
+        return findMenuNode(nodes, current.id) || nodes[0] || null;
+      });
+    } catch (err) {
+      setTreeError(readErrorMessage(err));
+    } finally {
+      setTreeLoading(false);
+    }
+  }
 
   function openCreate() {
     setEditorRecord(null);
@@ -318,12 +359,15 @@ function SystemPagePanel({
     setSaving(true);
     setEditorError(null);
     try {
-      if (editorRecord) {
+      if (editorRecord && editorRecord.id !== 0) {
         await onUpdate(editorRecord.id, payload);
         setOperationMessage({ type: 'success', text: '修改成功' });
       } else {
         await onCreate(payload);
         setOperationMessage({ type: 'success', text: '新增成功' });
+      }
+      if (isMenuManagement) {
+        await reloadMenuTree();
       }
       setEditorOpen(false);
       setEditorRecord(null);
@@ -344,6 +388,9 @@ function SystemPagePanel({
     setOperationMessage(null);
     try {
       await onDelete(record.id);
+      if (isMenuManagement) {
+        await reloadMenuTree();
+      }
       setOperationMessage({ type: 'success', text: '删除成功' });
     } catch (err) {
       const message = readErrorMessage(err);
@@ -414,10 +461,24 @@ function SystemPagePanel({
           <p>调用 {config.apiPath} 展示分页数据。</p>
         </div>
         <div className="section-actions">
-          <button className="primary-button small" type="button" onClick={openCreate} disabled={loading || saving}>
-            <Plus size={16} />
-            新增
-          </button>
+          {isMenuManagement ? (
+            <div className="view-switch" aria-label="菜单展示模式">
+              <button type="button" className={viewMode === 'table' ? 'active' : ''} onClick={() => setViewMode('table')}>
+                <ListTree size={15} />
+                列表
+              </button>
+              <button type="button" className={viewMode === 'tree' ? 'active' : ''} onClick={() => setViewMode('tree')}>
+                <Layers3 size={15} />
+                树形配置
+              </button>
+            </div>
+          ) : null}
+          {!readOnly ? (
+            <button className="primary-button small" type="button" onClick={openCreate} disabled={loading || saving}>
+              <Plus size={16} />
+              新增
+            </button>
+          ) : null}
           <div className="pager-actions">
             <button type="button" disabled={loading || pageNum <= 1} onClick={() => onPageChange(pageNum - 1)}>
               上一页
@@ -431,15 +492,59 @@ function SystemPagePanel({
           </div>
         </div>
       </div>
-      {menu?.path === '/api/manager/system/menus' ? (
-        <MenuQueryBar query={query} loading={loading} onSearch={onSearch} />
+      {(isMenuManagement && viewMode === 'table') || isOperationLogPage ? (
+        <MenuQueryBar
+          query={query}
+          loading={loading}
+          keywordPlaceholder={isOperationLogPage ? '操作者 / 模块 / 类型 / 业务 ID / URI' : '菜单编码 / 名称 / 路径 / 组件'}
+          statusLabel={isOperationLogPage ? '操作类型' : '状态'}
+          statusOptions={isOperationLogPage
+            ? [
+                { label: '新增', value: 'CREATE' },
+                { label: '修改', value: 'UPDATE' },
+                { label: '删除', value: 'DELETE' },
+              ]
+            : [
+                { label: '启用', value: 'ENABLED' },
+                { label: '禁用', value: 'DISABLED' },
+              ]}
+          onSearch={onSearch}
+        />
       ) : null}
       {operationMessage ? (
         <div className={operationMessage.type === 'success' ? 'success-banner compact' : 'error-banner compact'}>
           {operationMessage.text}
         </div>
       ) : null}
-      {error ? (
+      {isMenuManagement && viewMode === 'tree' ? (
+        <MenuTreeConfigPanel
+          nodes={treeNodes}
+          selectedMenu={selectedTreeMenu}
+          loading={treeLoading}
+          error={treeError}
+          saving={saving}
+          onReload={reloadMenuTree}
+          onSelect={setSelectedTreeMenu}
+          onCreateChild={(parent) => {
+            setEditorRecord({
+              id: 0,
+              parentId: parent.id,
+              menuCode: '',
+              menuName: '',
+              path: '',
+              component: '',
+              icon: '',
+              sortOrder: 0,
+              visible: true,
+              status: 'ENABLED',
+            });
+            setEditorError(null);
+            setEditorOpen(true);
+          }}
+          onEdit={(record) => openEdit(record)}
+          onPermissions={(record) => openPermissionDialog(record)}
+        />
+      ) : error ? (
         <div className="empty-state compact">{error}</div>
       ) : records.length > 0 ? (
         <div className="table-wrap">
@@ -449,7 +554,7 @@ function SystemPagePanel({
                 {config.columns.map((column) => (
                   <th key={column.key}>{column.title}</th>
                 ))}
-                <th>操作</th>
+                {!readOnly ? <th>操作</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -458,30 +563,32 @@ function SystemPagePanel({
                   {config.columns.map((column) => (
                     <td key={column.key}>{column.render(record)}</td>
                   ))}
-                  <td>
-                    <div className="row-actions">
-                      <button type="button" onClick={() => openEdit(record)} disabled={saving}>
-                        <Pencil size={14} />
-                        修改
-                      </button>
-                      {menu?.path === '/api/manager/system/users' ? (
-                        <button type="button" onClick={() => setPasswordRecord(record)} disabled={saving}>
-                          <KeyRound size={14} />
-                          重置密码
+                  {!readOnly ? (
+                    <td>
+                      <div className="row-actions">
+                        <button type="button" onClick={() => openEdit(record)} disabled={saving}>
+                          <Pencil size={14} />
+                          修改
                         </button>
-                      ) : null}
-                      {menu?.path === '/api/manager/system/menus' ? (
-                        <button type="button" onClick={() => openPermissionDialog(record)} disabled={saving}>
-                          <KeyRound size={14} />
-                          按钮权限
+                        {menu?.path === '/api/manager/system/users' ? (
+                          <button type="button" onClick={() => setPasswordRecord(record)} disabled={saving}>
+                            <KeyRound size={14} />
+                            重置密码
+                          </button>
+                        ) : null}
+                        {menu?.path === '/api/manager/system/menus' ? (
+                          <button type="button" onClick={() => openPermissionDialog(record)} disabled={saving}>
+                            <KeyRound size={14} />
+                            按钮权限
+                          </button>
+                        ) : null}
+                        <button className="danger" type="button" onClick={() => deleteRecord(record)} disabled={saving}>
+                          <Trash2 size={14} />
+                          删除
                         </button>
-                      ) : null}
-                      <button className="danger" type="button" onClick={() => deleteRecord(record)} disabled={saving}>
-                        <Trash2 size={14} />
-                        删除
-                      </button>
-                    </div>
-                  </td>
+                      </div>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -493,7 +600,8 @@ function SystemPagePanel({
       {editorOpen ? (
         <RecordEditorDialog
           config={config}
-          record={editorRecord}
+          record={editorRecord?.id === 0 ? null : editorRecord}
+          initialRecord={editorRecord?.id === 0 ? editorRecord : null}
           saving={saving}
           error={editorError}
           onClose={() => {
@@ -534,13 +642,231 @@ function SystemPagePanel({
   );
 }
 
+function MenuTreeConfigPanel({
+  nodes,
+  selectedMenu,
+  loading,
+  error,
+  saving,
+  onReload,
+  onSelect,
+  onCreateChild,
+  onEdit,
+  onPermissions,
+}: {
+  nodes: MenuTreeNode[];
+  selectedMenu: MenuTreeNode | null;
+  loading: boolean;
+  error: string | null;
+  saving: boolean;
+  onReload: () => Promise<void>;
+  onSelect: (menu: MenuTreeNode) => void;
+  onCreateChild: (menu: MenuTreeNode) => void;
+  onEdit: (menu: MenuTreeNode) => void;
+  onPermissions: (menu: MenuTreeNode) => void;
+}) {
+  const total = countAllMenuNodes(nodes);
+  const visibleTotal = countMenuNodes(nodes);
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(() => new Set());
+
+  useEffect(() => {
+    if (nodes.length === 0) {
+      setExpandedIds(new Set());
+      return;
+    }
+
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      nodes.forEach((node) => {
+        if (node.children.length > 0) {
+          next.add(node.id);
+        }
+      });
+      return next;
+    });
+  }, [nodes]);
+
+  function toggleNode(menu: MenuTreeNode) {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      if (next.has(menu.id)) {
+        next.delete(menu.id);
+      } else {
+        next.add(menu.id);
+      }
+      return next;
+    });
+  }
+
+  return (
+    <div className="menu-config">
+      <div className="menu-config-tree">
+        <div className="subsection-heading">
+          <div>
+            <h3>菜单树</h3>
+            <p>{loading ? '加载中' : `${total} 个菜单，${visibleTotal} 个显示`}</p>
+          </div>
+          <div className="tree-actions">
+            <button className="ghost-button small" type="button" onClick={() => setExpandedIds(new Set(collectExpandableMenuIds(nodes)))} disabled={loading || saving || nodes.length === 0}>
+              展开
+            </button>
+            <button className="ghost-button small" type="button" onClick={() => setExpandedIds(new Set())} disabled={loading || saving || nodes.length === 0}>
+              收起
+            </button>
+            <button className="icon-button" type="button" onClick={() => void onReload()} disabled={loading || saving} title="刷新菜单树">
+              <RefreshCw size={16} />
+            </button>
+          </div>
+        </div>
+        {error ? (
+          <div className="empty-state compact">{error}</div>
+        ) : nodes.length > 0 ? (
+          <div className="config-tree-list" role="tree">
+            {nodes.map((node) => (
+              <ConfigMenuNode
+                key={node.id}
+                node={node}
+                level={0}
+                selectedId={selectedMenu?.id}
+                expandedIds={expandedIds}
+                onSelect={onSelect}
+                onToggle={toggleNode}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state compact">{loading ? '菜单树加载中。' : '暂无菜单数据。'}</div>
+        )}
+      </div>
+
+      <div className="menu-config-detail">
+        {selectedMenu ? (
+          <>
+            <div className="detail-title">
+              <div>
+                <h3>{selectedMenu.menuName || selectedMenu.menuCode || `菜单 ${selectedMenu.id}`}</h3>
+                <p>ID {selectedMenu.id}</p>
+              </div>
+              <div className="detail-actions">
+                <button className="ghost-button small" type="button" onClick={() => onCreateChild(selectedMenu)} disabled={saving}>
+                  <Plus size={15} />
+                  子菜单
+                </button>
+                <button className="ghost-button small" type="button" onClick={() => onEdit(selectedMenu)} disabled={saving}>
+                  <Pencil size={15} />
+                  修改
+                </button>
+                <button className="ghost-button small" type="button" onClick={() => onPermissions(selectedMenu)} disabled={saving}>
+                  <KeyRound size={15} />
+                  权限
+                </button>
+              </div>
+            </div>
+            <div className="menu-detail-grid">
+              <DetailItem label="父菜单 ID" value={selectedMenu.parentId ?? '顶级菜单'} />
+              <DetailItem label="菜单编码" value={selectedMenu.menuCode} />
+              <DetailItem label="访问路径" value={selectedMenu.path} />
+              <DetailItem label="组件" value={selectedMenu.component} />
+              <DetailItem label="图标" value={selectedMenu.icon} />
+              <DetailItem label="排序" value={selectedMenu.sortOrder ?? 0} />
+              <DetailItem label="显示状态" value={selectedMenu.visible === false ? '隐藏' : '显示'} />
+              <DetailItem label="启用状态" value={selectedMenu.status || '-'} />
+            </div>
+          </>
+        ) : (
+          <div className="empty-state compact">请选择一个菜单节点。</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ConfigMenuNode({
+  node,
+  level,
+  selectedId,
+  expandedIds,
+  onSelect,
+  onToggle,
+}: {
+  node: MenuTreeNode;
+  level: number;
+  selectedId?: number;
+  expandedIds: Set<number>;
+  onSelect: (menu: MenuTreeNode) => void;
+  onToggle: (menu: MenuTreeNode) => void;
+}) {
+  const hasChildren = node.children.length > 0;
+  const expanded = expandedIds.has(node.id);
+
+  return (
+    <div role="treeitem" aria-expanded={hasChildren ? expanded : undefined}>
+      <button
+        className={node.id === selectedId ? 'config-tree-node active' : 'config-tree-node'}
+        type="button"
+        style={{ paddingLeft: 12 + level * 22 }}
+        onClick={() => onSelect(node)}
+      >
+        <span
+          className={hasChildren ? `node-toggle visible ${expanded ? 'expanded' : ''}` : 'node-toggle'}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (hasChildren) {
+              onToggle(node);
+            }
+          }}
+        >
+          <ChevronRight size={15} />
+        </span>
+        <span className="config-tree-main">
+          <strong>{node.menuName || node.menuCode || `菜单 ${node.id}`}</strong>
+          <small>{node.path || node.component || '未配置路径'}</small>
+        </span>
+        <span className="config-tree-state" title={node.visible === false ? '隐藏' : '显示'}>
+          {node.visible === false ? <EyeOff size={14} /> : <Eye size={14} />}
+        </span>
+      </button>
+      {hasChildren && expanded ? (
+        <div role="group">
+          {node.children.map((child) => (
+            <ConfigMenuNode
+              key={child.id}
+              node={child}
+              level={level + 1}
+              selectedId={selectedId}
+              expandedIds={expandedIds}
+              onSelect={onSelect}
+              onToggle={onToggle}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string | number | null | undefined }) {
+  return (
+    <div className="detail-item">
+      <span>{label}</span>
+      <strong>{value === null || value === undefined || value === '' ? '-' : value}</strong>
+    </div>
+  );
+}
+
 function MenuQueryBar({
   query,
   loading,
+  keywordPlaceholder,
+  statusLabel,
+  statusOptions,
   onSearch,
 }: {
   query: PageQuery;
   loading: boolean;
+  keywordPlaceholder: string;
+  statusLabel: string;
+  statusOptions: Array<{ label: string; value: string }>;
   onSearch: (query: PageQuery) => void;
 }) {
   const [keyword, setKeyword] = useState(query.keyword || '');
@@ -574,16 +900,19 @@ function MenuQueryBar({
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="菜单编码 / 名称 / 路径 / 组件"
+            placeholder={keywordPlaceholder}
           />
         </span>
       </label>
       <label>
-        状态
+        {statusLabel}
         <select value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option value="">全部状态</option>
-          <option value="ENABLED">启用</option>
-          <option value="DISABLED">禁用</option>
+          <option value="">全部{statusLabel}</option>
+          {statusOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </label>
       <div className="query-actions">
@@ -627,6 +956,7 @@ type SystemPageConfig = {
 function RecordEditorDialog({
   config,
   record,
+  initialRecord,
   saving,
   error,
   onClose,
@@ -634,13 +964,14 @@ function RecordEditorDialog({
 }: {
   config: SystemPageConfig;
   record: SystemPageRecord | null;
+  initialRecord?: SystemPageRecord | null;
   saving: boolean;
   error: string | null;
   onClose: () => void;
   onSave: (payload: SystemRecordPayload) => Promise<void>;
 }) {
   const fields = config.fields.filter((field) => !field.createOnly || !record);
-  const [values, setValues] = useState<Record<string, string | boolean>>(() => initialEditorValues(fields, record));
+  const [values, setValues] = useState<Record<string, string | boolean>>(() => initialEditorValues(fields, initialRecord || record));
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -920,8 +1251,8 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
   };
   const commonColumns: TableColumn[] = [
     { key: 'id', title: 'ID', render: (record) => record.id },
-    { key: 'status', title: '状态', render: (record) => <StatusValue value={record.status} /> },
-    { key: 'createdAt', title: '创建时间', render: (record) => formatDate(record.createdAt) },
+    { key: 'status', title: '状态', render: (record) => <StatusValue value={readField(record, 'status')} /> },
+    { key: 'createdAt', title: '创建时间', render: (record) => formatDate(readField(record, 'createdAt')) },
   ];
 
   if (path === '/api/manager/system/roles') {
@@ -993,6 +1324,24 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
     };
   }
 
+  if (path === '/api/manager/system/operation-logs') {
+    return {
+      title: '操作日志',
+      apiPath: '/api/manager/system/operation-logs/page',
+      columns: [
+        commonColumns[0],
+        { key: 'operationType', title: '操作', render: (record) => <OperationTypeValue value={readField(record, 'operationType')} /> },
+        { key: 'operatorUsername', title: '操作者', render: (record) => textValue(readField(record, 'operatorUsername')) },
+        { key: 'businessModule', title: '模块', render: (record) => textValue(readField(record, 'businessModule')) },
+        { key: 'businessType', title: '业务类型', render: (record) => textValue(readField(record, 'businessType')) },
+        { key: 'businessName', title: '业务名称', render: (record) => textValue(readField(record, 'businessName')) },
+        { key: 'requestUri', title: '请求 URI', render: (record) => textValue(readField(record, 'requestUri')) },
+        { key: 'operationAt', title: '操作时间', render: (record) => formatDate(readField(record, 'operationAt')) },
+      ],
+      fields: [],
+    };
+  }
+
   return {
     title: '用户管理',
     apiPath: '/api/manager/system/users/page',
@@ -1018,11 +1367,21 @@ function isSystemPageMenu(path?: string) {
   return path === '/api/manager/system/users'
     || path === '/api/manager/system/roles'
     || path === '/api/manager/system/permissions'
-    || path === '/api/manager/system/menus';
+    || path === '/api/manager/system/menus'
+    || path === '/api/manager/system/operation-logs';
 }
 
 function StatusValue({ value }: { value?: string }) {
   return <span className={value === 'ENABLED' ? 'status-pill' : 'muted-pill'}>{value || '-'}</span>;
+}
+
+function OperationTypeValue({ value }: { value?: string }) {
+  const labelMap: Record<string, string> = {
+    CREATE: '新增',
+    UPDATE: '修改',
+    DELETE: '删除',
+  };
+  return <span className={value === 'DELETE' ? 'danger-pill' : 'status-pill'}>{value ? labelMap[value] || value : '-'}</span>;
 }
 
 function readField(record: SystemPageRecord, key: string) {
@@ -1053,7 +1412,7 @@ function MenuTreePanel({ nodes, total, error }: { nodes: MenuTreeNode[]; total: 
       <div className="section-heading">
         <div>
           <h2>当前用户菜单树</h2>
-          <p>调用 /api/manager/system/menus/current-user/tree，按登录用户角色授权展示。</p>
+          <p>调用 /api/manager/system/menus/current-user/tree，按登录用户角色授权展示 {total} 个可见菜单。</p>
         </div>
       </div>
       {error ? (
@@ -1105,6 +1464,32 @@ function countMenuNodes(nodes: MenuTreeNode[]): number {
     const self = node.visible === false ? 0 : 1;
     return total + self + countMenuNodes(node.children || []);
   }, 0);
+}
+
+function countAllMenuNodes(nodes: MenuTreeNode[]): number {
+  return nodes.reduce((total, node) => total + 1 + countAllMenuNodes(node.children || []), 0);
+}
+
+function findMenuNode(nodes: MenuTreeNode[], id: number): MenuTreeNode | null {
+  for (const node of nodes) {
+    if (node.id === id) {
+      return node;
+    }
+    const child = findMenuNode(node.children || [], id);
+    if (child) {
+      return child;
+    }
+  }
+  return null;
+}
+
+function collectExpandableMenuIds(nodes: MenuTreeNode[]): number[] {
+  return nodes.flatMap((node) => {
+    if (node.children.length === 0) {
+      return [];
+    }
+    return [node.id, ...collectExpandableMenuIds(node.children)];
+  });
 }
 
 function formatDate(value?: string) {

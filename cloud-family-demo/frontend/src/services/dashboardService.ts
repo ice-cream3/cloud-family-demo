@@ -25,6 +25,10 @@ export function loadMenus() {
   return post<MenuTreeNode[]>('/api/manager/system/menus/current-user/tree');
 }
 
+export function loadSystemMenuTree() {
+  return post<MenuTreeNode[]>('/api/manager/system/menus/tree');
+}
+
 export function loadSystemUsers(pageNum = 1, pageSize = 10) {
   return post<PageResult<SysUser>>('/api/manager/system/users/page', {
     form: {
@@ -54,6 +58,17 @@ export function loadSystemPermissions(pageNum = 1, pageSize = 10) {
 
 export function loadSystemMenuPage(pageNum = 1, pageSize = 10, query: PageQuery = {}) {
   return post<PageResult<SysMenu>>('/api/manager/system/menus/page', {
+    form: {
+      pageNum,
+      pageSize,
+      keyword: query.keyword,
+      status: query.status,
+    },
+  });
+}
+
+export function loadSystemOperationLogs(pageNum = 1, pageSize = 10, query: PageQuery = {}) {
+  return post<PageResult<SystemPageRecord>>('/api/manager/system/operation-logs/page', {
     form: {
       pageNum,
       pageSize,

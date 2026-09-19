@@ -39,7 +39,7 @@ export async function post<T>(path: string, options: RequestOptions = {}): Promi
     }
   }
 
-  let url = `${API_BASE_URL}${path}`;
+  const url = `${API_BASE_URL}${path}`;
   if (options.form) {
     const search = new URLSearchParams();
     Object.entries(options.form).forEach(([key, value]) => {

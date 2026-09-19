@@ -5,10 +5,8 @@ import java.time.LocalDateTime;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
-import com.kfpd.cloud.common.web.GatewayHeaders;
 import com.kfpd.cloud.manager.pojo.entity.OperationLog;
 import com.kfpd.cloud.manager.service.event.OperationLogEvent;
-import jakarta.servlet.http.HttpServletRequest;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,8 +16,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Component
 public class OperationLogEventListener {
@@ -39,10 +35,9 @@ public class OperationLogEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onOperationLog(OperationLogEvent event) {
         try {
-            HttpServletRequest request = currentRequest();
             OperationLog operationLog = new OperationLog();
-            operationLog.setOperatorUsername(header(request, GatewayHeaders.USER_NAME, "anonymous"));
-            operationLog.setOperatorUserType(header(request, GatewayHeaders.USER_TYPE, null));
+            operationLog.setOperatorUsername(event.operatorUsername());
+            operationLog.setOperatorUserType(event.operatorUserType());
             operationLog.setOperationType(event.operationType());
             operationLog.setBusinessModule(event.businessModule());
             operationLog.setBusinessType(event.businessType());
@@ -50,9 +45,9 @@ public class OperationLogEventListener {
             operationLog.setBusinessName(event.businessName());
             operationLog.setBeforeData(toJson(event.beforeData()));
             operationLog.setAfterData(toJson(event.afterData()));
-            operationLog.setClientIp(resolveClientIp(request));
-            operationLog.setRequestUri(request == null ? null : request.getRequestURI());
-            operationLog.setRequestMethod(request == null ? null : request.getMethod());
+            operationLog.setClientIp(event.clientIp());
+            operationLog.setRequestUri(event.requestUri());
+            operationLog.setRequestMethod(event.requestMethod());
             operationLog.setOperationAt(LocalDateTime.now());
             insertOperationLog(operationLog);
         } catch (Exception ex) {
@@ -92,32 +87,6 @@ public class OperationLogEventListener {
         );
     }
 
-    private HttpServletRequest currentRequest() {
-        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
-            return attributes.getRequest();
-        }
-        return null;
-    }
-
-    private String header(HttpServletRequest request, String name, String defaultValue) {
-        if (request == null) {
-            return defaultValue;
-        }
-        String value = request.getHeader(name);
-        return value == null || value.isBlank() ? defaultValue : value;
-    }
-
-    private String resolveClientIp(HttpServletRequest request) {
-        if (request == null) {
-            return null;
-        }
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
-    }
-
     private String toJson(Object value) {
         if (value == null) {
             return null;
@@ -125,7 +94,11 @@ public class OperationLogEventListener {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException ex) {
-            return String.valueOf(value);
+            try {
+                return objectMapper.writeValueAsString(String.valueOf(value));
+            } catch (JsonProcessingException fallbackEx) {
+                return "\"<unserializable operation log payload>\"";
+            }
         }
     }
 }

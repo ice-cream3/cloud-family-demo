@@ -7,6 +7,11 @@ public record OperationLogEvent(
         Object businessId,
         String businessName,
         Object beforeData,
-        Object afterData
+        Object afterData,
+        String operatorUsername,
+        String operatorUserType,
+        String clientIp,
+        String requestUri,
+        String requestMethod
 ) {
 }

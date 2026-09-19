@@ -1,4 +1,4 @@
-package com.kfpd.cloud.manager.dao;
+package com.kfpd.cloud.manager.dao.cloud;
 
 import java.util.List;
 

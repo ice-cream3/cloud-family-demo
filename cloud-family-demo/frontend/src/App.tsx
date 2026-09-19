@@ -10,6 +10,7 @@ import {
   loadManagerDashboard,
   loadMenus,
   loadSystemMenuPage,
+  loadSystemOperationLogs,
   loadSystemPermissions,
   loadSystemRoles,
   loadSystemUsers,
@@ -251,6 +252,7 @@ function getSystemPageLoaders(): Record<string, (pageNum: number, pageSize: numb
     '/api/manager/system/roles': loadSystemRoles,
     '/api/manager/system/permissions': loadSystemPermissions,
     '/api/manager/system/menus': loadSystemMenuPage,
+    '/api/manager/system/operation-logs': loadSystemOperationLogs,
   };
 }
 

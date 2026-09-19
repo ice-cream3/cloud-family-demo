@@ -95,7 +95,25 @@ export type SysPermission = {
   updatedAt?: string;
 };
 
-export type SystemPageRecord = SysUser | SysRole | SysPermission | SysMenu;
+export type OperationLog = {
+  id: number;
+  operatorUsername?: string;
+  operatorUserType?: string;
+  operationType?: string;
+  businessModule?: string;
+  businessType?: string;
+  businessId?: string;
+  businessName?: string;
+  beforeData?: string;
+  afterData?: string;
+  clientIp?: string;
+  requestUri?: string;
+  requestMethod?: string;
+  operationAt?: string;
+  createdAt?: string;
+};
+
+export type SystemPageRecord = SysUser | SysRole | SysPermission | SysMenu | OperationLog;
 
 export type SystemRecordPayload = {
   [key: string]: string | number | boolean | null | undefined;

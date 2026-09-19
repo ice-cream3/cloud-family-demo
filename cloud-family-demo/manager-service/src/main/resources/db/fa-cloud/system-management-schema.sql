@@ -159,6 +159,11 @@ FROM sys_menu parent
 WHERE parent.menu_code = 'system-management';
 
 INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, sort_order, visible, status)
+SELECT parent.id, 'system-operation-logs', '操作日志', '/api/manager/system/operation-logs', 'SystemOperationLogs', 'ScrollText', 35, 1, 'ENABLED'
+FROM sys_menu parent
+WHERE parent.menu_code = 'system-management';
+
+INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, sort_order, visible, status)
 SELECT parent.id, item.menu_code, item.menu_name, item.permission_code, 'ButtonPermission', 'MousePointerClick', item.sort_order, 0, 'ENABLED'
 FROM sys_menu parent
 JOIN (
@@ -216,13 +221,13 @@ WHERE r.role_code = 'USER' AND m.menu_code = 'user-profile';
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
 SELECT r.id, m.id FROM sys_role r, sys_menu m
 WHERE r.role_code = 'MANAGER'
-  AND m.menu_code IN ('manager-dashboard', 'system-management', 'system-menus');
+  AND m.menu_code IN ('manager-dashboard', 'system-management', 'system-menus', 'system-operation-logs');
 
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
 SELECT r.id, m.id FROM sys_role r, sys_menu m
 WHERE r.role_code = 'SUPER_ADMIN'
   AND m.menu_code IN (
-      'manager-dashboard', 'system-management', 'system-users', 'system-roles', 'system-permissions', 'system-menus',
+      'manager-dashboard', 'system-management', 'system-users', 'system-roles', 'system-permissions', 'system-menus', 'system-operation-logs',
       'system-users-add', 'system-users-edit', 'system-users-delete', 'system-users-reset-password',
       'system-roles-add', 'system-roles-edit', 'system-roles-delete',
       'system-permissions-add', 'system-permissions-edit', 'system-permissions-delete',

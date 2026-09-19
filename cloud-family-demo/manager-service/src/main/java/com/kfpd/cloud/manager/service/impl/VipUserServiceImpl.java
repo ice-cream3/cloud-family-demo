@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
-import com.kfpd.cloud.manager.dao.VipUserDao;
+import com.kfpd.cloud.manager.dao.cloud.VipUserDao;
 import com.kfpd.cloud.manager.pojo.entity.VipUser;
 import com.kfpd.cloud.manager.pojo.vo.PageVO;
 import com.kfpd.cloud.manager.pojo.vo.VipUserPageQueryVO;
