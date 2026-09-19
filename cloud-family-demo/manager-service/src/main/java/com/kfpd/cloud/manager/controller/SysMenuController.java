@@ -13,6 +13,7 @@ import com.kfpd.cloud.manager.pojo.vo.SysMenuRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.SysMenuTreeVO;
 import com.kfpd.cloud.manager.service.SysRoleService;
 import com.kfpd.cloud.manager.service.SysUserService;
+import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -58,12 +59,12 @@ public class SysMenuController {
     }
 
     @PostMapping("/menus")
-    public ResponseEntity<ApiResponse<SysMenu>> createMenu(@RequestBody SysMenuRequestVO request) {
+    public ResponseEntity<ApiResponse<SysMenu>> createMenu(@Valid @RequestBody SysMenuRequestVO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(roleService.createMenu(request)));
     }
 
     @PostMapping("/menus/update/{id}")
-    public ApiResponse<SysMenu> updateMenu(@PathVariable Long id, @RequestBody SysMenuRequestVO request) {
+    public ApiResponse<SysMenu> updateMenu(@PathVariable Long id, @Valid @RequestBody SysMenuRequestVO request) {
         return ApiResponse.success(roleService.updateMenu(id, request));
     }
 
@@ -79,7 +80,7 @@ public class SysMenuController {
     }
 
     @PostMapping("/menus/permissions/replace/{id}")
-    public ApiResponse<List<SysPermission>> replaceMenuPermissions(@PathVariable Long id, @RequestBody IdListVO request) {
+    public ApiResponse<List<SysPermission>> replaceMenuPermissions(@PathVariable Long id, @Valid @RequestBody IdListVO request) {
         return ApiResponse.success(roleService.replaceMenuPermissions(id, request));
     }
 }

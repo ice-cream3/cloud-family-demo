@@ -11,6 +11,7 @@ import com.kfpd.cloud.manager.pojo.entity.SysMenu;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
 import com.kfpd.cloud.manager.pojo.entity.SysRole;
 import com.kfpd.cloud.manager.service.SysRoleService;
+import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,12 +43,12 @@ public class SysRoleController {
     }
 
     @PostMapping("/roles")
-    public ResponseEntity<ApiResponse<SysRole>> createRole(@RequestBody SysRoleRequestVO request) {
+    public ResponseEntity<ApiResponse<SysRole>> createRole(@Valid @RequestBody SysRoleRequestVO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(roleService.createRole(request)));
     }
 
     @PostMapping("/roles/update/{id}")
-    public ApiResponse<SysRole> updateRole(@PathVariable Long id, @RequestBody SysRoleRequestVO request) {
+    public ApiResponse<SysRole> updateRole(@PathVariable Long id, @Valid @RequestBody SysRoleRequestVO request) {
         return ApiResponse.success(roleService.updateRole(id, request));
     }
 
@@ -63,7 +64,7 @@ public class SysRoleController {
     }
 
     @PostMapping("/roles/permissions/replace/{id}")
-    public ApiResponse<List<SysPermission>> replaceRolePermissions(@PathVariable Long id, @RequestBody IdListVO request) {
+    public ApiResponse<List<SysPermission>> replaceRolePermissions(@PathVariable Long id, @Valid @RequestBody IdListVO request) {
         return ApiResponse.success(roleService.replaceRolePermissions(id, request));
     }
 
@@ -73,7 +74,7 @@ public class SysRoleController {
     }
 
     @PostMapping("/roles/menus/replace/{id}")
-    public ApiResponse<List<SysMenu>> replaceRoleMenus(@PathVariable Long id, @RequestBody IdListVO request) {
+    public ApiResponse<List<SysMenu>> replaceRoleMenus(@PathVariable Long id, @Valid @RequestBody IdListVO request) {
         return ApiResponse.success(roleService.replaceRoleMenus(id, request));
     }
 }

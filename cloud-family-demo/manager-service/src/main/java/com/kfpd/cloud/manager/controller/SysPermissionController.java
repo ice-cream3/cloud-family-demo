@@ -6,6 +6,7 @@ import com.kfpd.cloud.manager.pojo.vo.PageVO;
 import com.kfpd.cloud.manager.pojo.vo.SysPermissionRequestVO;
 import com.kfpd.cloud.manager.pojo.entity.SysPermission;
 import com.kfpd.cloud.manager.service.SysPermissionService;
+import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,12 +38,12 @@ public class SysPermissionController {
     }
 
     @PostMapping("/permissions")
-    public ResponseEntity<ApiResponse<SysPermission>> createPermission(@RequestBody SysPermissionRequestVO request) {
+    public ResponseEntity<ApiResponse<SysPermission>> createPermission(@Valid @RequestBody SysPermissionRequestVO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(permissionService.createPermission(request)));
     }
 
     @PostMapping("/permissions/update/{id}")
-    public ApiResponse<SysPermission> updatePermission(@PathVariable Long id, @RequestBody SysPermissionRequestVO request) {
+    public ApiResponse<SysPermission> updatePermission(@PathVariable Long id, @Valid @RequestBody SysPermissionRequestVO request) {
         return ApiResponse.success(permissionService.updatePermission(id, request));
     }
 

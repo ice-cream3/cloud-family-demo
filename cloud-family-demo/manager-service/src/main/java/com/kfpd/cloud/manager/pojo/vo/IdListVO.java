@@ -2,5 +2,10 @@ package com.kfpd.cloud.manager.pojo.vo;
 
 import java.util.List;
 
-public record IdListVO(List<Long> ids) {
+import jakarta.validation.constraints.NotNull;
+
+public record IdListVO(
+        @NotNull(message = "ID列表不能为空")
+        List<Long> ids
+) {
 }

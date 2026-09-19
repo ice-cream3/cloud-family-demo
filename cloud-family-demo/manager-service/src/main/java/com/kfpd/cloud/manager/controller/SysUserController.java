@@ -12,6 +12,7 @@ import com.kfpd.cloud.manager.pojo.vo.SysUserRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserVO;
 import com.kfpd.cloud.manager.pojo.entity.SysRole;
 import com.kfpd.cloud.manager.service.SysUserService;
+import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,17 +49,17 @@ public class SysUserController {
     }
 
     @PostMapping("/users")
-    public ResponseEntity<ApiResponse<SysUserVO>> createUser(@RequestBody(required = false) SysUserRequestVO request) {
+    public ResponseEntity<ApiResponse<SysUserVO>> createUser(@Valid @RequestBody(required = false) SysUserRequestVO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(userService.createUser(request)));
     }
 
     @PostMapping("/users/update/{id}")
-    public ApiResponse<SysUserVO> updateUser(@PathVariable Long id, @RequestBody(required = false) SysUserRequestVO request) {
+    public ApiResponse<SysUserVO> updateUser(@PathVariable Long id, @Valid @RequestBody(required = false) SysUserRequestVO request) {
         return ApiResponse.success(userService.updateUser(id, request));
     }
 
     @PostMapping("/users/password/reset/{id}")
-    public ApiResponse<SysUserVO> resetUserPassword(@PathVariable Long id, @RequestBody(required = false) PasswordResetRequestVO request) {
+    public ApiResponse<SysUserVO> resetUserPassword(@PathVariable Long id, @Valid @RequestBody(required = false) PasswordResetRequestVO request) {
         return ApiResponse.success(userService.resetUserPassword(id, request));
     }
 
@@ -74,7 +75,7 @@ public class SysUserController {
     }
 
     @PostMapping("/users/roles/replace/{id}")
-    public ApiResponse<List<SysRole>> replaceUserRoles(@PathVariable Long id, @RequestBody IdListVO request) {
+    public ApiResponse<List<SysRole>> replaceUserRoles(@PathVariable Long id, @Valid @RequestBody IdListVO request) {
         return ApiResponse.success(userService.replaceUserRoles(id, request));
     }
 }

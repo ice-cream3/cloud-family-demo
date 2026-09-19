@@ -34,9 +34,21 @@ public class ManagerExceptionHandler {
             MethodArgumentTypeMismatchException.class
     })
     public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception ex, HttpServletRequest request) {
+        String message = badRequestMessage(ex);
         log.warn("Bad request: code={}, method={}, path={}, message={}",
-                ErrorCode.COMMON_BAD_REQUEST.getCode(), request.getMethod(), request.getRequestURI(), ex.getMessage());
-        return ResponseEntity.badRequest().body(ApiResponse.error(ErrorCode.COMMON_BAD_REQUEST, ex.getMessage()));
+                ErrorCode.COMMON_BAD_REQUEST.getCode(), request.getMethod(), request.getRequestURI(), message);
+        return ResponseEntity.badRequest().body(ApiResponse.error(ErrorCode.COMMON_BAD_REQUEST, message));
+    }
+
+    private String badRequestMessage(Exception ex) {
+        if (ex instanceof MethodArgumentNotValidException validationException) {
+            return validationException.getBindingResult().getFieldErrors().stream()
+                    .map(error -> error.getDefaultMessage() == null ? error.getField() + " is invalid" : error.getDefaultMessage())
+                    .distinct()
+                    .findFirst()
+                    .orElse("请求参数不合法");
+        }
+        return ex.getMessage();
     }
 
     @ExceptionHandler(ResponseStatusException.class)
