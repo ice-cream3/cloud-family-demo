@@ -5,6 +5,8 @@ import java.util.List;
 import com.kfpd.cloud.common.web.ApiResponse;
 import com.kfpd.cloud.common.web.GatewayHeaders;
 import com.kfpd.cloud.manager.pojo.entity.SysMenu;
+import com.kfpd.cloud.manager.pojo.entity.SysPermission;
+import com.kfpd.cloud.manager.pojo.vo.IdListVO;
 import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.manager.pojo.vo.PageVO;
 import com.kfpd.cloud.manager.pojo.vo.SysMenuRequestVO;
@@ -69,5 +71,15 @@ public class SysMenuController {
     public ApiResponse<Void> deleteMenu(@PathVariable Long id) {
         roleService.deleteMenu(id);
         return ApiResponse.success();
+    }
+
+    @PostMapping("/menus/permissions/{id}")
+    public ApiResponse<List<SysPermission>> menuPermissions(@PathVariable Long id) {
+        return ApiResponse.success(roleService.findMenuPermissions(id));
+    }
+
+    @PostMapping("/menus/permissions/replace/{id}")
+    public ApiResponse<List<SysPermission>> replaceMenuPermissions(@PathVariable Long id, @RequestBody IdListVO request) {
+        return ApiResponse.success(roleService.replaceMenuPermissions(id, request));
     }
 }

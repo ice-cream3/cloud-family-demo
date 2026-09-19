@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
@@ -38,6 +39,7 @@ public class SysRoleServiceImpl implements SysRoleService {
     private static final String BUSINESS_ROLE_PERMISSION = "SYS_ROLE_PERMISSION";
     private static final String BUSINESS_ROLE_MENU = "SYS_ROLE_MENU";
     private static final String BUSINESS_MENU = "SYS_MENU";
+    private static final String BUSINESS_MENU_PERMISSION = "SYS_MENU_PERMISSION";
 
     private final SysRoleDao roleDao;
     private final SysMenuDao menuDao;
@@ -63,9 +65,21 @@ public class SysRoleServiceImpl implements SysRoleService {
     public PageVO<SysRole> findRoles(PageQueryVO query) {
         int normalizedPageNum = SystemManagementSupport.pageNum(query);
         int normalizedPageSize = SystemManagementSupport.pageSize(query);
+        String keyword = SystemManagementSupport.keyword(query);
+        String status = SystemManagementSupport.status(query);
+        LambdaQueryWrapper<SysRole> wrapper = Wrappers.lambdaQuery(SysRole.class)
+                .eq(SystemManagementSupport.hasText(status), SysRole::getStatus, status)
+                .and(SystemManagementSupport.hasText(keyword), condition -> condition
+                        .like(SysRole::getRoleCode, keyword)
+                        .or()
+                        .like(SysRole::getRoleName, keyword)
+                        .or()
+                        .like(SysRole::getDescription, keyword)
+                )
+                .orderByDesc(SysRole::getId);
         Page<SysRole> page = roleDao.selectPage(
                 new Page<>(normalizedPageNum, normalizedPageSize),
-                Wrappers.lambdaQuery(SysRole.class).orderByDesc(SysRole::getId)
+                wrapper
         );
         return SystemManagementSupport.pageVO(page, normalizedPageNum, normalizedPageSize);
     }
@@ -169,9 +183,24 @@ public class SysRoleServiceImpl implements SysRoleService {
     public PageVO<SysMenu> findMenus(PageQueryVO query) {
         int normalizedPageNum = SystemManagementSupport.pageNum(query);
         int normalizedPageSize = SystemManagementSupport.pageSize(query);
+        String keyword = SystemManagementSupport.keyword(query);
+        String status = SystemManagementSupport.status(query);
+        LambdaQueryWrapper<SysMenu> wrapper = Wrappers.lambdaQuery(SysMenu.class)
+                .eq(SystemManagementSupport.hasText(status), SysMenu::getStatus, status)
+                .and(SystemManagementSupport.hasText(keyword), condition -> condition
+                        .like(SysMenu::getMenuCode, keyword)
+                        .or()
+                        .like(SysMenu::getMenuName, keyword)
+                        .or()
+                        .like(SysMenu::getPath, keyword)
+                        .or()
+                        .like(SysMenu::getComponent, keyword)
+                )
+                .orderByAsc(SysMenu::getSortOrder)
+                .orderByDesc(SysMenu::getId);
         Page<SysMenu> page = menuDao.selectPage(
                 new Page<>(normalizedPageNum, normalizedPageSize),
-                Wrappers.lambdaQuery(SysMenu.class).orderByDesc(SysMenu::getId)
+                wrapper
         );
         return SystemManagementSupport.pageVO(page, normalizedPageNum, normalizedPageSize);
     }
@@ -219,11 +248,32 @@ public class SysRoleServiceImpl implements SysRoleService {
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void deleteMenu(Long id) {
         SysMenu before = findMenuById(id);
+        menuDao.deleteMenuPermissions(id);
         if (menuDao.deleteById(id) == 0) {
             log.warn("Role service exception: action=deleteMenu, id={}, message=Menu not found", id);
             throw SystemManagementSupport.notFound("Menu not found");
         }
         operationLogService.recordDelete(MODULE_SYSTEM, BUSINESS_MENU, id, before.getMenuCode(), before);
+    }
+
+    @Override
+    public List<SysPermission> findMenuPermissions(Long id) {
+        findMenuById(id);
+        return menuDao.findPermissionsByMenuId(id);
+    }
+
+    @Override
+    @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public List<SysPermission> replaceMenuPermissions(Long id, IdListVO request) {
+        findMenuById(id);
+        List<Long> permissionIds = SystemManagementSupport.ids(request);
+        permissionIds.forEach(permissionService::findPermissionById);
+        List<SysPermission> before = menuDao.findPermissionsByMenuId(id);
+        menuDao.deleteMenuPermissions(id);
+        permissionIds.forEach(permissionId -> menuDao.insertMenuPermission(id, permissionId));
+        List<SysPermission> updated = menuDao.findPermissionsByMenuId(id);
+        operationLogService.recordUpdate(MODULE_SYSTEM, BUSINESS_MENU_PERMISSION, id, String.valueOf(id), before, updated);
+        return updated;
     }
 
     @Override

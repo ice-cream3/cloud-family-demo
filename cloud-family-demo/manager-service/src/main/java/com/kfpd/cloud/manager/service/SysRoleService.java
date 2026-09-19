@@ -44,6 +44,10 @@ public interface SysRoleService {
 
     void deleteMenu(Long id);
 
+    List<SysPermission> findMenuPermissions(Long id);
+
+    List<SysPermission> replaceMenuPermissions(Long id, IdListVO request);
+
     List<SysMenu> findRoleMenus(Long id);
 
     List<SysMenu> replaceRoleMenus(Long id, IdListVO request);

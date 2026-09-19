@@ -69,6 +69,12 @@
             <groupId>org.redisson</groupId>
             <artifactId>redisson</artifactId>
         </dependency>
+        <!-- Spring Cloud Gateway's JsonToGrpc filter introspects io.grpc.netty.NettyChannelBuilder at startup. -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty</artifactId>
+            <version>1.53.0</version>
+        </dependency>
         <!-- Log4j2 logging backend and Spring Boot logging integration. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -7,6 +7,7 @@ import com.kfpd.cloud.manager.pojo.vo.IdListVO;
 import com.kfpd.cloud.manager.pojo.dto.SysUserAccessDTO;
 import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.manager.pojo.vo.PageVO;
+import com.kfpd.cloud.manager.pojo.vo.PasswordResetRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserVO;
 import com.kfpd.cloud.manager.pojo.entity.SysRole;
@@ -54,6 +55,11 @@ public class SysUserController {
     @PostMapping("/users/update/{id}")
     public ApiResponse<SysUserVO> updateUser(@PathVariable Long id, @RequestBody(required = false) SysUserRequestVO request) {
         return ApiResponse.success(userService.updateUser(id, request));
+    }
+
+    @PostMapping("/users/password/reset/{id}")
+    public ApiResponse<SysUserVO> resetUserPassword(@PathVariable Long id, @RequestBody(required = false) PasswordResetRequestVO request) {
+        return ApiResponse.success(userService.resetUserPassword(id, request));
     }
 
     @PostMapping("/users/delete/{id}")

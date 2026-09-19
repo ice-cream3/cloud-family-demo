@@ -3,6 +3,7 @@ package com.kfpd.cloud.manager.service.impl;
 import java.util.List;
 import java.util.Optional;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
@@ -43,9 +44,22 @@ public class SysPermissionServiceImpl implements SysPermissionService {
     public PageVO<SysPermission> findPermissions(PageQueryVO query) {
         int normalizedPageNum = SystemManagementSupport.pageNum(query);
         int normalizedPageSize = SystemManagementSupport.pageSize(query);
+        String keyword = SystemManagementSupport.keyword(query);
+        String status = SystemManagementSupport.status(query);
+        LambdaQueryWrapper<SysPermission> wrapper = Wrappers.lambdaQuery(SysPermission.class)
+                .eq(SystemManagementSupport.hasText(status), SysPermission::getStatus, status)
+                .and(SystemManagementSupport.hasText(keyword), condition -> condition
+                        .like(SysPermission::getPermissionCode, keyword)
+                        .or()
+                        .like(SysPermission::getPermissionName, keyword)
+                        .or()
+                        .like(SysPermission::getDescription, keyword)
+                )
+                .orderByAsc(SysPermission::getPermissionCode)
+                .orderByDesc(SysPermission::getId);
         Page<SysPermission> page = permissionDao.selectPage(
                 new Page<>(normalizedPageNum, normalizedPageSize),
-                Wrappers.lambdaQuery(SysPermission.class).orderByDesc(SysPermission::getId)
+                wrapper
         );
         return SystemManagementSupport.pageVO(page, normalizedPageNum, normalizedPageSize);
     }

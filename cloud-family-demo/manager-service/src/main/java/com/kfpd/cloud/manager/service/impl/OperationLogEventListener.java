@@ -4,14 +4,16 @@ import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.common.web.GatewayHeaders;
-import com.kfpd.cloud.manager.dao.OperationLogDao;
 import com.kfpd.cloud.manager.pojo.entity.OperationLog;
 import com.kfpd.cloud.manager.service.event.OperationLogEvent;
 import jakarta.servlet.http.HttpServletRequest;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -24,11 +26,12 @@ public class OperationLogEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(OperationLogEventListener.class);
 
-    private final OperationLogDao operationLogDao;
+    private final JdbcTemplate faModelJdbcTemplate;
     private final ObjectMapper objectMapper;
 
-    public OperationLogEventListener(OperationLogDao operationLogDao, ObjectMapper objectMapper) {
-        this.operationLogDao = operationLogDao;
+    public OperationLogEventListener(@Qualifier(MultiDataSourceNames.FA_MODEL_JDBC_TEMPLATE) JdbcTemplate faModelJdbcTemplate,
+                                     ObjectMapper objectMapper) {
+        this.faModelJdbcTemplate = faModelJdbcTemplate;
         this.objectMapper = objectMapper;
     }
 
@@ -51,7 +54,7 @@ public class OperationLogEventListener {
             operationLog.setRequestUri(request == null ? null : request.getRequestURI());
             operationLog.setRequestMethod(request == null ? null : request.getMethod());
             operationLog.setOperationAt(LocalDateTime.now());
-            operationLogDao.insert(operationLog);
+            insertOperationLog(operationLog);
         } catch (Exception ex) {
             log.error("Operation log listener failed: operationType={}, businessModule={}, businessType={}, businessId={}, message={}",
                     event.operationType(),
@@ -61,6 +64,32 @@ public class OperationLogEventListener {
                     ex.getMessage(),
                     ex);
         }
+    }
+
+    private void insertOperationLog(OperationLog operationLog) {
+        faModelJdbcTemplate.update(
+                """
+                        INSERT INTO operation_log
+                            (operator_username, operator_user_type, operation_type, business_module,
+                             business_type, business_id, business_name, before_data, after_data,
+                             client_ip, request_uri, request_method, operation_at)
+                        VALUES
+                            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                operationLog.getOperatorUsername(),
+                operationLog.getOperatorUserType(),
+                operationLog.getOperationType(),
+                operationLog.getBusinessModule(),
+                operationLog.getBusinessType(),
+                operationLog.getBusinessId(),
+                operationLog.getBusinessName(),
+                operationLog.getBeforeData(),
+                operationLog.getAfterData(),
+                operationLog.getClientIp(),
+                operationLog.getRequestUri(),
+                operationLog.getRequestMethod(),
+                operationLog.getOperationAt()
+        );
     }
 
     private HttpServletRequest currentRequest() {

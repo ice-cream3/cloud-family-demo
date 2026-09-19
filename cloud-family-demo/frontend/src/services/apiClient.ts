@@ -31,7 +31,11 @@ export async function post<T>(path: string, options: RequestOptions = {}): Promi
   if (options.auth !== false) {
     const session = readSession();
     if (session?.accessToken) {
-      headers.set('Authorization', `${session.tokenType} ${session.accessToken}`);
+      headers.set('Authorization', `${session.tokenType || 'Bearer'} ${session.accessToken}`);
+    } else {
+      clearSession();
+      notifyUnauthorized();
+      throw new ApiError('登录状态已失效，请重新登录。', 401);
     }
   }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ChevronRight, FolderTree, LogOut, RefreshCw } from 'lucide-react';
-import type { ManagerDashboard, MenuTreeNode, PageResult, SysUser, UserProfile } from '../types/api';
+import type { FormEvent, ReactNode } from 'react';
+import { ChevronRight, FolderTree, KeyRound, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import type { ManagerDashboard, MenuTreeNode, PageQuery, PageResult, SysPermission, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
 import type { Session } from '../services/tokenStore';
 
 type DashboardProps = {
@@ -10,11 +11,20 @@ type DashboardProps = {
   menuTree: MenuTreeNode[];
   menuError: string | null;
   activeMenu: MenuTreeNode | null;
-  userPage: PageResult<SysUser> | null;
-  userPageLoading: boolean;
-  userPageError: string | null;
+  systemPage: PageResult<SystemPageRecord> | null;
+  systemPageQuery: PageQuery;
+  systemPageLoading: boolean;
+  systemPageError: string | null;
   onMenuSelect: (menu: MenuTreeNode) => void;
-  onUserPageChange: (pageNum: number) => void;
+  onSystemPageChange: (pageNum: number) => void;
+  onSystemPageSearch: (query: PageQuery) => void;
+  onCreateSystemRecord: (payload: SystemRecordPayload) => Promise<void>;
+  onUpdateSystemRecord: (id: number, payload: SystemRecordPayload) => Promise<void>;
+  onDeleteSystemRecord: (id: number) => Promise<void>;
+  onResetUserPassword: (id: number, password: string) => Promise<void>;
+  onLoadMenuPermissionOptions: () => Promise<SysPermission[]>;
+  onLoadMenuPermissions: (id: number) => Promise<SysPermission[]>;
+  onReplaceMenuPermissions: (id: number, ids: number[]) => Promise<void>;
   loading: boolean;
   error: string | null;
   onReload: () => void;
@@ -28,17 +38,28 @@ export function Dashboard({
   menuTree,
   menuError,
   activeMenu,
-  userPage,
-  userPageLoading,
-  userPageError,
+  systemPage,
+  systemPageQuery,
+  systemPageLoading,
+  systemPageError,
   onMenuSelect,
-  onUserPageChange,
+  onSystemPageChange,
+  onSystemPageSearch,
+  onCreateSystemRecord,
+  onUpdateSystemRecord,
+  onDeleteSystemRecord,
+  onResetUserPassword,
+  onLoadMenuPermissionOptions,
+  onLoadMenuPermissions,
+  onReplaceMenuPermissions,
   loading,
   error,
   onReload,
   onLogout,
 }: DashboardProps) {
   const menuCount = countMenuNodes(menuTree);
+  const inSystemPage = isSystemPageMenu(activeMenu?.path);
+  const pageTitle = activeMenu?.menuName || 'Manager Dashboard';
 
   return (
     <main className="app-shell">
@@ -57,8 +78,8 @@ export function Dashboard({
       <section className="workspace">
         <header className="topbar">
           <div>
-            <h1>服务工作台</h1>
-            <p>登录身份、Gateway 转发和后端响应状态。</p>
+            <h1>{pageTitle}</h1>
+            <p>{inSystemPage ? '系统数据维护、分页查询和操作权限配置。' : '登录身份、Gateway 转发和后端响应状态。'}</p>
           </div>
           <div className="topbar-actions">
             <button className="icon-button" type="button" onClick={onReload} disabled={loading} title="刷新">
@@ -79,21 +100,32 @@ export function Dashboard({
           <InfoCard title="菜单数量" value={String(menuCount)} meta="当前登录用户可见菜单" />
         </div>
 
-        {activeMenu?.path === '/api/manager/system/users' ? (
-          <UserPagePanel
-            page={userPage}
-            loading={userPageLoading}
-            error={userPageError}
-            onPageChange={onUserPageChange}
+        {inSystemPage ? (
+          <SystemPagePanel
+            menu={activeMenu}
+            page={systemPage}
+            query={systemPageQuery}
+            loading={systemPageLoading}
+            error={systemPageError}
+            onPageChange={onSystemPageChange}
+            onSearch={onSystemPageSearch}
+            onCreate={onCreateSystemRecord}
+            onUpdate={onUpdateSystemRecord}
+            onDelete={onDeleteSystemRecord}
+            onResetPassword={onResetUserPassword}
+            onLoadMenuPermissionOptions={onLoadMenuPermissionOptions}
+            onLoadMenuPermissions={onLoadMenuPermissions}
+            onReplaceMenuPermissions={onReplaceMenuPermissions}
           />
         ) : (
-          <MenuTreePanel nodes={menuTree} total={menuCount} error={menuError} />
+          <>
+            <MenuTreePanel nodes={menuTree} total={menuCount} error={menuError} />
+            <div className="content-grid">
+              <DataPanel title="用户服务 /api/users/me" data={userProfile} emptyText="当前账号暂无用户端响应" />
+              <DataPanel title="管理服务 /api/manager/dashboard" data={managerDashboard} emptyText="非管理账号可能无法访问该接口" />
+            </div>
+          </>
         )}
-
-        <div className="content-grid">
-          <DataPanel title="用户服务 /api/users/me" data={userProfile} emptyText="当前账号暂无用户端响应" />
-          <DataPanel title="管理服务 /api/manager/dashboard" data={managerDashboard} emptyText="非管理账号可能无法访问该接口" />
-        </div>
       </section>
     </main>
   );
@@ -221,42 +253,192 @@ function SidebarMenuNode({
   );
 }
 
-function UserPagePanel({
+function SystemPagePanel({
+  menu,
   page,
+  query,
   loading,
   error,
   onPageChange,
+  onSearch,
+  onCreate,
+  onUpdate,
+  onDelete,
+  onResetPassword,
+  onLoadMenuPermissionOptions,
+  onLoadMenuPermissions,
+  onReplaceMenuPermissions,
 }: {
-  page: PageResult<SysUser> | null;
+  menu: MenuTreeNode | null;
+  page: PageResult<SystemPageRecord> | null;
+  query: PageQuery;
   loading: boolean;
   error: string | null;
   onPageChange: (pageNum: number) => void;
+  onSearch: (query: PageQuery) => void;
+  onCreate: (payload: SystemRecordPayload) => Promise<void>;
+  onUpdate: (id: number, payload: SystemRecordPayload) => Promise<void>;
+  onDelete: (id: number) => Promise<void>;
+  onResetPassword: (id: number, password: string) => Promise<void>;
+  onLoadMenuPermissionOptions: () => Promise<SysPermission[]>;
+  onLoadMenuPermissions: (id: number) => Promise<SysPermission[]>;
+  onReplaceMenuPermissions: (id: number, ids: number[]) => Promise<void>;
 }) {
+  const config = getSystemPageConfig(menu?.path);
   const records = page?.records || [];
   const pageNum = page?.pageNum || 1;
   const pageSize = page?.pageSize || 10;
   const total = page?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const [editorRecord, setEditorRecord] = useState<SystemPageRecord | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editorError, setEditorError] = useState<string | null>(null);
+  const [passwordRecord, setPasswordRecord] = useState<SystemPageRecord | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [permissionRecord, setPermissionRecord] = useState<SystemPageRecord | null>(null);
+  const [permissionOptions, setPermissionOptions] = useState<SysPermission[]>([]);
+  const [selectedPermissionIds, setSelectedPermissionIds] = useState<Set<number>>(() => new Set());
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [operationMessage, setOperationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  function openCreate() {
+    setEditorRecord(null);
+    setEditorError(null);
+    setEditorOpen(true);
+  }
+
+  function openEdit(record: SystemPageRecord) {
+    setEditorRecord(record);
+    setEditorError(null);
+    setEditorOpen(true);
+  }
+
+  async function saveRecord(payload: SystemRecordPayload) {
+    setSaving(true);
+    setEditorError(null);
+    try {
+      if (editorRecord) {
+        await onUpdate(editorRecord.id, payload);
+        setOperationMessage({ type: 'success', text: '修改成功' });
+      } else {
+        await onCreate(payload);
+        setOperationMessage({ type: 'success', text: '新增成功' });
+      }
+      setEditorOpen(false);
+      setEditorRecord(null);
+    } catch (err) {
+      const message = readErrorMessage(err);
+      setEditorError(message);
+      setOperationMessage({ type: 'error', text: message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteRecord(record: SystemPageRecord) {
+    if (!window.confirm(`确认删除 ${recordLabel(record)}？`)) {
+      return;
+    }
+    setSaving(true);
+    setOperationMessage(null);
+    try {
+      await onDelete(record.id);
+      setOperationMessage({ type: 'success', text: '删除成功' });
+    } catch (err) {
+      const message = readErrorMessage(err);
+      setEditorError(message);
+      setOperationMessage({ type: 'error', text: message });
+      setEditorOpen(true);
+      setEditorRecord(record);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function resetPassword(record: SystemPageRecord, password: string) {
+    setSaving(true);
+    setPasswordError(null);
+    try {
+      await onResetPassword(record.id, password);
+      setPasswordRecord(null);
+      setOperationMessage({ type: 'success', text: '密码重置成功' });
+    } catch (err) {
+      const message = readErrorMessage(err);
+      setPasswordError(message);
+      setOperationMessage({ type: 'error', text: message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function openPermissionDialog(record: SystemPageRecord) {
+    setSaving(true);
+    setPermissionError(null);
+    try {
+      const [options, selected] = await Promise.all([onLoadMenuPermissionOptions(), onLoadMenuPermissions(record.id)]);
+      setPermissionOptions(options);
+      setSelectedPermissionIds(new Set(selected.map((permission) => permission.id)));
+      setPermissionRecord(record);
+    } catch (err) {
+      setOperationMessage({ type: 'error', text: readErrorMessage(err) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveMenuPermissions(ids: number[]) {
+    if (!permissionRecord) {
+      return;
+    }
+    setSaving(true);
+    setPermissionError(null);
+    try {
+      await onReplaceMenuPermissions(permissionRecord.id, ids);
+      setPermissionRecord(null);
+      setOperationMessage({ type: 'success', text: '按钮权限保存成功' });
+    } catch (err) {
+      const message = readErrorMessage(err);
+      setPermissionError(message);
+      setOperationMessage({ type: 'error', text: message });
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <article className="table-panel">
       <div className="section-heading">
         <div>
-          <h2>用户管理</h2>
-          <p>调用 /api/manager/system/users/page 展示系统用户分页数据。</p>
+          <h2>{config.title}</h2>
+          <p>调用 {config.apiPath} 展示分页数据。</p>
         </div>
-        <div className="pager-actions">
-          <button type="button" disabled={loading || pageNum <= 1} onClick={() => onPageChange(pageNum - 1)}>
-            上一页
+        <div className="section-actions">
+          <button className="primary-button small" type="button" onClick={openCreate} disabled={loading || saving}>
+            <Plus size={16} />
+            新增
           </button>
-          <span>
-            {pageNum} / {totalPages}
-          </span>
-          <button type="button" disabled={loading || pageNum >= totalPages} onClick={() => onPageChange(pageNum + 1)}>
-            下一页
-          </button>
+          <div className="pager-actions">
+            <button type="button" disabled={loading || pageNum <= 1} onClick={() => onPageChange(pageNum - 1)}>
+              上一页
+            </button>
+            <span>
+              {pageNum} / {totalPages}
+            </span>
+            <button type="button" disabled={loading || pageNum >= totalPages} onClick={() => onPageChange(pageNum + 1)}>
+              下一页
+            </button>
+          </div>
         </div>
       </div>
+      {menu?.path === '/api/manager/system/menus' ? (
+        <MenuQueryBar query={query} loading={loading} onSearch={onSearch} />
+      ) : null}
+      {operationMessage ? (
+        <div className={operationMessage.type === 'success' ? 'success-banner compact' : 'error-banner compact'}>
+          {operationMessage.text}
+        </div>
+      ) : null}
       {error ? (
         <div className="empty-state compact">{error}</div>
       ) : records.length > 0 ? (
@@ -264,35 +446,605 @@ function UserPagePanel({
           <table>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>账号</th>
-                <th>显示名称</th>
-                <th>邮箱</th>
-                <th>状态</th>
-                <th>创建时间</th>
+                {config.columns.map((column) => (
+                  <th key={column.key}>{column.title}</th>
+                ))}
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
-              {records.map((user) => (
-                <tr key={user.id}>
-                  <td>{user.id}</td>
-                  <td>{user.username}</td>
-                  <td>{user.displayName || '-'}</td>
-                  <td>{user.email || '-'}</td>
+              {records.map((record) => (
+                <tr key={record.id}>
+                  {config.columns.map((column) => (
+                    <td key={column.key}>{column.render(record)}</td>
+                  ))}
                   <td>
-                    <span className={user.status === 'ENABLED' ? 'status-pill' : 'muted-pill'}>{user.status || '-'}</span>
+                    <div className="row-actions">
+                      <button type="button" onClick={() => openEdit(record)} disabled={saving}>
+                        <Pencil size={14} />
+                        修改
+                      </button>
+                      {menu?.path === '/api/manager/system/users' ? (
+                        <button type="button" onClick={() => setPasswordRecord(record)} disabled={saving}>
+                          <KeyRound size={14} />
+                          重置密码
+                        </button>
+                      ) : null}
+                      {menu?.path === '/api/manager/system/menus' ? (
+                        <button type="button" onClick={() => openPermissionDialog(record)} disabled={saving}>
+                          <KeyRound size={14} />
+                          按钮权限
+                        </button>
+                      ) : null}
+                      <button className="danger" type="button" onClick={() => deleteRecord(record)} disabled={saving}>
+                        <Trash2 size={14} />
+                        删除
+                      </button>
+                    </div>
                   </td>
-                  <td>{formatDate(user.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : (
-        <div className="empty-state compact">{loading ? '用户数据加载中。' : '暂无用户数据。'}</div>
+        <div className="empty-state compact">{loading ? '数据加载中。' : '暂无分页数据。'}</div>
       )}
+      {editorOpen ? (
+        <RecordEditorDialog
+          config={config}
+          record={editorRecord}
+          saving={saving}
+          error={editorError}
+          onClose={() => {
+            setEditorOpen(false);
+            setEditorRecord(null);
+            setEditorError(null);
+          }}
+          onSave={saveRecord}
+        />
+      ) : null}
+      {passwordRecord ? (
+        <PasswordResetDialog
+          record={passwordRecord}
+          saving={saving}
+          error={passwordError}
+          onClose={() => {
+            setPasswordRecord(null);
+            setPasswordError(null);
+          }}
+          onReset={(password) => resetPassword(passwordRecord, password)}
+        />
+      ) : null}
+      {permissionRecord ? (
+        <MenuPermissionDialog
+          record={permissionRecord}
+          permissions={permissionOptions}
+          selectedIds={selectedPermissionIds}
+          saving={saving}
+          error={permissionError}
+          onClose={() => {
+            setPermissionRecord(null);
+            setPermissionError(null);
+          }}
+          onSave={saveMenuPermissions}
+        />
+      ) : null}
     </article>
   );
+}
+
+function MenuQueryBar({
+  query,
+  loading,
+  onSearch,
+}: {
+  query: PageQuery;
+  loading: boolean;
+  onSearch: (query: PageQuery) => void;
+}) {
+  const [keyword, setKeyword] = useState(query.keyword || '');
+  const [status, setStatus] = useState(query.status || '');
+
+  useEffect(() => {
+    setKeyword(query.keyword || '');
+    setStatus(query.status || '');
+  }, [query.keyword, query.status]);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSearch({
+      keyword: keyword.trim() || undefined,
+      status: status || undefined,
+    });
+  }
+
+  function reset() {
+    setKeyword('');
+    setStatus('');
+    onSearch({});
+  }
+
+  return (
+    <form className="query-bar" onSubmit={submit}>
+      <label>
+        关键词
+        <span className="query-input">
+          <Search size={16} />
+          <input
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder="菜单编码 / 名称 / 路径 / 组件"
+          />
+        </span>
+      </label>
+      <label>
+        状态
+        <select value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option value="">全部状态</option>
+          <option value="ENABLED">启用</option>
+          <option value="DISABLED">禁用</option>
+        </select>
+      </label>
+      <div className="query-actions">
+        <button className="primary-button small" type="submit" disabled={loading}>
+          <Search size={16} />
+          查询
+        </button>
+        <button className="ghost-button small" type="button" onClick={reset} disabled={loading && !keyword && !status}>
+          <X size={16} />
+          重置
+        </button>
+      </div>
+    </form>
+  );
+}
+
+type TableColumn = {
+  key: string;
+  title: string;
+  render: (record: SystemPageRecord) => ReactNode;
+};
+
+type EditorField = {
+  key: string;
+  label: string;
+  type?: 'text' | 'password' | 'number' | 'select' | 'checkbox' | 'textarea';
+  required?: boolean;
+  createOnly?: boolean;
+  readonlyOnEdit?: boolean;
+  options?: Array<{ label: string; value: string }>;
+  placeholder?: string;
+};
+
+type SystemPageConfig = {
+  title: string;
+  apiPath: string;
+  columns: TableColumn[];
+  fields: EditorField[];
+};
+
+function RecordEditorDialog({
+  config,
+  record,
+  saving,
+  error,
+  onClose,
+  onSave,
+}: {
+  config: SystemPageConfig;
+  record: SystemPageRecord | null;
+  saving: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSave: (payload: SystemRecordPayload) => Promise<void>;
+}) {
+  const fields = config.fields.filter((field) => !field.createOnly || !record);
+  const [values, setValues] = useState<Record<string, string | boolean>>(() => initialEditorValues(fields, record));
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void onSave(buildPayload(fields, values));
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="record-dialog" role="dialog" aria-modal="true" aria-label={record ? '修改记录' : '新增记录'}>
+        <div className="dialog-heading">
+          <div>
+            <h3>{record ? `修改${config.title}` : `新增${config.title}`}</h3>
+            <p>{record ? `ID ${record.id}` : '填写基础字段后保存。'}</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} disabled={saving} title="关闭">
+            <X size={18} />
+          </button>
+        </div>
+        <form className="record-form" onSubmit={submit}>
+          {fields.map((field) => (
+            <label key={field.key} className={field.type === 'checkbox' ? 'checkbox-field' : ''}>
+              <span>{field.label}</span>
+              {renderEditorControl(
+                field,
+                values[field.key],
+                (value) => setValues((current) => ({ ...current, [field.key]: value })),
+                Boolean(record && field.readonlyOnEdit),
+              )}
+            </label>
+          ))}
+          {error ? <div className="error-banner compact">{error}</div> : null}
+          <div className="dialog-actions">
+            <button className="ghost-button" type="button" onClick={onClose} disabled={saving}>
+              取消
+            </button>
+            <button className="primary-button" type="submit" disabled={saving}>
+              {saving ? '保存中' : '保存'}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function PasswordResetDialog({
+  record,
+  saving,
+  error,
+  onClose,
+  onReset,
+}: {
+  record: SystemPageRecord;
+  saving: boolean;
+  error: string | null;
+  onClose: () => void;
+  onReset: (password: string) => void;
+}) {
+  const [password, setPassword] = useState('');
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onReset(password);
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="record-dialog" role="dialog" aria-modal="true" aria-label="重置密码">
+        <div className="dialog-heading">
+          <div>
+            <h3>重置密码</h3>
+            <p>{recordLabel(record)}</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} disabled={saving} title="关闭">
+            <X size={18} />
+          </button>
+        </div>
+        <form className="record-form single-column" onSubmit={submit}>
+          <label>
+            <span>新密码</span>
+            <input
+              autoComplete="new-password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </label>
+          {error ? <div className="error-banner compact">{error}</div> : null}
+          <div className="dialog-actions">
+            <button className="ghost-button" type="button" onClick={onClose} disabled={saving}>
+              取消
+            </button>
+            <button className="primary-button" type="submit" disabled={saving || !password.trim()}>
+              {saving ? '重置中' : '重置'}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function MenuPermissionDialog({
+  record,
+  permissions,
+  selectedIds,
+  saving,
+  error,
+  onClose,
+  onSave,
+}: {
+  record: SystemPageRecord;
+  permissions: SysPermission[];
+  selectedIds: Set<number>;
+  saving: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSave: (ids: number[]) => void;
+}) {
+  const [nextIds, setNextIds] = useState<Set<number>>(() => new Set(selectedIds));
+
+  function toggle(permissionId: number) {
+    setNextIds((current) => {
+      const next = new Set(current);
+      if (next.has(permissionId)) {
+        next.delete(permissionId);
+      } else {
+        next.add(permissionId);
+      }
+      return next;
+    });
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSave(Array.from(nextIds));
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="record-dialog" role="dialog" aria-modal="true" aria-label="按钮权限">
+        <div className="dialog-heading">
+          <div>
+            <h3>按钮权限</h3>
+            <p>{recordLabel(record)}</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} disabled={saving} title="关闭">
+            <X size={18} />
+          </button>
+        </div>
+        <form className="record-form single-column" onSubmit={submit}>
+          <div className="permission-list">
+            {permissions.length > 0 ? (
+              permissions.map((permission) => (
+                <label key={permission.id} className="permission-option">
+                  <input
+                    type="checkbox"
+                    checked={nextIds.has(permission.id)}
+                    onChange={() => toggle(permission.id)}
+                    disabled={saving}
+                  />
+                  <span>
+                    <strong>{permission.permissionName || permission.permissionCode}</strong>
+                    <small>{permission.permissionCode}</small>
+                  </span>
+                </label>
+              ))
+            ) : (
+              <div className="empty-state compact">暂无可选权限。</div>
+            )}
+          </div>
+          {error ? <div className="error-banner compact">{error}</div> : null}
+          <div className="dialog-actions">
+            <button className="ghost-button" type="button" onClick={onClose} disabled={saving}>
+              取消
+            </button>
+            <button className="primary-button" type="submit" disabled={saving}>
+              {saving ? '保存中' : '保存'}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function renderEditorControl(
+  field: EditorField,
+  value: string | boolean | undefined,
+  onChange: (value: string | boolean) => void,
+  disabled = false,
+) {
+  if (field.type === 'select') {
+    return (
+      <select value={String(value ?? '')} onChange={(event) => onChange(event.target.value)} required={field.required} disabled={disabled}>
+        {field.options?.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  if (field.type === 'textarea') {
+    return (
+      <textarea
+        value={String(value ?? '')}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={field.placeholder}
+        required={field.required}
+        disabled={disabled}
+      />
+    );
+  }
+
+  if (field.type === 'checkbox') {
+    return <input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} disabled={disabled} />;
+  }
+
+  return (
+    <input
+      type={field.type || 'text'}
+      value={String(value ?? '')}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={field.placeholder}
+      required={field.required}
+      disabled={disabled}
+    />
+  );
+}
+
+function initialEditorValues(fields: EditorField[], record: SystemPageRecord | null) {
+  const values: Record<string, string | boolean> = {};
+  fields.forEach((field) => {
+    const raw = record ? (record as Record<string, unknown>)[field.key] : undefined;
+    if (field.type === 'checkbox') {
+      values[field.key] = raw === undefined ? true : Boolean(raw);
+    } else if (field.key === 'status') {
+      values[field.key] = typeof raw === 'string' ? raw : 'ENABLED';
+    } else {
+      values[field.key] = raw === null || raw === undefined ? '' : String(raw);
+    }
+  });
+  return values;
+}
+
+function buildPayload(fields: EditorField[], values: Record<string, string | boolean>) {
+  const payload: SystemRecordPayload = {};
+  fields.forEach((field) => {
+    const value = values[field.key];
+    if (field.type === 'checkbox') {
+      payload[field.key] = Boolean(value);
+      return;
+    }
+    if (field.type === 'number') {
+      payload[field.key] = value === '' || value === undefined ? null : Number(value);
+      return;
+    }
+    const text = typeof value === 'string' ? value.trim() : '';
+    payload[field.key] = text || undefined;
+  });
+  return payload;
+}
+
+function getSystemPageConfig(path?: string): SystemPageConfig {
+  const statusField: EditorField = {
+    key: 'status',
+    label: '状态',
+    type: 'select',
+    required: true,
+    options: [
+      { label: '启用', value: 'ENABLED' },
+      { label: '禁用', value: 'DISABLED' },
+    ],
+  };
+  const commonColumns: TableColumn[] = [
+    { key: 'id', title: 'ID', render: (record) => record.id },
+    { key: 'status', title: '状态', render: (record) => <StatusValue value={record.status} /> },
+    { key: 'createdAt', title: '创建时间', render: (record) => formatDate(record.createdAt) },
+  ];
+
+  if (path === '/api/manager/system/roles') {
+    return {
+      title: '角色管理',
+      apiPath: '/api/manager/system/roles/page',
+      columns: [
+        commonColumns[0],
+        { key: 'roleCode', title: '角色编码', render: (record) => textValue(readField(record, 'roleCode')) },
+        { key: 'roleName', title: '角色名称', render: (record) => textValue(readField(record, 'roleName')) },
+        { key: 'description', title: '描述', render: (record) => textValue(readField(record, 'description')) },
+        commonColumns[1],
+        commonColumns[2],
+      ],
+      fields: [
+        { key: 'roleCode', label: '角色编码', required: true, placeholder: '例如 SUPER_ADMIN' },
+        { key: 'roleName', label: '角色名称', required: true },
+        { key: 'description', label: '描述', type: 'textarea' },
+        statusField,
+      ],
+    };
+  }
+
+  if (path === '/api/manager/system/permissions') {
+    return {
+      title: '权限管理',
+      apiPath: '/api/manager/system/permissions/page',
+      columns: [
+        commonColumns[0],
+        { key: 'permissionCode', title: '权限编码', render: (record) => textValue(readField(record, 'permissionCode')) },
+        { key: 'permissionName', title: '权限名称', render: (record) => textValue(readField(record, 'permissionName')) },
+        { key: 'description', title: '描述', render: (record) => textValue(readField(record, 'description')) },
+        commonColumns[1],
+        commonColumns[2],
+      ],
+      fields: [
+        { key: 'permissionCode', label: '权限编码', required: true, placeholder: '例如 menu:read' },
+        { key: 'permissionName', label: '权限名称', required: true },
+        { key: 'description', label: '描述', type: 'textarea' },
+        statusField,
+      ],
+    };
+  }
+
+  if (path === '/api/manager/system/menus') {
+    return {
+      title: '菜单管理',
+      apiPath: '/api/manager/system/menus/page',
+      columns: [
+        commonColumns[0],
+        { key: 'menuCode', title: '菜单编码', render: (record) => textValue(readField(record, 'menuCode')) },
+        { key: 'menuName', title: '菜单名称', render: (record) => textValue(readField(record, 'menuName')) },
+        { key: 'path', title: '路径', render: (record) => textValue(readField(record, 'path')) },
+        { key: 'component', title: '组件', render: (record) => textValue(readField(record, 'component')) },
+        commonColumns[1],
+        commonColumns[2],
+      ],
+      fields: [
+        { key: 'parentId', label: '父菜单 ID', type: 'number', placeholder: '顶级菜单留空' },
+        { key: 'menuCode', label: '菜单编码', required: true },
+        { key: 'menuName', label: '菜单名称', required: true },
+        { key: 'path', label: '路径', required: true },
+        { key: 'component', label: '组件', required: true },
+        { key: 'icon', label: '图标' },
+        { key: 'sortOrder', label: '排序', type: 'number' },
+        { key: 'visible', label: '显示', type: 'checkbox' },
+        statusField,
+      ],
+    };
+  }
+
+  return {
+    title: '用户管理',
+    apiPath: '/api/manager/system/users/page',
+    columns: [
+      commonColumns[0],
+      { key: 'username', title: '账号', render: (record) => textValue(readField(record, 'username')) },
+      { key: 'displayName', title: '显示名称', render: (record) => textValue(readField(record, 'displayName')) },
+      { key: 'email', title: '邮箱', render: (record) => textValue(readField(record, 'email')) },
+      commonColumns[1],
+      commonColumns[2],
+    ],
+    fields: [
+      { key: 'username', label: '账号', required: true, readonlyOnEdit: true },
+      { key: 'password', label: '密码', type: 'password', createOnly: true, required: true },
+      { key: 'displayName', label: '显示名称' },
+      { key: 'email', label: '邮箱' },
+      statusField,
+    ],
+  };
+}
+
+function isSystemPageMenu(path?: string) {
+  return path === '/api/manager/system/users'
+    || path === '/api/manager/system/roles'
+    || path === '/api/manager/system/permissions'
+    || path === '/api/manager/system/menus';
+}
+
+function StatusValue({ value }: { value?: string }) {
+  return <span className={value === 'ENABLED' ? 'status-pill' : 'muted-pill'}>{value || '-'}</span>;
+}
+
+function readField(record: SystemPageRecord, key: string) {
+  const value = (record as Record<string, unknown>)[key];
+  return typeof value === 'string' || typeof value === 'number' ? String(value) : undefined;
+}
+
+function recordLabel(record: SystemPageRecord) {
+  return textValue(
+    readField(record, 'username')
+      || readField(record, 'roleName')
+      || readField(record, 'permissionName')
+      || readField(record, 'menuName')
+      || String(record.id),
+  );
+}
+
+function readErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return '操作失败';
 }
 
 function MenuTreePanel({ nodes, total, error }: { nodes: MenuTreeNode[]; total: number; error: string | null }) {
@@ -349,7 +1101,10 @@ function MenuNode({ node, level }: { node: MenuTreeNode; level: number }) {
 }
 
 function countMenuNodes(nodes: MenuTreeNode[]): number {
-  return nodes.reduce((total, node) => total + 1 + countMenuNodes(node.children || []), 0);
+  return nodes.reduce((total, node) => {
+    const self = node.visible === false ? 0 : 1;
+    return total + self + countMenuNodes(node.children || []);
+  }, 0);
 }
 
 function formatDate(value?: string) {
@@ -357,4 +1112,8 @@ function formatDate(value?: string) {
     return '-';
   }
   return value.replace('T', ' ').slice(0, 19);
+}
+
+function textValue(value?: string) {
+  return value && value.trim() ? value : '-';
 }

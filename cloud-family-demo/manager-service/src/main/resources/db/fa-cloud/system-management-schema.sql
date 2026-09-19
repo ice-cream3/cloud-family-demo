@@ -91,26 +91,13 @@ CREATE TABLE IF NOT EXISTS sys_role_menu (
     CONSTRAINT fk_sys_role_menu_menu FOREIGN KEY (menu_id) REFERENCES sys_menu (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS operation_log (
-    id bigint NOT NULL AUTO_INCREMENT,
-    operator_username varchar(64) DEFAULT NULL,
-    operator_user_type varchar(32) DEFAULT NULL,
-    operation_type varchar(32) NOT NULL,
-    business_module varchar(64) NOT NULL,
-    business_type varchar(64) NOT NULL,
-    business_id varchar(128) DEFAULT NULL,
-    business_name varchar(255) DEFAULT NULL,
-    before_data json DEFAULT NULL,
-    after_data json DEFAULT NULL,
-    client_ip varchar(64) DEFAULT NULL,
-    request_uri varchar(255) DEFAULT NULL,
-    request_method varchar(16) DEFAULT NULL,
-    operation_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE IF NOT EXISTS sys_menu_permission (
+    menu_id bigint NOT NULL,
+    permission_id bigint NOT NULL,
     created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    KEY idx_operation_log_operator_time (operator_username, operation_at),
-    KEY idx_operation_log_business (business_module, business_type, business_id),
-    KEY idx_operation_log_type_time (operation_type, operation_at)
+    PRIMARY KEY (menu_id, permission_id),
+    CONSTRAINT fk_sys_menu_permission_menu FOREIGN KEY (menu_id) REFERENCES sys_menu (id) ON DELETE CASCADE,
+    CONSTRAINT fk_sys_menu_permission_permission FOREIGN KEY (permission_id) REFERENCES sys_permission (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 INSERT IGNORE INTO sys_user (username, password_hash, display_name, email, status)
@@ -129,7 +116,21 @@ INSERT IGNORE INTO sys_permission (permission_code, permission_name, description
 VALUES
     ('user:profile:read', 'Read user profile', 'Allows reading the current API user profile', 'ENABLED'),
     ('manager:login', 'Manager login', 'Allows login through the manager login endpoint', 'ENABLED'),
-    ('manager:dashboard:read', 'Read manager dashboard', 'Allows reading manager dashboard data', 'ENABLED');
+    ('manager:dashboard:read', 'Read manager dashboard', 'Allows reading manager dashboard data', 'ENABLED'),
+    ('system:user:add', '用户新增', 'Allows creating system users', 'ENABLED'),
+    ('system:user:edit', '用户修改', 'Allows updating system users', 'ENABLED'),
+    ('system:user:delete', '用户删除', 'Allows deleting system users', 'ENABLED'),
+    ('system:user:reset-password', '重置密码', 'Allows resetting system user passwords', 'ENABLED'),
+    ('system:role:add', '角色新增', 'Allows creating system roles', 'ENABLED'),
+    ('system:role:edit', '角色修改', 'Allows updating system roles', 'ENABLED'),
+    ('system:role:delete', '角色删除', 'Allows deleting system roles', 'ENABLED'),
+    ('system:permission:add', '权限新增', 'Allows creating system permissions', 'ENABLED'),
+    ('system:permission:edit', '权限修改', 'Allows updating system permissions', 'ENABLED'),
+    ('system:permission:delete', '权限删除', 'Allows deleting system permissions', 'ENABLED'),
+    ('system:menu:add', '菜单新增', 'Allows creating system menus', 'ENABLED'),
+    ('system:menu:edit', '菜单修改', 'Allows updating system menus', 'ENABLED'),
+    ('system:menu:delete', '菜单删除', 'Allows deleting system menus', 'ENABLED'),
+    ('system:menu:button-permission', '按钮权限', 'Allows configuring menu button permissions', 'ENABLED');
 
 INSERT IGNORE INTO sys_menu (menu_code, menu_name, path, component, icon, sort_order, visible, status)
 VALUES
@@ -151,6 +152,37 @@ INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, i
 SELECT parent.id, 'system-permissions', 'Permission Management', '/api/manager/system/permissions', 'SystemPermissions', 'KeyRound', 33, 1, 'ENABLED'
 FROM sys_menu parent
 WHERE parent.menu_code = 'system-management';
+
+INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, sort_order, visible, status)
+SELECT parent.id, 'system-menus', '菜单查询', '/api/manager/system/menus', 'SystemMenuQuery', 'FolderSearch', 34, 1, 'ENABLED'
+FROM sys_menu parent
+WHERE parent.menu_code = 'system-management';
+
+INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, sort_order, visible, status)
+SELECT parent.id, item.menu_code, item.menu_name, item.permission_code, 'ButtonPermission', 'MousePointerClick', item.sort_order, 0, 'ENABLED'
+FROM sys_menu parent
+JOIN (
+    SELECT 'system-users' parent_code, 'system-users-add' menu_code, '新增' menu_name, 'system:user:add' permission_code, 311 sort_order
+    UNION ALL SELECT 'system-users', 'system-users-edit', '修改', 'system:user:edit', 312
+    UNION ALL SELECT 'system-users', 'system-users-delete', '删除', 'system:user:delete', 313
+    UNION ALL SELECT 'system-users', 'system-users-reset-password', '重置密码', 'system:user:reset-password', 314
+    UNION ALL SELECT 'system-roles', 'system-roles-add', '新增', 'system:role:add', 321
+    UNION ALL SELECT 'system-roles', 'system-roles-edit', '修改', 'system:role:edit', 322
+    UNION ALL SELECT 'system-roles', 'system-roles-delete', '删除', 'system:role:delete', 323
+    UNION ALL SELECT 'system-permissions', 'system-permissions-add', '新增', 'system:permission:add', 331
+    UNION ALL SELECT 'system-permissions', 'system-permissions-edit', '修改', 'system:permission:edit', 332
+    UNION ALL SELECT 'system-permissions', 'system-permissions-delete', '删除', 'system:permission:delete', 333
+    UNION ALL SELECT 'system-menus', 'system-menus-add', '新增', 'system:menu:add', 341
+    UNION ALL SELECT 'system-menus', 'system-menus-edit', '修改', 'system:menu:edit', 342
+    UNION ALL SELECT 'system-menus', 'system-menus-delete', '删除', 'system:menu:delete', 343
+    UNION ALL SELECT 'system-menus', 'system-menus-button-permission', '按钮权限', 'system:menu:button-permission', 344
+) item ON item.parent_code = parent.menu_code;
+
+INSERT IGNORE INTO sys_menu_permission (menu_id, permission_id)
+SELECT m.id, p.id
+FROM sys_menu m
+INNER JOIN sys_permission p ON p.permission_code = m.path
+WHERE m.component = 'ButtonPermission';
 
 INSERT IGNORE INTO sys_user_role (user_id, role_id)
 SELECT u.id, r.id FROM sys_user u, sys_role r
@@ -184,9 +216,15 @@ WHERE r.role_code = 'USER' AND m.menu_code = 'user-profile';
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
 SELECT r.id, m.id FROM sys_role r, sys_menu m
 WHERE r.role_code = 'MANAGER'
-  AND m.menu_code IN ('manager-dashboard', 'system-management');
+  AND m.menu_code IN ('manager-dashboard', 'system-management', 'system-menus');
 
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
 SELECT r.id, m.id FROM sys_role r, sys_menu m
 WHERE r.role_code = 'SUPER_ADMIN'
-  AND m.menu_code IN ('manager-dashboard', 'system-management', 'system-users', 'system-roles', 'system-permissions');
+  AND m.menu_code IN (
+      'manager-dashboard', 'system-management', 'system-users', 'system-roles', 'system-permissions', 'system-menus',
+      'system-users-add', 'system-users-edit', 'system-users-delete', 'system-users-reset-password',
+      'system-roles-add', 'system-roles-edit', 'system-roles-delete',
+      'system-permissions-add', 'system-permissions-edit', 'system-permissions-delete',
+      'system-menus-add', 'system-menus-edit', 'system-menus-delete', 'system-menus-button-permission'
+  );

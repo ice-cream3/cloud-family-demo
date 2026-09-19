@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
@@ -15,6 +16,7 @@ import com.kfpd.cloud.manager.pojo.dto.LoginAccountDTO;
 import com.kfpd.cloud.manager.pojo.dto.SysUserAccessDTO;
 import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.manager.pojo.vo.PageVO;
+import com.kfpd.cloud.manager.pojo.vo.PasswordResetRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.SysMenuTreeVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserVO;
@@ -58,9 +60,21 @@ public class SysUserServiceImpl implements SysUserService {
     public PageVO<SysUserVO> findUsers(PageQueryVO query) {
         int normalizedPageNum = SystemManagementSupport.pageNum(query);
         int normalizedPageSize = SystemManagementSupport.pageSize(query);
+        String keyword = SystemManagementSupport.keyword(query);
+        String status = SystemManagementSupport.status(query);
+        LambdaQueryWrapper<SysUser> wrapper = Wrappers.lambdaQuery(SysUser.class)
+                .eq(SystemManagementSupport.hasText(status), SysUser::getStatus, status)
+                .and(SystemManagementSupport.hasText(keyword), condition -> condition
+                        .like(SysUser::getUsername, keyword)
+                        .or()
+                        .like(SysUser::getDisplayName, keyword)
+                        .or()
+                        .like(SysUser::getEmail, keyword)
+                )
+                .orderByDesc(SysUser::getId);
         Page<SysUser> page = userDao.selectPage(
                 new Page<>(normalizedPageNum, normalizedPageSize),
-                Wrappers.lambdaQuery(SysUser.class).orderByDesc(SysUser::getId)
+                wrapper
         );
         return new PageVO<>(
                 page.getTotal(),
@@ -142,6 +156,10 @@ public class SysUserServiceImpl implements SysUserService {
         requireRequest(request);
         SystemManagementSupport.requireText(request.username(), "username is required");
         SystemManagementSupport.requireText(request.displayName(), "displayName is required");
+        if (userDao.findByUsername(request.username()) != null) {
+            log.warn("User service exception: action=createUser, username={}, message=用户已存在", request.username());
+            throw SystemManagementSupport.badRequest("用户已存在");
+        }
         SysUser user = new SysUser();
         apply(user, request);
         userDao.insert(user);
@@ -161,6 +179,10 @@ public class SysUserServiceImpl implements SysUserService {
         SysUser user = new SysUser();
         user.setId(id);
         apply(user, request);
+        user.setUsername(before.getUsername());
+        if (!SystemManagementSupport.hasText(request.resolvedPasswordHash())) {
+            user.setPasswordHash(before.getPasswordHash());
+        }
         if (userDao.update(user) == 0) {
             log.warn("User service exception: action=updateUser, id={}, message=User not found", id);
             throw SystemManagementSupport.notFound("User not found");
@@ -168,6 +190,31 @@ public class SysUserServiceImpl implements SysUserService {
         SysUser updated = findUserEntityById(id);
         SysUserVO updatedVO = toVO(updated);
         operationLogService.recordUpdate(MODULE_SYSTEM, BUSINESS_USER, id, updatedVO.username(), toVO(before), updatedVO);
+        return updatedVO;
+    }
+
+    @Override
+    @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public SysUserVO resetUserPassword(Long id, PasswordResetRequestVO request) {
+        if (request == null) {
+            throw SystemManagementSupport.badRequest("request body is required");
+        }
+        SystemManagementSupport.requireText(request.resolvedPasswordHash(), "password is required");
+        SysUser before = findUserEntityById(id);
+        SysUser user = new SysUser();
+        user.setId(id);
+        user.setUsername(before.getUsername());
+        user.setPasswordHash(request.resolvedPasswordHash());
+        user.setDisplayName(before.getDisplayName());
+        user.setEmail(before.getEmail());
+        user.setStatus(before.getStatus());
+        if (userDao.update(user) == 0) {
+            log.warn("User service exception: action=resetUserPassword, id={}, message=User not found", id);
+            throw SystemManagementSupport.notFound("User not found");
+        }
+        SysUser updated = findUserEntityById(id);
+        SysUserVO updatedVO = toVO(updated);
+        operationLogService.recordUpdate(MODULE_SYSTEM, BUSINESS_USER, id, updatedVO.username(), "PASSWORD_RESET", updatedVO);
         return updatedVO;
     }
 

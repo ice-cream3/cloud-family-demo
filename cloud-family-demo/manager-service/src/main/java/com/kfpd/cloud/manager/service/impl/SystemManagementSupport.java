@@ -59,6 +59,18 @@ final class SystemManagementSupport {
         return status == null || status.isBlank() ? "ENABLED" : status;
     }
 
+    static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    static String keyword(PageQueryVO query) {
+        return query == null || !hasText(query.keyword()) ? null : query.keyword().trim();
+    }
+
+    static String status(PageQueryVO query) {
+        return query == null || !hasText(query.status()) ? null : query.status().trim();
+    }
+
     static int pageNum(Integer pageNum) {
         return pageNum == null || pageNum < 1 ? DEFAULT_PAGE_NUM : pageNum;
     }

@@ -2,10 +2,24 @@ import { useEffect, useState } from 'react';
 import { LoginPanel } from './components/LoginPanel';
 import { Dashboard } from './components/Dashboard';
 import { login, logout } from './services/authService';
-import { loadCurrentUser, loadManagerDashboard, loadMenus, loadSystemUsers } from './services/dashboardService';
+import {
+  createSystemRecord,
+  deleteSystemRecord,
+  loadSystemMenuPermissions,
+  loadCurrentUser,
+  loadManagerDashboard,
+  loadMenus,
+  loadSystemMenuPage,
+  loadSystemPermissions,
+  loadSystemRoles,
+  loadSystemUsers,
+  resetSystemUserPassword,
+  replaceSystemMenuPermissions,
+  updateSystemRecord,
+} from './services/dashboardService';
 import { ApiError } from './services/apiClient';
 import { AUTH_UNAUTHORIZED_EVENT, readSession, type Session } from './services/tokenStore';
-import type { LoginMode, ManagerDashboard, MenuTreeNode, PageResult, SysUser, UserProfile } from './types/api';
+import type { LoginMode, ManagerDashboard, MenuTreeNode, PageQuery, PageResult, SystemPageRecord, SystemRecordPayload, UserProfile } from './types/api';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(() => readSession());
@@ -13,9 +27,10 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [menuTree, setMenuTree] = useState<MenuTreeNode[]>([]);
   const [activeMenu, setActiveMenu] = useState<MenuTreeNode | null>(null);
-  const [userPage, setUserPage] = useState<PageResult<SysUser> | null>(null);
-  const [userPageLoading, setUserPageLoading] = useState(false);
-  const [userPageError, setUserPageError] = useState<string | null>(null);
+  const [systemPage, setSystemPage] = useState<PageResult<SystemPageRecord> | null>(null);
+  const [systemPageQuery, setSystemPageQuery] = useState<PageQuery>({});
+  const [systemPageLoading, setSystemPageLoading] = useState(false);
+  const [systemPageError, setSystemPageError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [menuError, setMenuError] = useState<string | null>(null);
@@ -77,23 +92,93 @@ export default function App() {
 
   async function handleMenuSelect(menu: MenuTreeNode) {
     setActiveMenu(menu);
-    setUserPageError(null);
+    setSystemPageError(null);
+    setSystemPage(null);
+    setSystemPageQuery({});
 
-    if (menu.path === '/api/manager/system/users') {
-      await loadUserPage(1);
+    if (isSystemPageMenu(menu.path)) {
+      await loadSystemPage(menu, 1, {});
     }
   }
 
-  async function loadUserPage(pageNum: number) {
-    setUserPageLoading(true);
-    setUserPageError(null);
+  async function loadSystemPage(menu: MenuTreeNode | null, pageNum: number, query = systemPageQuery) {
+    if (!menu || !isSystemPageMenu(menu.path)) {
+      return;
+    }
+
+    setSystemPageLoading(true);
+    setSystemPageError(null);
     try {
-      setUserPage(await loadSystemUsers(pageNum, userPage?.pageSize || 10));
+      setSystemPage(await getSystemPageLoader(menu.path)(pageNum, systemPage?.pageSize || 10, query));
     } catch (err) {
-      setUserPage(null);
-      setUserPageError(readError(err));
+      setSystemPage(null);
+      setSystemPageError(readError(err));
     } finally {
-      setUserPageLoading(false);
+      setSystemPageLoading(false);
+    }
+  }
+
+  async function handleCreateSystemRecord(payload: SystemRecordPayload) {
+    if (!activeMenu?.path) {
+      return;
+    }
+    await createSystemRecord(activeMenu.path, payload);
+    await reloadCurrentSystemPage(1);
+    if (activeMenu.path === '/api/manager/system/menus') {
+      await refreshMenus();
+    }
+  }
+
+  async function handleUpdateSystemRecord(id: number, payload: SystemRecordPayload) {
+    if (!activeMenu?.path) {
+      return;
+    }
+    await updateSystemRecord(activeMenu.path, id, payload);
+    await reloadCurrentSystemPage(systemPage?.pageNum || 1);
+    if (activeMenu.path === '/api/manager/system/menus') {
+      await refreshMenus();
+    }
+  }
+
+  async function handleDeleteSystemRecord(id: number) {
+    if (!activeMenu?.path) {
+      return;
+    }
+    await deleteSystemRecord(activeMenu.path, id);
+    await reloadCurrentSystemPage(systemPage?.pageNum || 1);
+    if (activeMenu.path === '/api/manager/system/menus') {
+      await refreshMenus();
+    }
+  }
+
+  async function handleResetUserPassword(id: number, password: string) {
+    await resetSystemUserPassword(id, password);
+    await reloadCurrentSystemPage(systemPage?.pageNum || 1);
+  }
+
+  async function handleLoadMenuPermissionOptions() {
+    const page = await loadSystemPermissions(1, 100);
+    return page.records;
+  }
+
+  async function handleLoadMenuPermissions(id: number) {
+    return loadSystemMenuPermissions(id);
+  }
+
+  async function handleReplaceMenuPermissions(id: number, ids: number[]) {
+    await replaceSystemMenuPermissions(id, ids);
+  }
+
+  async function reloadCurrentSystemPage(pageNum: number) {
+    await loadSystemPage(activeMenu, pageNum, systemPageQuery);
+  }
+
+  async function refreshMenus() {
+    try {
+      setMenuTree(await loadMenus());
+      setMenuError(null);
+    } catch {
+      setMenuError('当前登录用户菜单加载失败，请确认账号有管理端菜单权限。');
     }
   }
 
@@ -108,9 +193,10 @@ export default function App() {
     setUserProfile(null);
     setMenuTree([]);
     setActiveMenu(null);
-    setUserPage(null);
-    setUserPageError(null);
-    setUserPageLoading(false);
+    setSystemPage(null);
+    setSystemPageQuery({});
+    setSystemPageError(null);
+    setSystemPageLoading(false);
     setMenuError(null);
   }
 
@@ -126,17 +212,46 @@ export default function App() {
       menuTree={menuTree}
       menuError={menuError}
       activeMenu={activeMenu}
-      userPage={userPage}
-      userPageLoading={userPageLoading}
-      userPageError={userPageError}
+      systemPage={systemPage}
+      systemPageQuery={systemPageQuery}
+      systemPageLoading={systemPageLoading}
+      systemPageError={systemPageError}
       onMenuSelect={handleMenuSelect}
-      onUserPageChange={loadUserPage}
+      onSystemPageChange={(pageNum) => loadSystemPage(activeMenu, pageNum)}
+      onSystemPageSearch={(query) => {
+        setSystemPageQuery(query);
+        void loadSystemPage(activeMenu, 1, query);
+      }}
+      onCreateSystemRecord={handleCreateSystemRecord}
+      onUpdateSystemRecord={handleUpdateSystemRecord}
+      onDeleteSystemRecord={handleDeleteSystemRecord}
+      onResetUserPassword={handleResetUserPassword}
+      onLoadMenuPermissionOptions={handleLoadMenuPermissionOptions}
+      onLoadMenuPermissions={handleLoadMenuPermissions}
+      onReplaceMenuPermissions={handleReplaceMenuPermissions}
       loading={loading}
       error={error}
       onReload={reloadData}
       onLogout={handleLogout}
     />
   );
+}
+
+function isSystemPageMenu(path?: string) {
+  return Boolean(path && getSystemPageLoaders()[path]);
+}
+
+function getSystemPageLoader(path?: string) {
+  return getSystemPageLoaders()[path || ''];
+}
+
+function getSystemPageLoaders(): Record<string, (pageNum: number, pageSize: number, query?: PageQuery) => Promise<PageResult<SystemPageRecord>>> {
+  return {
+    '/api/manager/system/users': loadSystemUsers,
+    '/api/manager/system/roles': loadSystemRoles,
+    '/api/manager/system/permissions': loadSystemPermissions,
+    '/api/manager/system/menus': loadSystemMenuPage,
+  };
 }
 
 function readError(error: unknown) {

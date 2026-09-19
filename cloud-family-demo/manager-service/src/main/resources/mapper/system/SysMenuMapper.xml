@@ -19,6 +19,16 @@
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
+    <resultMap id="SysPermissionResultMap" type="com.kfpd.cloud.manager.pojo.entity.SysPermission">
+        <id property="id" column="id"/>
+        <result property="permissionCode" column="permission_code"/>
+        <result property="permissionName" column="permission_name"/>
+        <result property="description" column="description"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
     <sql id="SysMenuColumns">
         id, parent_id, menu_code, menu_name, path, component, icon, sort_order, visible, status, created_at, updated_at
     </sql>
@@ -59,4 +69,22 @@
         DELETE FROM sys_menu
         WHERE id = #{id}
     </delete>
+
+    <select id="findPermissionsByMenuId" resultMap="SysPermissionResultMap">
+        SELECT p.id, p.permission_code, p.permission_name, p.description, p.status, p.created_at, p.updated_at
+        FROM sys_permission p
+        INNER JOIN sys_menu_permission mp ON mp.permission_id = p.id
+        WHERE mp.menu_id = #{menuId}
+        ORDER BY p.permission_code ASC
+    </select>
+
+    <delete id="deleteMenuPermissions">
+        DELETE FROM sys_menu_permission
+        WHERE menu_id = #{menuId}
+    </delete>
+
+    <insert id="insertMenuPermission">
+        INSERT IGNORE INTO sys_menu_permission (menu_id, permission_id)
+        VALUES (#{menuId}, #{permissionId})
+    </insert>
 </mapper>

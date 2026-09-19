@@ -41,6 +41,11 @@ export type PageResult<T> = {
   records: T[];
 };
 
+export type PageQuery = {
+  keyword?: string;
+  status?: string;
+};
+
 export type SysMenu = {
   id: number;
   parentId?: number | null;
@@ -68,6 +73,32 @@ export type SysUser = {
   status?: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type SysRole = {
+  id: number;
+  roleCode?: string;
+  roleName?: string;
+  description?: string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type SysPermission = {
+  id: number;
+  permissionCode?: string;
+  permissionName?: string;
+  description?: string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type SystemPageRecord = SysUser | SysRole | SysPermission | SysMenu;
+
+export type SystemRecordPayload = {
+  [key: string]: string | number | boolean | null | undefined;
 };
 
 export type LoginMode = 'partner' | 'manager';

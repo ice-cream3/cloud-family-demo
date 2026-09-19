@@ -7,6 +7,7 @@ import com.kfpd.cloud.manager.pojo.dto.LoginAccountDTO;
 import com.kfpd.cloud.manager.pojo.dto.SysUserAccessDTO;
 import com.kfpd.cloud.manager.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.manager.pojo.vo.PageVO;
+import com.kfpd.cloud.manager.pojo.vo.PasswordResetRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.SysMenuTreeVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.SysUserVO;
@@ -29,6 +30,8 @@ public interface SysUserService {
     SysUserVO createUser(SysUserRequestVO request);
 
     SysUserVO updateUser(Long id, SysUserRequestVO request);
+
+    SysUserVO resetUserPassword(Long id, PasswordResetRequestVO request);
 
     void deleteUser(Long id);
 
