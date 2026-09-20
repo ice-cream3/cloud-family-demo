@@ -126,13 +126,14 @@ VALUES
     ('system:role:add', '角色新增', 'Allows creating system roles', 'ENABLED'),
     ('system:role:edit', '角色修改', 'Allows updating system roles', 'ENABLED'),
     ('system:role:delete', '角色删除', 'Allows deleting system roles', 'ENABLED'),
+    ('system:role:menu', '分配菜单', 'Allows configuring role menus', 'ENABLED'),
     ('system:permission:add', '权限新增', 'Allows creating system permissions', 'ENABLED'),
     ('system:permission:edit', '权限修改', 'Allows updating system permissions', 'ENABLED'),
     ('system:permission:delete', '权限删除', 'Allows deleting system permissions', 'ENABLED'),
     ('system:menu:add', '菜单新增', 'Allows creating system menus', 'ENABLED'),
     ('system:menu:edit', '菜单修改', 'Allows updating system menus', 'ENABLED'),
     ('system:menu:delete', '菜单删除', 'Allows deleting system menus', 'ENABLED'),
-    ('system:menu:button-permission', '按钮权限', 'Allows configuring menu button permissions', 'ENABLED');
+    ('system:menu:button-permission', '分配权限', 'Allows configuring menu button permissions', 'ENABLED');
 
 INSERT IGNORE INTO sys_menu (menu_code, menu_name, path, component, icon, menu_level, button_flag, sort_order, visible, status)
 VALUES
@@ -176,13 +177,14 @@ JOIN (
     UNION ALL SELECT 'system-roles', 'system-roles-add', '新增', 'system:role:add', 321
     UNION ALL SELECT 'system-roles', 'system-roles-edit', '修改', 'system:role:edit', 322
     UNION ALL SELECT 'system-roles', 'system-roles-delete', '删除', 'system:role:delete', 323
+    UNION ALL SELECT 'system-roles', 'system-roles-menu', '分配菜单', 'system:role:menu', 324
     UNION ALL SELECT 'system-permissions', 'system-permissions-add', '新增', 'system:permission:add', 331
     UNION ALL SELECT 'system-permissions', 'system-permissions-edit', '修改', 'system:permission:edit', 332
     UNION ALL SELECT 'system-permissions', 'system-permissions-delete', '删除', 'system:permission:delete', 333
     UNION ALL SELECT 'system-menus', 'system-menus-add', '新增', 'system:menu:add', 341
     UNION ALL SELECT 'system-menus', 'system-menus-edit', '修改', 'system:menu:edit', 342
     UNION ALL SELECT 'system-menus', 'system-menus-delete', '删除', 'system:menu:delete', 343
-    UNION ALL SELECT 'system-menus', 'system-menus-button-permission', '按钮权限', 'system:menu:button-permission', 344
+    UNION ALL SELECT 'system-menus', 'system-menus-button-permission', '分配权限', 'system:menu:button-permission', 344
 ) item ON item.parent_code = parent.menu_code;
 
 INSERT IGNORE INTO sys_menu_permission (menu_id, permission_id)
@@ -231,7 +233,7 @@ WHERE r.role_code = 'SUPER_ADMIN'
   AND m.menu_code IN (
       'manager-dashboard', 'system-management', 'system-users', 'system-roles', 'system-permissions', 'system-menus', 'system-operation-logs',
       'system-users-add', 'system-users-edit', 'system-users-delete', 'system-users-reset-password',
-      'system-roles-add', 'system-roles-edit', 'system-roles-delete',
+      'system-roles-add', 'system-roles-edit', 'system-roles-delete', 'system-roles-menu',
       'system-permissions-add', 'system-permissions-edit', 'system-permissions-delete',
       'system-menus-add', 'system-menus-edit', 'system-menus-delete', 'system-menus-button-permission'
   );

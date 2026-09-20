@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ChevronRight, Eye, EyeOff, FolderTree, KeyRound, Layers3, ListTree, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
-import type { ManagerDashboard, MenuTreeNode, OperationLog, PageQuery, PageResult, SysPermission, SysRole, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
+import type { ManagerDashboard, MenuTreeNode, OperationLog, PageQuery, PageResult, SysMenu, SysPermission, SysRole, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
 import type { Session } from '../services/tokenStore';
 import { loadSystemMenuTree } from '../services/dashboardService';
 
@@ -29,6 +29,8 @@ type DashboardProps = {
   onLoadUserRoleOptions: () => Promise<SysRole[]>;
   onLoadUserRoles: (id: number) => Promise<SysRole[]>;
   onReplaceUserRoles: (id: number, ids: number[]) => Promise<void>;
+  onLoadRoleMenus: (id: number) => Promise<SysMenu[]>;
+  onReplaceRoleMenus: (id: number, ids: number[]) => Promise<void>;
   loading: boolean;
   error: string | null;
   onReload: () => void;
@@ -59,6 +61,8 @@ export function Dashboard({
   onLoadUserRoleOptions,
   onLoadUserRoles,
   onReplaceUserRoles,
+  onLoadRoleMenus,
+  onReplaceRoleMenus,
   loading,
   error,
   onReload,
@@ -126,6 +130,8 @@ export function Dashboard({
             onLoadUserRoleOptions={onLoadUserRoleOptions}
             onLoadUserRoles={onLoadUserRoles}
             onReplaceUserRoles={onReplaceUserRoles}
+            onLoadRoleMenus={onLoadRoleMenus}
+            onReplaceRoleMenus={onReplaceRoleMenus}
           />
         ) : (
           <>
@@ -281,6 +287,8 @@ function SystemPagePanel({
   onLoadUserRoleOptions,
   onLoadUserRoles,
   onReplaceUserRoles,
+  onLoadRoleMenus,
+  onReplaceRoleMenus,
 }: {
   menu: MenuTreeNode | null;
   page: PageResult<SystemPageRecord> | null;
@@ -299,6 +307,8 @@ function SystemPagePanel({
   onLoadUserRoleOptions: () => Promise<SysRole[]>;
   onLoadUserRoles: (id: number) => Promise<SysRole[]>;
   onReplaceUserRoles: (id: number, ids: number[]) => Promise<void>;
+  onLoadRoleMenus: (id: number) => Promise<SysMenu[]>;
+  onReplaceRoleMenus: (id: number, ids: number[]) => Promise<void>;
 }) {
   const config = getSystemPageConfig(menu?.path);
   const isMenuManagement = menu?.path === '/api/manager/system/menus';
@@ -318,12 +328,17 @@ function SystemPagePanel({
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [permissionRecord, setPermissionRecord] = useState<SystemPageRecord | null>(null);
   const [permissionOptions, setPermissionOptions] = useState<SysPermission[]>([]);
+  const [permissionMenuTree, setPermissionMenuTree] = useState<MenuTreeNode[]>([]);
   const [selectedPermissionIds, setSelectedPermissionIds] = useState<Set<number>>(() => new Set());
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [roleRecord, setRoleRecord] = useState<SystemPageRecord | null>(null);
   const [roleOptions, setRoleOptions] = useState<SysRole[]>([]);
   const [selectedRoleIds, setSelectedRoleIds] = useState<Set<number>>(() => new Set());
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [roleMenuRecord, setRoleMenuRecord] = useState<SystemPageRecord | null>(null);
+  const [roleMenuOptions, setRoleMenuOptions] = useState<MenuTreeNode[]>([]);
+  const [selectedRoleMenuIds, setSelectedRoleMenuIds] = useState<Set<number>>(() => new Set());
+  const [roleMenuError, setRoleMenuError] = useState<string | null>(null);
   const [logDetailRecord, setLogDetailRecord] = useState<OperationLog | null>(null);
   const [operationMessage, setOperationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [treeNodes, setTreeNodes] = useState<MenuTreeNode[]>([]);
@@ -468,8 +483,13 @@ function SystemPagePanel({
     setSaving(true);
     setPermissionError(null);
     try {
-      const [options, selected] = await Promise.all([onLoadMenuPermissionOptions(), onLoadMenuPermissions(record.id)]);
+      const [options, selected, nodes] = await Promise.all([
+        onLoadMenuPermissionOptions(),
+        onLoadMenuPermissions(record.id),
+        loadSystemMenuTree(),
+      ]);
       setPermissionOptions(options);
+      setPermissionMenuTree(nodes);
       setSelectedPermissionIds(new Set(selected.map((permission) => permission.id)));
       setPermissionRecord(record);
     } catch (err) {
@@ -526,6 +546,40 @@ function SystemPagePanel({
     } catch (err) {
       const message = readErrorMessage(err);
       setRoleError(message);
+      setOperationMessage({ type: 'error', text: message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function openRoleMenuDialog(record: SystemPageRecord) {
+    setSaving(true);
+    setRoleMenuError(null);
+    try {
+      const [nodes, selected] = await Promise.all([loadSystemMenuTree(), onLoadRoleMenus(record.id)]);
+      setRoleMenuOptions(nodes);
+      setSelectedRoleMenuIds(new Set(selected.map((menuItem) => menuItem.id)));
+      setRoleMenuRecord(record);
+    } catch (err) {
+      setOperationMessage({ type: 'error', text: readErrorMessage(err) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveRoleMenus(ids: number[]) {
+    if (!roleMenuRecord) {
+      return;
+    }
+    setSaving(true);
+    setRoleMenuError(null);
+    try {
+      await onReplaceRoleMenus(roleMenuRecord.id, ids);
+      setRoleMenuRecord(null);
+      setOperationMessage({ type: 'success', text: '角色菜单保存成功' });
+    } catch (err) {
+      const message = readErrorMessage(err);
+      setRoleMenuError(message);
       setOperationMessage({ type: 'error', text: message });
     } finally {
       setSaving(false);
@@ -672,10 +726,16 @@ function SystemPagePanel({
                             </button>
                           </>
                         ) : null}
+                        {menu?.path === '/api/manager/system/roles' ? (
+                          <button type="button" onClick={() => openRoleMenuDialog(record)} disabled={saving}>
+                            <ListTree size={14} />
+                            分配菜单
+                          </button>
+                        ) : null}
                         {menu?.path === '/api/manager/system/menus' ? (
                           <button type="button" onClick={() => openPermissionDialog(record)} disabled={saving}>
                             <KeyRound size={14} />
-                            按钮权限
+                            分配权限
                           </button>
                         ) : null}
                         <button className="danger" type="button" onClick={() => deleteRecord(record)} disabled={saving}>
@@ -724,12 +784,14 @@ function SystemPagePanel({
         <MenuPermissionDialog
           record={permissionRecord}
           permissions={permissionOptions}
+          menuTree={permissionMenuTree}
           selectedIds={selectedPermissionIds}
           saving={saving}
           error={permissionError}
           onClose={() => {
             setPermissionRecord(null);
             setPermissionError(null);
+            setPermissionMenuTree([]);
           }}
           onSave={saveMenuPermissions}
         />
@@ -746,6 +808,20 @@ function SystemPagePanel({
             setRoleError(null);
           }}
           onSave={saveUserRoles}
+        />
+      ) : null}
+      {roleMenuRecord ? (
+        <RoleMenuDialog
+          record={roleMenuRecord}
+          menus={roleMenuOptions}
+          selectedIds={selectedRoleMenuIds}
+          saving={saving}
+          error={roleMenuError}
+          onClose={() => {
+            setRoleMenuRecord(null);
+            setRoleMenuError(null);
+          }}
+          onSave={saveRoleMenus}
         />
       ) : null}
       {logDetailRecord ? (
@@ -1068,6 +1144,7 @@ type EditorField = {
 type MenuSelectOption = {
   id: number;
   label: string;
+  meta?: string;
 };
 
 type SystemPageConfig = {
@@ -1202,6 +1279,7 @@ function PasswordResetDialog({
 function MenuPermissionDialog({
   record,
   permissions,
+  menuTree,
   selectedIds,
   saving,
   error,
@@ -1210,6 +1288,7 @@ function MenuPermissionDialog({
 }: {
   record: SystemPageRecord;
   permissions: SysPermission[];
+  menuTree: MenuTreeNode[];
   selectedIds: Set<number>;
   saving: boolean;
   error: string | null;
@@ -1217,6 +1296,14 @@ function MenuPermissionDialog({
   onSave: (ids: number[]) => void;
 }) {
   const [nextIds, setNextIds] = useState<Set<number>>(() => new Set(selectedIds));
+  const permissionByCode = new Map(
+    permissions
+      .filter((permission) => Boolean(permission.permissionCode))
+      .map((permission) => [permission.permissionCode as string, permission])
+  );
+  const matchedPermissionIds = new Set<number>();
+  const visibleMenuTree = menuTree.filter((node) => menuNodeHasPermission(node, permissionByCode, matchedPermissionIds));
+  const unmatchedPermissions = permissions.filter((permission) => !matchedPermissionIds.has(permission.id));
 
   function toggle(permissionId: number) {
     setNextIds((current) => {
@@ -1237,10 +1324,10 @@ function MenuPermissionDialog({
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="record-dialog" role="dialog" aria-modal="true" aria-label="按钮权限">
+      <section className="record-dialog" role="dialog" aria-modal="true" aria-label="分配权限">
         <div className="dialog-heading">
           <div>
-            <h3>按钮权限</h3>
+            <h3>分配权限</h3>
             <p>{recordLabel(record)}</p>
           </div>
           <button className="icon-button" type="button" onClick={onClose} disabled={saving} title="关闭">
@@ -1248,25 +1335,43 @@ function MenuPermissionDialog({
           </button>
         </div>
         <form className="record-form single-column" onSubmit={submit}>
-          <div className="permission-list">
-            {permissions.length > 0 ? (
-              permissions.map((permission) => (
-                <label key={permission.id} className="permission-option">
-                  <input
-                    type="checkbox"
-                    checked={nextIds.has(permission.id)}
-                    onChange={() => toggle(permission.id)}
-                    disabled={saving}
-                  />
-                  <span>
-                    <strong>{permission.permissionName || permission.permissionCode}</strong>
-                    <small>{permission.permissionCode}</small>
-                  </span>
-                </label>
+          <div className="permission-menu-tree">
+            {visibleMenuTree.length > 0 ? (
+              visibleMenuTree.map((node) => (
+                <MenuPermissionTreeNode
+                  key={node.id}
+                  node={node}
+                  level={0}
+                  permissionByCode={permissionByCode}
+                  selectedIds={nextIds}
+                  saving={saving}
+                  onToggle={toggle}
+                />
               ))
             ) : (
               <div className="empty-state compact">暂无可选权限。</div>
             )}
+            {unmatchedPermissions.length > 0 ? (
+              <div className="permission-menu-unmatched">
+                <div className="permission-menu-group" style={{ paddingLeft: 12 }}>
+                  <FolderTree size={15} />
+                  <span>
+                    <strong>未关联菜单</strong>
+                    <small>{unmatchedPermissions.length} 个权限</small>
+                  </span>
+                </div>
+                {unmatchedPermissions.map((permission) => (
+                  <PermissionCheckbox
+                    key={permission.id}
+                    permission={permission}
+                    level={1}
+                    checked={nextIds.has(permission.id)}
+                    saving={saving}
+                    onToggle={toggle}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
           {error ? <div className="error-banner compact">{error}</div> : null}
           <div className="dialog-actions">
@@ -1281,6 +1386,108 @@ function MenuPermissionDialog({
       </section>
     </div>
   );
+}
+
+function MenuPermissionTreeNode({
+  node,
+  level,
+  permissionByCode,
+  selectedIds,
+  saving,
+  onToggle,
+}: {
+  node: MenuTreeNode;
+  level: number;
+  permissionByCode: Map<string, SysPermission>;
+  selectedIds: Set<number>;
+  saving: boolean;
+  onToggle: (id: number) => void;
+}) {
+  const permission = node.path ? permissionByCode.get(node.path) : undefined;
+  const children = node.children.filter((child) => menuNodeHasPermission(child, permissionByCode));
+
+  return (
+    <div className="permission-menu-tree-item">
+      {permission ? (
+        <PermissionCheckbox
+          permission={permission}
+          level={level}
+          checked={selectedIds.has(permission.id)}
+          saving={saving}
+          onToggle={onToggle}
+          menuName={node.menuName}
+        />
+      ) : (
+        <div className="permission-menu-group" style={{ paddingLeft: 12 + level * 22 }}>
+          <FolderTree size={15} />
+          <span>
+            <strong>{node.menuName || node.menuCode || `菜单 ${node.id}`}</strong>
+            <small>{node.menuCode || node.path || node.id}</small>
+          </span>
+        </div>
+      )}
+      {children.length > 0 ? (
+        <div className="permission-menu-tree-children">
+          {children.map((child) => (
+            <MenuPermissionTreeNode
+              key={child.id}
+              node={child}
+              level={level + 1}
+              permissionByCode={permissionByCode}
+              selectedIds={selectedIds}
+              saving={saving}
+              onToggle={onToggle}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PermissionCheckbox({
+  permission,
+  level,
+  checked,
+  saving,
+  onToggle,
+  menuName,
+}: {
+  permission: SysPermission;
+  level: number;
+  checked: boolean;
+  saving: boolean;
+  onToggle: (id: number) => void;
+  menuName?: string;
+}) {
+  return (
+    <label className="permission-menu-option" style={{ paddingLeft: 12 + level * 22 }}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={() => onToggle(permission.id)}
+        disabled={saving}
+      />
+      <span className="permission-menu-option-main">
+        <strong>{menuName || permission.permissionName || permission.permissionCode}</strong>
+        <small>{permission.permissionName ? `${permission.permissionName} · ${permission.permissionCode}` : permission.permissionCode}</small>
+      </span>
+      <span className="status-pill">权限</span>
+    </label>
+  );
+}
+
+function menuNodeHasPermission(
+  node: MenuTreeNode,
+  permissionByCode: Map<string, SysPermission>,
+  matchedPermissionIds?: Set<number>
+): boolean {
+  const permission = node.path ? permissionByCode.get(node.path) : undefined;
+  if (permission) {
+    matchedPermissionIds?.add(permission.id);
+    return true;
+  }
+  return node.children.some((child) => menuNodeHasPermission(child, permissionByCode, matchedPermissionIds));
 }
 
 function UserRoleDialog({
@@ -1367,10 +1574,137 @@ function UserRoleDialog({
   );
 }
 
+function RoleMenuDialog({
+  record,
+  menus,
+  selectedIds,
+  saving,
+  error,
+  onClose,
+  onSave,
+}: {
+  record: SystemPageRecord;
+  menus: MenuTreeNode[];
+  selectedIds: Set<number>;
+  saving: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSave: (ids: number[]) => void;
+}) {
+  const [nextIds, setNextIds] = useState<Set<number>>(() => new Set(selectedIds));
+
+  function toggle(menuId: number) {
+    setNextIds((current) => {
+      const next = new Set(current);
+      if (next.has(menuId)) {
+        next.delete(menuId);
+      } else {
+        next.add(menuId);
+      }
+      return next;
+    });
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSave(Array.from(nextIds));
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="record-dialog" role="dialog" aria-modal="true" aria-label="分配菜单">
+        <div className="dialog-heading">
+          <div>
+            <h3>分配菜单</h3>
+            <p>{recordLabel(record)}</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} disabled={saving} title="关闭">
+            <X size={18} />
+          </button>
+        </div>
+        <form className="record-form single-column" onSubmit={submit}>
+          <div className="role-menu-tree">
+            {menus.length > 0 ? (
+              menus.map((menuItem) => (
+                <RoleMenuTreeOption
+                  key={menuItem.id}
+                  node={menuItem}
+                  level={0}
+                  selectedIds={nextIds}
+                  saving={saving}
+                  onToggle={toggle}
+                />
+              ))
+            ) : (
+              <div className="empty-state compact">暂无可选菜单。</div>
+            )}
+          </div>
+          {error ? <div className="error-banner compact">{error}</div> : null}
+          <div className="dialog-actions">
+            <button className="ghost-button" type="button" onClick={onClose} disabled={saving}>
+              取消
+            </button>
+            <button className="primary-button" type="submit" disabled={saving}>
+              {saving ? '保存中' : '保存'}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function RoleMenuTreeOption({
+  node,
+  level,
+  selectedIds,
+  saving,
+  onToggle,
+}: {
+  node: MenuTreeNode;
+  level: number;
+  selectedIds: Set<number>;
+  saving: boolean;
+  onToggle: (id: number) => void;
+}) {
+  return (
+    <div className="role-menu-tree-item">
+      <label className="role-menu-option" style={{ paddingLeft: 12 + level * 22 }}>
+        <input
+          type="checkbox"
+          checked={selectedIds.has(node.id)}
+          onChange={() => onToggle(node.id)}
+          disabled={saving}
+        />
+        <span className="role-menu-option-main">
+          <strong>{node.menuName || node.menuCode || `菜单 ${node.id}`}</strong>
+          <small>{node.buttonFlag ? '按钮' : '菜单'} · {node.menuCode || node.id}</small>
+        </span>
+        <span className={node.buttonFlag ? 'muted-pill' : 'status-pill'}>{node.buttonFlag ? '按钮' : '菜单'}</span>
+      </label>
+      {node.children.length > 0 ? (
+        <div className="role-menu-tree-children">
+          {node.children.map((child) => (
+            <RoleMenuTreeOption
+              key={child.id}
+              node={child}
+              level={level + 1}
+              selectedIds={selectedIds}
+              saving={saving}
+              onToggle={onToggle}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function OperationLogDetailDialog({ record, onClose }: { record: OperationLog; onClose: () => void }) {
   const before = parseLogData(record.beforeData);
   const after = parseLogData(record.afterData);
-  const rows = buildLogCompareRows(before, after);
+  const rows = buildLogCompareRows(before, after, record.businessType);
+  const changedRows = rows.filter((row) => row.changeType !== 'same');
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -1398,29 +1732,17 @@ function OperationLogDetailDialog({ record, onClose }: { record: OperationLog; o
             <DetailItem label="客户端 IP" value={record.clientIp} />
           </div>
 
-          <div className="compare-table-wrap">
-            <table className="compare-table">
-              <thead>
-                <tr>
-                  <th>字段</th>
-                  <th>变更前</th>
-                  <th>变更后</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length > 0 ? rows.map((row) => (
-                  <tr key={row.key} className={row.changed ? 'changed' : ''}>
-                    <td>{row.key}</td>
-                    <td><code>{row.beforeValue}</code></td>
-                    <td><code>{row.afterValue}</code></td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan={3}>暂无可对比数据。</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="diff-summary">
+            <span>{changedRows.length > 0 ? `本次变更 ${changedRows.length} 个字段` : '没有页面字段变化'}</span>
+            <small>新增 {rows.filter((row) => row.changeType === 'added').length} · 删除 {rows.filter((row) => row.changeType === 'removed').length} · 修改 {rows.filter((row) => row.changeType === 'modified').length}</small>
+          </div>
+
+          <div className="diff-card-list">
+            {changedRows.length > 0 ? changedRows.map((row) => (
+              <DiffCard key={row.key} row={row} />
+            )) : (
+              <div className="empty-state compact">暂无页面字段变化。</div>
+            )}
           </div>
 
           <div className="dialog-actions">
@@ -1431,6 +1753,57 @@ function OperationLogDetailDialog({ record, onClose }: { record: OperationLog; o
         </div>
       </section>
     </div>
+  );
+}
+
+function DiffCard({ row }: { row: CompareRow }) {
+  return (
+    <div className={`diff-card ${row.changeType}`}>
+      <div className="diff-card-head">
+        <strong>{row.label}</strong>
+        <span>{changeTypeLabel(row.changeType)}</span>
+      </div>
+      <div className="diff-highlight">
+        {renderDiffHighlight(row)}
+      </div>
+      <div className="diff-values">
+        <div className="diff-value before">
+          <span>操作前</span>
+          <code>{row.beforeValue}</code>
+        </div>
+        <div className="diff-arrow">→</div>
+        <div className="diff-value after">
+          <span>操作后</span>
+          <code>{row.afterValue}</code>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function renderDiffHighlight(row: CompareRow) {
+  if (row.changeType === 'added') {
+    return (
+      <>
+        <span className="diff-action-label">新增</span>
+        <code>{row.afterValue}</code>
+      </>
+    );
+  }
+  if (row.changeType === 'removed') {
+    return (
+      <>
+        <span className="diff-action-label">删除</span>
+        <code>{row.beforeValue}</code>
+      </>
+    );
+  }
+  return (
+    <>
+      <code className="diff-from">{row.beforeValue}</code>
+      <span className="diff-action-label">改为</span>
+      <code className="diff-to">{row.afterValue}</code>
+    </>
   );
 }
 
@@ -1705,29 +2078,33 @@ function readBooleanField(record: SystemPageRecord, key: string) {
 }
 
 type ParsedLogData = {
+  value: unknown;
   flattened: Record<string, string>;
   raw: string;
 };
 
 type CompareRow = {
   key: string;
+  label: string;
   beforeValue: string;
   afterValue: string;
-  changed: boolean;
+  changeType: 'added' | 'removed' | 'modified' | 'same';
 };
 
 function parseLogData(value?: string): ParsedLogData {
   if (!value || !value.trim()) {
-    return { flattened: {}, raw: '' };
+    return { value: undefined, flattened: {}, raw: '' };
   }
   try {
     const parsed = JSON.parse(value) as unknown;
     return {
+      value: parsed,
       flattened: flattenLogValue(parsed),
       raw: formatLogValue(parsed),
     };
   } catch {
     return {
+      value,
       flattened: { 原始数据: value },
       raw: value,
     };
@@ -1760,21 +2137,285 @@ function flattenLogValue(value: unknown, prefix = ''): Record<string, string> {
   return prefix ? { [prefix]: formatLogValue(value) } : { 值: formatLogValue(value) };
 }
 
-function buildLogCompareRows(before: ParsedLogData, after: ParsedLogData): CompareRow[] {
-  const keys = Array.from(new Set([...Object.keys(before.flattened), ...Object.keys(after.flattened)])).sort();
+function buildLogCompareRows(before: ParsedLogData, after: ParsedLogData, businessType?: string): CompareRow[] {
+  const relationRows = buildRelationCompareRows(before.value, after.value, businessType);
+  if (relationRows) {
+    return relationRows;
+  }
+  const labels = operationLogFieldLabels(businessType);
+  const fieldOrder = Object.keys(labels);
+  const knownPageFields = new Set(fieldOrder);
+  const supportsPageFields = fieldOrder.length > 0;
+  const keys = Array.from(new Set([...Object.keys(before.flattened), ...Object.keys(after.flattened)]))
+    .filter((key) => !supportsPageFields || knownPageFields.has(baseLogFieldKey(key)))
+    .sort((left, right) => {
+      const leftIndex = fieldOrder.indexOf(baseLogFieldKey(left));
+      const rightIndex = fieldOrder.indexOf(baseLogFieldKey(right));
+      if (leftIndex !== rightIndex) {
+        return leftIndex - rightIndex;
+      }
+      return left.localeCompare(right);
+    });
   if (keys.length === 0 && (before.raw || after.raw)) {
     keys.push('原始数据');
   }
   return keys.map((key) => {
-    const beforeValue = before.flattened[key] ?? (key === '原始数据' ? before.raw : '-');
-    const afterValue = after.flattened[key] ?? (key === '原始数据' ? after.raw : '-');
+    const beforeValue = displayLogFieldValue(key, before.flattened[key] ?? (key === '原始数据' ? before.raw : '-'));
+    const afterValue = displayLogFieldValue(key, after.flattened[key] ?? (key === '原始数据' ? after.raw : '-'));
     return {
       key,
+      label: operationLogFieldLabel(labels, businessType, key),
       beforeValue,
       afterValue,
-      changed: beforeValue !== afterValue,
+      changeType: logChangeType(beforeValue, afterValue),
     };
   });
+}
+
+function buildRelationCompareRows(beforeValue: unknown, afterValue: unknown, businessType?: string): CompareRow[] | null {
+  const config = relationCompareConfig(businessType);
+  if (!config) {
+    return null;
+  }
+  const beforeItems = Array.isArray(beforeValue) ? beforeValue : [];
+  const afterItems = Array.isArray(afterValue) ? afterValue : [];
+  const beforeMap = new Map(beforeItems.map((item, index) => [relationItemKey(item, index), item]));
+  const afterMap = new Map(afterItems.map((item, index) => [relationItemKey(item, index), item]));
+  const keys = Array.from(new Set([...beforeMap.keys(), ...afterMap.keys()])).sort((left, right) => {
+    const leftItem = afterMap.get(left) ?? beforeMap.get(left);
+    const rightItem = afterMap.get(right) ?? beforeMap.get(right);
+    return relationItemTitle(leftItem, config).localeCompare(relationItemTitle(rightItem, config), 'zh-Hans-CN');
+  });
+
+  return keys.map((key) => {
+    const beforeItem = beforeMap.get(key);
+    const afterItem = afterMap.get(key);
+    const item = afterItem ?? beforeItem;
+    return {
+      key,
+      label: relationItemTitle(item, config),
+      beforeValue: beforeItem ? relationItemSummary(beforeItem, config) : '-',
+      afterValue: afterItem ? relationItemSummary(afterItem, config) : '-',
+      changeType: logChangeType(beforeItem ? relationItemSummary(beforeItem, config) : '-', afterItem ? relationItemSummary(afterItem, config) : '-'),
+    };
+  });
+}
+
+function relationCompareConfig(businessType?: string) {
+  const configs: Record<string, { title: string; nameKeys: string[]; codeKeys: string[]; extraKeys: string[] }> = {
+    SYS_USER_ROLE: {
+      title: '用户角色',
+      nameKeys: ['roleName'],
+      codeKeys: ['roleCode'],
+      extraKeys: ['status'],
+    },
+    SYS_ROLE_PERMISSION: {
+      title: '角色权限',
+      nameKeys: ['permissionName'],
+      codeKeys: ['permissionCode'],
+      extraKeys: ['description', 'status'],
+    },
+    SYS_ROLE_MENU: {
+      title: '角色菜单',
+      nameKeys: ['menuName'],
+      codeKeys: ['menuCode'],
+      extraKeys: ['path', 'component', 'buttonFlag', 'visible', 'status'],
+    },
+    SYS_MENU_PERMISSION: {
+      title: '菜单权限',
+      nameKeys: ['permissionName'],
+      codeKeys: ['permissionCode'],
+      extraKeys: ['description', 'status'],
+    },
+  };
+  return businessType ? configs[businessType] : undefined;
+}
+
+function relationItemKey(item: unknown, index: number) {
+  if (item && typeof item === 'object') {
+    const record = item as Record<string, unknown>;
+    const stableValue = record.id ?? record.permissionCode ?? record.menuCode ?? record.roleCode ?? record.username;
+    if (stableValue !== undefined && stableValue !== null && stableValue !== '') {
+      return String(stableValue);
+    }
+  }
+  return `index-${index}`;
+}
+
+function relationItemTitle(item: unknown, config: { title: string; nameKeys: string[]; codeKeys: string[] }) {
+  if (!item || typeof item !== 'object') {
+    return config.title;
+  }
+  const record = item as Record<string, unknown>;
+  const name = firstTextValue(record, config.nameKeys);
+  const code = firstTextValue(record, config.codeKeys);
+  if (name && code) {
+    return `${name}（${code}）`;
+  }
+  return name || code || `${config.title} ${textValueFromUnknown(record.id)}`;
+}
+
+function relationItemSummary(item: unknown, config: { nameKeys: string[]; codeKeys: string[]; extraKeys: string[] }) {
+  if (!item || typeof item !== 'object') {
+    return formatLogValue(item);
+  }
+  const record = item as Record<string, unknown>;
+  const lines = [
+    ...config.nameKeys.map((key) => relationSummaryLine(record, key)),
+    ...config.codeKeys.map((key) => relationSummaryLine(record, key)),
+    ...config.extraKeys.map((key) => relationSummaryLine(record, key)),
+  ].filter(Boolean);
+  return lines.length > 0 ? lines.join('\n') : formatLogValue(item);
+}
+
+function relationSummaryLine(record: Record<string, unknown>, key: string) {
+  const value = textValueFromUnknown(record[key]);
+  if (!value) {
+    return '';
+  }
+  return `${logFieldDisplayLabel(key)}：${displayLogFieldValue(key, value)}`;
+}
+
+function firstTextValue(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = textValueFromUnknown(record[key]);
+    if (value) {
+      return value;
+    }
+  }
+  return '';
+}
+
+function textValueFromUnknown(value: unknown) {
+  return value === null || value === undefined || value === '' ? '' : String(value);
+}
+
+function operationLogFieldLabels(businessType: string | undefined) {
+  const labelsByBusinessType: Record<string, Record<string, string>> = {
+    SYS_USER: {
+      username: '账号',
+      password: '密码',
+      displayName: '显示名称',
+      email: '邮箱',
+      status: '状态',
+    },
+    SYS_ROLE: {
+      roleCode: '角色编码',
+      roleName: '角色名称',
+      description: '描述',
+      status: '状态',
+    },
+    SYS_PERMISSION: {
+      permissionCode: '权限编码',
+      permissionName: '权限名称',
+      description: '描述',
+      status: '状态',
+    },
+    SYS_MENU: {
+      parentId: '父菜单',
+      menuCode: '菜单编码',
+      menuName: '菜单名称',
+      path: '路径',
+      component: '组件',
+      icon: '图标',
+      menuLevel: '菜单级别',
+      buttonFlag: '按钮标识',
+      sortOrder: '排序',
+      visible: '显示',
+      status: '状态',
+    },
+    VIP_USER: {
+      username: '账号',
+      password: '密码',
+      displayName: '显示名称',
+      email: '邮箱',
+      phone: '手机号',
+      vipLevel: '会员等级',
+      status: '状态',
+    },
+  };
+  return businessType ? labelsByBusinessType[businessType] || {} : {};
+}
+
+function operationLogFieldLabel(labels: Record<string, string>, businessType: string | undefined, key: string) {
+  const relationLabels: Record<string, string> = {
+    SYS_USER_ROLE: '用户角色',
+    SYS_ROLE_PERMISSION: '角色权限',
+    SYS_ROLE_MENU: '角色菜单',
+    SYS_MENU_PERMISSION: '菜单权限',
+  };
+  if (businessType && relationLabels[businessType]) {
+    return key === '原始数据' ? relationLabels[businessType] : `${relationLabels[businessType]} ${key}`;
+  }
+  const baseKey = baseLogFieldKey(key);
+  return labels[baseKey]
+    || key;
+}
+
+function logFieldDisplayLabel(key: string) {
+  const labels: Record<string, string> = {
+    id: 'ID',
+    username: '账号',
+    roleCode: '角色编码',
+    roleName: '角色名称',
+    permissionCode: '权限编码',
+    permissionName: '权限名称',
+    menuCode: '菜单编码',
+    menuName: '菜单名称',
+    path: '路径',
+    component: '组件',
+    description: '描述',
+    buttonFlag: '按钮标识',
+    visible: '显示',
+    status: '状态',
+  };
+  return labels[baseLogFieldKey(key)] || key;
+}
+
+function displayLogFieldValue(key: string, value: string) {
+  const baseKey = baseLogFieldKey(key);
+  if (value === '-') {
+    return value;
+  }
+  if (baseKey === 'status') {
+    return value === 'ENABLED' ? '启用' : value === 'DISABLED' ? '禁用' : value;
+  }
+  if (baseKey === 'buttonFlag') {
+    return value === 'true' ? '按钮' : value === 'false' ? '菜单' : value;
+  }
+  if (baseKey === 'visible') {
+    return value === 'true' ? '显示' : value === 'false' ? '隐藏' : value;
+  }
+  return value;
+}
+
+function baseLogFieldKey(key: string) {
+  const withoutArrayPrefix = key.replace(/^\[\d+]\./, '');
+  const segments = withoutArrayPrefix.split('.');
+  return segments[segments.length - 1] || key;
+}
+
+function logChangeType(beforeValue: string, afterValue: string): CompareRow['changeType'] {
+  if (beforeValue === afterValue) {
+    return 'same';
+  }
+  if (beforeValue === '-') {
+    return 'added';
+  }
+  if (afterValue === '-') {
+    return 'removed';
+  }
+  return 'modified';
+}
+
+function changeTypeLabel(type: CompareRow['changeType']) {
+  const labels: Record<CompareRow['changeType'], string> = {
+    added: '新增',
+    removed: '删除',
+    modified: '修改',
+    same: '未变化',
+  };
+  return labels[type];
 }
 
 function formatLogValue(value: unknown) {
