@@ -110,6 +110,16 @@ export function replaceSystemMenuPermissions(id: number, ids: number[]) {
   });
 }
 
+export function loadSystemUserRoles(id: number) {
+  return post<SysRole[]>(`/api/manager/system/users/roles/${id}`);
+}
+
+export function replaceSystemUserRoles(id: number, ids: number[]) {
+  return post<SysRole[]>(`/api/manager/system/users/roles/replace/${id}`, {
+    body: { ids },
+  });
+}
+
 function getSystemEndpoint(path: string) {
   const endpoints: Record<string, string> = {
     '/api/manager/system/users': '/api/manager/system/users',

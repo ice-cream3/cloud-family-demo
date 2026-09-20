@@ -11,6 +11,8 @@ public record SysMenuTreeVO(
         String path,
         String component,
         String icon,
+        Integer menuLevel,
+        Boolean buttonFlag,
         Integer sortOrder,
         Boolean visible,
         String status,

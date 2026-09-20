@@ -54,6 +54,8 @@ export type SysMenu = {
   path?: string;
   component?: string;
   icon?: string;
+  menuLevel?: number | null;
+  buttonFlag?: boolean;
   sortOrder?: number | null;
   visible?: boolean;
   status?: string;

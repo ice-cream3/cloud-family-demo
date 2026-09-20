@@ -1,4 +1,4 @@
-package com.kfpd.cloud.partner.dao;
+package com.kfpd.cloud.partner.dao.cloud;
 
 import java.util.List;
 

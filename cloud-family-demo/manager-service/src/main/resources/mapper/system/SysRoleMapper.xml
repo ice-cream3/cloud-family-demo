@@ -32,6 +32,8 @@
         <result property="path" column="path"/>
         <result property="component" column="component"/>
         <result property="icon" column="icon"/>
+        <result property="menuLevel" column="menu_level"/>
+        <result property="buttonFlag" column="button_flag"/>
         <result property="sortOrder" column="sort_order"/>
         <result property="visible" column="visible"/>
         <result property="status" column="status"/>
@@ -94,7 +96,7 @@
     </insert>
 
     <select id="findMenusByRoleId" resultMap="SysMenuResultMap">
-        SELECT m.id, m.parent_id, m.menu_code, m.menu_name, m.path, m.component, m.icon,
+        SELECT m.id, m.parent_id, m.menu_code, m.menu_name, m.path, m.component, m.icon, m.menu_level, m.button_flag,
                m.sort_order, m.visible, m.status, m.created_at, m.updated_at
         FROM sys_menu m
         INNER JOIN sys_role_menu rm ON rm.menu_id = m.id

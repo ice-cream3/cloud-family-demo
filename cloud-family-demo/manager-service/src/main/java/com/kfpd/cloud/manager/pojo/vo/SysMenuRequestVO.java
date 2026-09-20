@@ -18,6 +18,7 @@ public record SysMenuRequestVO(
         String component,
         @Size(max = 100, message = "图标长度不能超过100个字符")
         String icon,
+        Boolean buttonFlag,
         @Min(value = 0, message = "排序不能小于0")
         Integer sortOrder,
         Boolean visible,

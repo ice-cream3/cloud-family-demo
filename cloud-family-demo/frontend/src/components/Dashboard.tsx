@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { ChevronRight, Eye, EyeOff, FolderTree, KeyRound, Layers3, ListTree, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
-import type { ManagerDashboard, MenuTreeNode, PageQuery, PageResult, SysPermission, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
+import { ChevronRight, Eye, EyeOff, FolderTree, KeyRound, Layers3, ListTree, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
+import type { ManagerDashboard, MenuTreeNode, OperationLog, PageQuery, PageResult, SysPermission, SysRole, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
 import type { Session } from '../services/tokenStore';
 import { loadSystemMenuTree } from '../services/dashboardService';
 
@@ -26,6 +26,9 @@ type DashboardProps = {
   onLoadMenuPermissionOptions: () => Promise<SysPermission[]>;
   onLoadMenuPermissions: (id: number) => Promise<SysPermission[]>;
   onReplaceMenuPermissions: (id: number, ids: number[]) => Promise<void>;
+  onLoadUserRoleOptions: () => Promise<SysRole[]>;
+  onLoadUserRoles: (id: number) => Promise<SysRole[]>;
+  onReplaceUserRoles: (id: number, ids: number[]) => Promise<void>;
   loading: boolean;
   error: string | null;
   onReload: () => void;
@@ -53,6 +56,9 @@ export function Dashboard({
   onLoadMenuPermissionOptions,
   onLoadMenuPermissions,
   onReplaceMenuPermissions,
+  onLoadUserRoleOptions,
+  onLoadUserRoles,
+  onReplaceUserRoles,
   loading,
   error,
   onReload,
@@ -117,6 +123,9 @@ export function Dashboard({
             onLoadMenuPermissionOptions={onLoadMenuPermissionOptions}
             onLoadMenuPermissions={onLoadMenuPermissions}
             onReplaceMenuPermissions={onReplaceMenuPermissions}
+            onLoadUserRoleOptions={onLoadUserRoleOptions}
+            onLoadUserRoles={onLoadUserRoles}
+            onReplaceUserRoles={onReplaceUserRoles}
           />
         ) : (
           <>
@@ -269,6 +278,9 @@ function SystemPagePanel({
   onLoadMenuPermissionOptions,
   onLoadMenuPermissions,
   onReplaceMenuPermissions,
+  onLoadUserRoleOptions,
+  onLoadUserRoles,
+  onReplaceUserRoles,
 }: {
   menu: MenuTreeNode | null;
   page: PageResult<SystemPageRecord> | null;
@@ -284,11 +296,14 @@ function SystemPagePanel({
   onLoadMenuPermissionOptions: () => Promise<SysPermission[]>;
   onLoadMenuPermissions: (id: number) => Promise<SysPermission[]>;
   onReplaceMenuPermissions: (id: number, ids: number[]) => Promise<void>;
+  onLoadUserRoleOptions: () => Promise<SysRole[]>;
+  onLoadUserRoles: (id: number) => Promise<SysRole[]>;
+  onReplaceUserRoles: (id: number, ids: number[]) => Promise<void>;
 }) {
   const config = getSystemPageConfig(menu?.path);
   const isMenuManagement = menu?.path === '/api/manager/system/menus';
   const isOperationLogPage = menu?.path === '/api/manager/system/operation-logs';
-  const readOnly = isOperationLogPage;
+  const readOnly = isOperationLogPage || config.fields.length === 0;
   const records = page?.records || [];
   const pageNum = page?.pageNum || 1;
   const pageSize = page?.pageSize || 10;
@@ -305,8 +320,14 @@ function SystemPagePanel({
   const [permissionOptions, setPermissionOptions] = useState<SysPermission[]>([]);
   const [selectedPermissionIds, setSelectedPermissionIds] = useState<Set<number>>(() => new Set());
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [roleRecord, setRoleRecord] = useState<SystemPageRecord | null>(null);
+  const [roleOptions, setRoleOptions] = useState<SysRole[]>([]);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<Set<number>>(() => new Set());
+  const [roleError, setRoleError] = useState<string | null>(null);
+  const [logDetailRecord, setLogDetailRecord] = useState<OperationLog | null>(null);
   const [operationMessage, setOperationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [treeNodes, setTreeNodes] = useState<MenuTreeNode[]>([]);
+  const [menuParentOptions, setMenuParentOptions] = useState<MenuSelectOption[]>([]);
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeError, setTreeError] = useState<string | null>(null);
   const [selectedTreeMenu, setSelectedTreeMenu] = useState<MenuTreeNode | null>(null);
@@ -344,15 +365,39 @@ function SystemPagePanel({
   }
 
   function openCreate() {
+    if (isMenuManagement) {
+      void openMenuEditor(null);
+      return;
+    }
     setEditorRecord(null);
     setEditorError(null);
     setEditorOpen(true);
   }
 
   function openEdit(record: SystemPageRecord) {
+    if (isMenuManagement) {
+      void openMenuEditor(record);
+      return;
+    }
     setEditorRecord(record);
     setEditorError(null);
     setEditorOpen(true);
+  }
+
+  async function openMenuEditor(record: SystemPageRecord | null, initialRecord?: SystemPageRecord | null) {
+    setSaving(true);
+    setEditorError(null);
+    try {
+      const nodes = await loadSystemMenuTree();
+      setMenuParentOptions(buildMenuParentOptions(nodes, record?.id));
+      setTreeNodes(nodes);
+      setEditorRecord(initialRecord || record);
+      setEditorOpen(true);
+    } catch (err) {
+      setOperationMessage({ type: 'error', text: readErrorMessage(err) });
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function saveRecord(payload: SystemRecordPayload) {
@@ -453,6 +498,40 @@ function SystemPagePanel({
     }
   }
 
+  async function openRoleDialog(record: SystemPageRecord) {
+    setSaving(true);
+    setRoleError(null);
+    try {
+      const [options, selected] = await Promise.all([onLoadUserRoleOptions(), onLoadUserRoles(record.id)]);
+      setRoleOptions(options);
+      setSelectedRoleIds(new Set(selected.map((role) => role.id)));
+      setRoleRecord(record);
+    } catch (err) {
+      setOperationMessage({ type: 'error', text: readErrorMessage(err) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveUserRoles(ids: number[]) {
+    if (!roleRecord) {
+      return;
+    }
+    setSaving(true);
+    setRoleError(null);
+    try {
+      await onReplaceUserRoles(roleRecord.id, ids);
+      setRoleRecord(null);
+      setOperationMessage({ type: 'success', text: '用户角色保存成功' });
+    } catch (err) {
+      const message = readErrorMessage(err);
+      setRoleError(message);
+      setOperationMessage({ type: 'error', text: message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <article className="table-panel">
       <div className="section-heading">
@@ -526,7 +605,7 @@ function SystemPagePanel({
           onReload={reloadMenuTree}
           onSelect={setSelectedTreeMenu}
           onCreateChild={(parent) => {
-            setEditorRecord({
+            void openMenuEditor(null, {
               id: 0,
               parentId: parent.id,
               menuCode: '',
@@ -534,12 +613,12 @@ function SystemPagePanel({
               path: '',
               component: '',
               icon: '',
+              menuLevel: (parent.menuLevel || 1) + 1,
+              buttonFlag: false,
               sortOrder: 0,
               visible: true,
               status: 'ENABLED',
             });
-            setEditorError(null);
-            setEditorOpen(true);
           }}
           onEdit={(record) => openEdit(record)}
           onPermissions={(record) => openPermissionDialog(record)}
@@ -554,6 +633,7 @@ function SystemPagePanel({
                 {config.columns.map((column) => (
                   <th key={column.key}>{column.title}</th>
                 ))}
+                {isOperationLogPage ? <th>详情</th> : null}
                 {!readOnly ? <th>操作</th> : null}
               </tr>
             </thead>
@@ -563,6 +643,16 @@ function SystemPagePanel({
                   {config.columns.map((column) => (
                     <td key={column.key}>{column.render(record)}</td>
                   ))}
+                  {isOperationLogPage ? (
+                    <td>
+                      <div className="row-actions">
+                        <button type="button" onClick={() => setLogDetailRecord(record as OperationLog)} disabled={saving}>
+                          <Search size={14} />
+                          详情
+                        </button>
+                      </div>
+                    </td>
+                  ) : null}
                   {!readOnly ? (
                     <td>
                       <div className="row-actions">
@@ -571,10 +661,16 @@ function SystemPagePanel({
                           修改
                         </button>
                         {menu?.path === '/api/manager/system/users' ? (
-                          <button type="button" onClick={() => setPasswordRecord(record)} disabled={saving}>
-                            <KeyRound size={14} />
+                          <>
+                            <button type="button" onClick={() => setPasswordRecord(record)} disabled={saving}>
+                              <KeyRound size={14} />
                             重置密码
-                          </button>
+                            </button>
+                            <button type="button" onClick={() => openRoleDialog(record)} disabled={saving}>
+                              <Users size={14} />
+                              分配角色
+                            </button>
+                          </>
                         ) : null}
                         {menu?.path === '/api/manager/system/menus' ? (
                           <button type="button" onClick={() => openPermissionDialog(record)} disabled={saving}>
@@ -599,7 +695,7 @@ function SystemPagePanel({
       )}
       {editorOpen ? (
         <RecordEditorDialog
-          config={config}
+          config={withMenuParentOptions(config, menuParentOptions)}
           record={editorRecord?.id === 0 ? null : editorRecord}
           initialRecord={editorRecord?.id === 0 ? editorRecord : null}
           saving={saving}
@@ -636,6 +732,26 @@ function SystemPagePanel({
             setPermissionError(null);
           }}
           onSave={saveMenuPermissions}
+        />
+      ) : null}
+      {roleRecord ? (
+        <UserRoleDialog
+          record={roleRecord}
+          roles={roleOptions}
+          selectedIds={selectedRoleIds}
+          saving={saving}
+          error={roleError}
+          onClose={() => {
+            setRoleRecord(null);
+            setRoleError(null);
+          }}
+          onSave={saveUserRoles}
+        />
+      ) : null}
+      {logDetailRecord ? (
+        <OperationLogDetailDialog
+          record={logDetailRecord}
+          onClose={() => setLogDetailRecord(null)}
         />
       ) : null}
     </article>
@@ -764,6 +880,8 @@ function MenuTreeConfigPanel({
             </div>
             <div className="menu-detail-grid">
               <DetailItem label="父菜单 ID" value={selectedMenu.parentId ?? '顶级菜单'} />
+              <DetailItem label="菜单级别" value={selectedMenu.menuLevel ?? '-'} />
+              <DetailItem label="按钮标识" value={selectedMenu.buttonFlag ? '按钮' : '菜单'} />
               <DetailItem label="菜单编码" value={selectedMenu.menuCode} />
               <DetailItem label="访问路径" value={selectedMenu.path} />
               <DetailItem label="组件" value={selectedMenu.component} />
@@ -939,11 +1057,17 @@ type EditorField = {
   key: string;
   label: string;
   type?: 'text' | 'password' | 'number' | 'select' | 'checkbox' | 'textarea';
+  valueType?: 'string' | 'number';
   required?: boolean;
   createOnly?: boolean;
   readonlyOnEdit?: boolean;
   options?: Array<{ label: string; value: string }>;
   placeholder?: string;
+};
+
+type MenuSelectOption = {
+  id: number;
+  label: string;
 };
 
 type SystemPageConfig = {
@@ -1159,6 +1283,157 @@ function MenuPermissionDialog({
   );
 }
 
+function UserRoleDialog({
+  record,
+  roles,
+  selectedIds,
+  saving,
+  error,
+  onClose,
+  onSave,
+}: {
+  record: SystemPageRecord;
+  roles: SysRole[];
+  selectedIds: Set<number>;
+  saving: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSave: (ids: number[]) => void;
+}) {
+  const [nextIds, setNextIds] = useState<Set<number>>(() => new Set(selectedIds));
+
+  function toggle(roleId: number) {
+    setNextIds((current) => {
+      const next = new Set(current);
+      if (next.has(roleId)) {
+        next.delete(roleId);
+      } else {
+        next.add(roleId);
+      }
+      return next;
+    });
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSave(Array.from(nextIds));
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="record-dialog" role="dialog" aria-modal="true" aria-label="分配角色">
+        <div className="dialog-heading">
+          <div>
+            <h3>分配角色</h3>
+            <p>{recordLabel(record)}</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} disabled={saving} title="关闭">
+            <X size={18} />
+          </button>
+        </div>
+        <form className="record-form single-column" onSubmit={submit}>
+          <div className="permission-list">
+            {roles.length > 0 ? (
+              roles.map((role) => (
+                <label key={role.id} className="permission-option">
+                  <input
+                    type="checkbox"
+                    checked={nextIds.has(role.id)}
+                    onChange={() => toggle(role.id)}
+                    disabled={saving}
+                  />
+                  <span>
+                    <strong>{role.roleName || role.roleCode}</strong>
+                    <small>{role.roleCode}</small>
+                  </span>
+                </label>
+              ))
+            ) : (
+              <div className="empty-state compact">暂无可选角色。</div>
+            )}
+          </div>
+          {error ? <div className="error-banner compact">{error}</div> : null}
+          <div className="dialog-actions">
+            <button className="ghost-button" type="button" onClick={onClose} disabled={saving}>
+              取消
+            </button>
+            <button className="primary-button" type="submit" disabled={saving}>
+              {saving ? '保存中' : '保存'}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function OperationLogDetailDialog({ record, onClose }: { record: OperationLog; onClose: () => void }) {
+  const before = parseLogData(record.beforeData);
+  const after = parseLogData(record.afterData);
+  const rows = buildLogCompareRows(before, after);
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="record-dialog log-detail-dialog" role="dialog" aria-modal="true" aria-label="操作日志详情">
+        <div className="dialog-heading">
+          <div>
+            <h3>操作日志详情</h3>
+            <p>ID {record.id} · {formatDate(record.operationAt)}</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} title="关闭">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="log-detail-body">
+          <div className="log-meta-grid">
+            <DetailItem label="操作类型" value={operationTypeLabel(record.operationType)} />
+            <DetailItem label="操作者" value={record.operatorUsername} />
+            <DetailItem label="用户类型" value={record.operatorUserType} />
+            <DetailItem label="业务模块" value={record.businessModule} />
+            <DetailItem label="业务类型" value={record.businessType} />
+            <DetailItem label="业务 ID" value={record.businessId} />
+            <DetailItem label="业务名称" value={record.businessName} />
+            <DetailItem label="请求方法" value={record.requestMethod} />
+            <DetailItem label="请求 URI" value={record.requestUri} />
+            <DetailItem label="客户端 IP" value={record.clientIp} />
+          </div>
+
+          <div className="compare-table-wrap">
+            <table className="compare-table">
+              <thead>
+                <tr>
+                  <th>字段</th>
+                  <th>变更前</th>
+                  <th>变更后</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length > 0 ? rows.map((row) => (
+                  <tr key={row.key} className={row.changed ? 'changed' : ''}>
+                    <td>{row.key}</td>
+                    <td><code>{row.beforeValue}</code></td>
+                    <td><code>{row.afterValue}</code></td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={3}>暂无可对比数据。</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="dialog-actions">
+            <button className="primary-button" type="button" onClick={onClose}>
+              关闭
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function renderEditorControl(
   field: EditorField,
   value: string | boolean | undefined,
@@ -1168,6 +1443,7 @@ function renderEditorControl(
   if (field.type === 'select') {
     return (
       <select value={String(value ?? '')} onChange={(event) => onChange(event.target.value)} required={field.required} disabled={disabled}>
+        {field.placeholder ? <option value="">{field.placeholder}</option> : null}
         {field.options?.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -1232,10 +1508,38 @@ function buildPayload(fields: EditorField[], values: Record<string, string | boo
       payload[field.key] = value === '' || value === undefined ? null : Number(value);
       return;
     }
+    if (field.valueType === 'number') {
+      payload[field.key] = value === '' || value === undefined ? null : Number(value);
+      return;
+    }
     const text = typeof value === 'string' ? value.trim() : '';
     payload[field.key] = text || undefined;
   });
   return payload;
+}
+
+function withMenuParentOptions(config: SystemPageConfig, options: MenuSelectOption[]) {
+  if (config.apiPath !== '/api/manager/system/menus/page') {
+    return config;
+  }
+  return {
+    ...config,
+    fields: config.fields.map((field) => {
+      if (field.key !== 'parentId') {
+        return field;
+      }
+      return {
+        ...field,
+        type: 'select' as const,
+        valueType: 'number' as const,
+        placeholder: '顶级菜单',
+        options: options.map((option) => ({
+          label: option.label,
+          value: String(option.id),
+        })),
+      };
+    }),
+  };
 }
 
 function getSystemPageConfig(path?: string): SystemPageConfig {
@@ -1305,18 +1609,21 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
         commonColumns[0],
         { key: 'menuCode', title: '菜单编码', render: (record) => textValue(readField(record, 'menuCode')) },
         { key: 'menuName', title: '菜单名称', render: (record) => textValue(readField(record, 'menuName')) },
+        { key: 'menuLevel', title: '级别', render: (record) => textValue(readField(record, 'menuLevel')) },
+        { key: 'buttonFlag', title: '标识', render: (record) => <span className={readBooleanField(record, 'buttonFlag') ? 'muted-pill' : 'status-pill'}>{readBooleanField(record, 'buttonFlag') ? '按钮' : '菜单'}</span> },
         { key: 'path', title: '路径', render: (record) => textValue(readField(record, 'path')) },
         { key: 'component', title: '组件', render: (record) => textValue(readField(record, 'component')) },
         commonColumns[1],
         commonColumns[2],
       ],
       fields: [
-        { key: 'parentId', label: '父菜单 ID', type: 'number', placeholder: '顶级菜单留空' },
+        { key: 'parentId', label: '父菜单', type: 'select', valueType: 'number', placeholder: '顶级菜单' },
         { key: 'menuCode', label: '菜单编码', required: true },
         { key: 'menuName', label: '菜单名称', required: true },
         { key: 'path', label: '路径', required: true },
         { key: 'component', label: '组件', required: true },
         { key: 'icon', label: '图标' },
+        { key: 'buttonFlag', label: '按钮标识', type: 'checkbox' },
         { key: 'sortOrder', label: '排序', type: 'number' },
         { key: 'visible', label: '显示', type: 'checkbox' },
         statusField,
@@ -1376,17 +1683,108 @@ function StatusValue({ value }: { value?: string }) {
 }
 
 function OperationTypeValue({ value }: { value?: string }) {
+  return <span className={value === 'DELETE' ? 'danger-pill' : 'status-pill'}>{operationTypeLabel(value)}</span>;
+}
+
+function operationTypeLabel(value?: string) {
   const labelMap: Record<string, string> = {
     CREATE: '新增',
     UPDATE: '修改',
     DELETE: '删除',
   };
-  return <span className={value === 'DELETE' ? 'danger-pill' : 'status-pill'}>{value ? labelMap[value] || value : '-'}</span>;
+  return value ? labelMap[value] || value : '-';
 }
 
 function readField(record: SystemPageRecord, key: string) {
   const value = (record as Record<string, unknown>)[key];
   return typeof value === 'string' || typeof value === 'number' ? String(value) : undefined;
+}
+
+function readBooleanField(record: SystemPageRecord, key: string) {
+  return Boolean((record as Record<string, unknown>)[key]);
+}
+
+type ParsedLogData = {
+  flattened: Record<string, string>;
+  raw: string;
+};
+
+type CompareRow = {
+  key: string;
+  beforeValue: string;
+  afterValue: string;
+  changed: boolean;
+};
+
+function parseLogData(value?: string): ParsedLogData {
+  if (!value || !value.trim()) {
+    return { flattened: {}, raw: '' };
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return {
+      flattened: flattenLogValue(parsed),
+      raw: formatLogValue(parsed),
+    };
+  } catch {
+    return {
+      flattened: { 原始数据: value },
+      raw: value,
+    };
+  }
+}
+
+function flattenLogValue(value: unknown, prefix = ''): Record<string, string> {
+  if (value === null || value === undefined) {
+    return prefix ? { [prefix]: '-' } : {};
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return prefix ? { [prefix]: '[]' } : {};
+    }
+    return value.reduce<Record<string, string>>((result, item, index) => ({
+      ...result,
+      ...flattenLogValue(item, prefix ? `${prefix}[${index}]` : `[${index}]`),
+    }), {});
+  }
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) {
+      return prefix ? { [prefix]: '{}' } : {};
+    }
+    return entries.reduce<Record<string, string>>((result, [key, item]) => ({
+      ...result,
+      ...flattenLogValue(item, prefix ? `${prefix}.${key}` : key),
+    }), {});
+  }
+  return prefix ? { [prefix]: formatLogValue(value) } : { 值: formatLogValue(value) };
+}
+
+function buildLogCompareRows(before: ParsedLogData, after: ParsedLogData): CompareRow[] {
+  const keys = Array.from(new Set([...Object.keys(before.flattened), ...Object.keys(after.flattened)])).sort();
+  if (keys.length === 0 && (before.raw || after.raw)) {
+    keys.push('原始数据');
+  }
+  return keys.map((key) => {
+    const beforeValue = before.flattened[key] ?? (key === '原始数据' ? before.raw : '-');
+    const afterValue = after.flattened[key] ?? (key === '原始数据' ? after.raw : '-');
+    return {
+      key,
+      beforeValue,
+      afterValue,
+      changed: beforeValue !== afterValue,
+    };
+  });
+}
+
+function formatLogValue(value: unknown) {
+  if (value === null || value === undefined || value === '') {
+    return '-';
+  }
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return JSON.stringify(value, null, 2);
 }
 
 function recordLabel(record: SystemPageRecord) {
@@ -1489,6 +1887,39 @@ function collectExpandableMenuIds(nodes: MenuTreeNode[]): number[] {
       return [];
     }
     return [node.id, ...collectExpandableMenuIds(node.children)];
+  });
+}
+
+function buildMenuParentOptions(nodes: MenuTreeNode[], excludedId?: number): MenuSelectOption[] {
+  const excludedIds = excludedId ? collectMenuSubtreeIds(nodes, excludedId) : new Set<number>();
+  return flattenMenuOptions(nodes, excludedIds);
+}
+
+function collectMenuSubtreeIds(nodes: MenuTreeNode[], id: number): Set<number> {
+  const target = findMenuNode(nodes, id);
+  if (!target) {
+    return new Set([id]);
+  }
+  return new Set([id, ...collectAllChildMenuIds(target.children || [])]);
+}
+
+function collectAllChildMenuIds(nodes: MenuTreeNode[]): number[] {
+  return nodes.flatMap((node) => [node.id, ...collectAllChildMenuIds(node.children || [])]);
+}
+
+function flattenMenuOptions(nodes: MenuTreeNode[], excludedIds: Set<number>, level = 0): MenuSelectOption[] {
+  return nodes.flatMap((node) => {
+    const children = flattenMenuOptions(node.children || [], excludedIds, level + 1);
+    if (excludedIds.has(node.id) || node.buttonFlag) {
+      return children;
+    }
+    return [
+      {
+        id: node.id,
+        label: `${'  '.repeat(level)}${node.menuName || node.menuCode || `菜单 ${node.id}`} (${node.menuCode || node.id})`,
+      },
+      ...children,
+    ];
   });
 }
 

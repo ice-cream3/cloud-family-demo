@@ -304,6 +304,8 @@ public class SysUserServiceImpl implements SysUserService {
                 menu.getPath(),
                 menu.getComponent(),
                 menu.getIcon(),
+                menu.getMenuLevel(),
+                menu.getButtonFlag(),
                 menu.getSortOrder(),
                 menu.getVisible(),
                 menu.getStatus(),

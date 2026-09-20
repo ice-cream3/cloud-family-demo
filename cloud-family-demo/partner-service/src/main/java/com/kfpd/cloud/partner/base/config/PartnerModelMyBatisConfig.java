@@ -17,35 +17,34 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-public class PartnerMyBatisConfig {
+public class PartnerModelMyBatisConfig {
 
     @Bean
-    SqlSessionFactory partnerSqlSessionFactory(
-            @Qualifier(MultiDataSourceNames.FA_CLOUD) DataSource dataSource,
+    SqlSessionFactory partnerModelSqlSessionFactory(
+            @Qualifier(MultiDataSourceNames.FA_MODEL) DataSource dataSource,
             ApplicationContext applicationContext,
-            MybatisPlusInterceptor partnerMybatisPlusInterceptor
+            MybatisPlusInterceptor partnerModelMybatisPlusInterceptor
     ) throws Exception {
         MybatisSqlSessionFactoryBean factoryBean = new MybatisSqlSessionFactoryBean();
         factoryBean.setDataSource(dataSource);
-        factoryBean.setMapperLocations(applicationContext.getResources("classpath*:mapper/system/**/*.xml"));
-        factoryBean.setPlugins(partnerMybatisPlusInterceptor);
+        factoryBean.setMapperLocations(applicationContext.getResources("classpath*:mapper/model/**/*.xml"));
+        factoryBean.setPlugins(partnerModelMybatisPlusInterceptor);
         return factoryBean.getObject();
     }
 
     @Bean
-    MybatisPlusInterceptor partnerMybatisPlusInterceptor() {
+    MybatisPlusInterceptor partnerModelMybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
-//        interceptor.addInnerInterceptor(new IllegalSQLInnerInterceptor());
         interceptor.addInnerInterceptor(new BlockAttackInnerInterceptor());
         interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
         return interceptor;
     }
 
     @Bean
-    static MapperScannerConfigurer partnerMapperScannerConfigurer() {
+    static MapperScannerConfigurer partnerModelMapperScannerConfigurer() {
         MapperScannerConfigurer configurer = new MapperScannerConfigurer();
-        configurer.setBasePackage("com.kfpd.cloud.partner.dao.cloud");
-        configurer.setSqlSessionFactoryBeanName("partnerSqlSessionFactory");
+        configurer.setBasePackage("com.kfpd.cloud.partner.dao.model");
+        configurer.setSqlSessionFactoryBeanName("partnerModelSqlSessionFactory");
         return configurer;
     }
 }

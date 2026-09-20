@@ -13,9 +13,11 @@ import {
   loadSystemOperationLogs,
   loadSystemPermissions,
   loadSystemRoles,
+  loadSystemUserRoles,
   loadSystemUsers,
   resetSystemUserPassword,
   replaceSystemMenuPermissions,
+  replaceSystemUserRoles,
   updateSystemRecord,
 } from './services/dashboardService';
 import { ApiError } from './services/apiClient';
@@ -170,6 +172,19 @@ export default function App() {
     await replaceSystemMenuPermissions(id, ids);
   }
 
+  async function handleLoadUserRoleOptions() {
+    const page = await loadSystemRoles(1, 100);
+    return page.records;
+  }
+
+  async function handleLoadUserRoles(id: number) {
+    return loadSystemUserRoles(id);
+  }
+
+  async function handleReplaceUserRoles(id: number, ids: number[]) {
+    await replaceSystemUserRoles(id, ids);
+  }
+
   async function reloadCurrentSystemPage(pageNum: number) {
     await loadSystemPage(activeMenu, pageNum, systemPageQuery);
   }
@@ -230,6 +245,9 @@ export default function App() {
       onLoadMenuPermissionOptions={handleLoadMenuPermissionOptions}
       onLoadMenuPermissions={handleLoadMenuPermissions}
       onReplaceMenuPermissions={handleReplaceMenuPermissions}
+      onLoadUserRoleOptions={handleLoadUserRoleOptions}
+      onLoadUserRoles={handleLoadUserRoles}
+      onReplaceUserRoles={handleReplaceUserRoles}
       loading={loading}
       error={error}
       onReload={reloadData}

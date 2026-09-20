@@ -778,6 +778,10 @@ button:disabled {
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
 }
 
+.log-detail-dialog {
+  width: min(1080px, 100%);
+}
+
 .dialog-heading {
   display: flex;
   justify-content: space-between;
@@ -795,6 +799,61 @@ button:disabled {
 .dialog-heading p {
   margin: 6px 0 0;
   color: #637083;
+}
+
+.log-detail-body {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.log-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.compare-table-wrap {
+  overflow: auto;
+  border: 1px solid #e5ebf1;
+  border-radius: 8px;
+}
+
+.compare-table {
+  min-width: 760px;
+}
+
+.compare-table th {
+  background: #f7fafc;
+}
+
+.compare-table td {
+  vertical-align: top;
+}
+
+.compare-table td:first-child {
+  width: 24%;
+  color: #354052;
+  font-weight: 700;
+}
+
+.compare-table code {
+  display: block;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #273142;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.compare-table tr.changed td {
+  background: #fff8ed;
+}
+
+.compare-table tr.changed td:first-child {
+  color: #9a4c00;
 }
 
 .record-form {

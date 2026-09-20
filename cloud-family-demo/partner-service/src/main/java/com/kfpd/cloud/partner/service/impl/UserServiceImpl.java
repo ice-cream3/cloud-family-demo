@@ -8,7 +8,7 @@ import java.util.Optional;
 import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.common.exception.BusinessException;
 import com.kfpd.cloud.common.exception.ErrorCode;
-import com.kfpd.cloud.partner.dao.VipUserDao;
+import com.kfpd.cloud.partner.dao.cloud.VipUserDao;
 import com.kfpd.cloud.partner.pojo.entity.VipUser;
 import com.kfpd.cloud.partner.pojo.vo.PageVO;
 import com.kfpd.cloud.partner.pojo.vo.UserProfileVO;

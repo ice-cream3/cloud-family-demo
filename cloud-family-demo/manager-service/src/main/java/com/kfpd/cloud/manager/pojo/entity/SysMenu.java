@@ -19,6 +19,8 @@ public class SysMenu {
     private String path;
     private String component;
     private String icon;
+    private Integer menuLevel;
+    private Boolean buttonFlag;
     private Integer sortOrder;
     private Boolean visible;
     private String status;

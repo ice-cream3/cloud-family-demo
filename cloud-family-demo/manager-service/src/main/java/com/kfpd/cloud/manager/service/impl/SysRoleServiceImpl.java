@@ -40,6 +40,7 @@ public class SysRoleServiceImpl implements SysRoleService {
     private static final String BUSINESS_ROLE_MENU = "SYS_ROLE_MENU";
     private static final String BUSINESS_MENU = "SYS_MENU";
     private static final String BUSINESS_MENU_PERMISSION = "SYS_MENU_PERMISSION";
+    private static final String OPERATION_LOG_MENU_CODE = "system-operation-logs";
 
     private final SysRoleDao roleDao;
     private final SysMenuDao menuDao;
@@ -219,7 +220,7 @@ public class SysRoleServiceImpl implements SysRoleService {
         SystemManagementSupport.requireText(request.menuCode(), "menuCode is required");
         SystemManagementSupport.requireText(request.menuName(), "menuName is required");
         SysMenu menu = new SysMenu();
-        apply(menu, request);
+        apply(menu, request, null);
         menuDao.insert(menu);
         SysMenu created = findMenuById(menu.getId());
         operationLogService.recordCreate(MODULE_SYSTEM, BUSINESS_MENU, created.getId(), created.getMenuCode(), created);
@@ -232,9 +233,10 @@ public class SysRoleServiceImpl implements SysRoleService {
         SystemManagementSupport.requireText(request.menuCode(), "menuCode is required");
         SystemManagementSupport.requireText(request.menuName(), "menuName is required");
         SysMenu before = findMenuById(id);
+        requireMutableMenu(before);
         SysMenu menu = new SysMenu();
         menu.setId(id);
-        apply(menu, request);
+        apply(menu, request, id);
         if (menuDao.update(menu) == 0) {
             log.warn("Role service exception: action=updateMenu, id={}, message=Menu not found", id);
             throw SystemManagementSupport.notFound("Menu not found");
@@ -248,6 +250,7 @@ public class SysRoleServiceImpl implements SysRoleService {
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void deleteMenu(Long id) {
         SysMenu before = findMenuById(id);
+        requireMutableMenu(before);
         menuDao.deleteMenuPermissions(id);
         if (menuDao.deleteById(id) == 0) {
             log.warn("Role service exception: action=deleteMenu, id={}, message=Menu not found", id);
@@ -265,7 +268,8 @@ public class SysRoleServiceImpl implements SysRoleService {
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public List<SysPermission> replaceMenuPermissions(Long id, IdListVO request) {
-        findMenuById(id);
+        SysMenu menu = findMenuById(id);
+        requireMutableMenu(menu);
         List<Long> permissionIds = SystemManagementSupport.ids(request);
         permissionIds.forEach(permissionService::findPermissionById);
         List<SysPermission> before = menuDao.findPermissionsByMenuId(id);
@@ -303,16 +307,43 @@ public class SysRoleServiceImpl implements SysRoleService {
         role.setStatus(SystemManagementSupport.defaultStatus(request.status()));
     }
 
-    private void apply(SysMenu menu, SysMenuRequestVO request) {
+    private void apply(SysMenu menu, SysMenuRequestVO request, Long currentMenuId) {
+        SysMenu parent = resolveParentMenu(request.parentId(), currentMenuId);
         menu.setParentId(request.parentId());
         menu.setMenuCode(request.menuCode());
         menu.setMenuName(request.menuName());
         menu.setPath(request.path());
         menu.setComponent(request.component());
         menu.setIcon(request.icon());
+        menu.setMenuLevel(parent == null ? 1 : parentLevel(parent) + 1);
+        menu.setButtonFlag(Boolean.TRUE.equals(request.buttonFlag()));
         menu.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
         menu.setVisible(request.visible() == null ? Boolean.TRUE : request.visible());
         menu.setStatus(SystemManagementSupport.defaultStatus(request.status()));
+    }
+
+    private SysMenu resolveParentMenu(Long parentId, Long currentMenuId) {
+        if (parentId == null) {
+            return null;
+        }
+        if (currentMenuId != null && parentId.equals(currentMenuId)) {
+            throw SystemManagementSupport.badRequest("父菜单不能选择当前菜单");
+        }
+        SysMenu parent = findMenuById(parentId);
+        if (Boolean.TRUE.equals(parent.getButtonFlag())) {
+            throw SystemManagementSupport.badRequest("父菜单只能选择菜单，不能选择按钮");
+        }
+        return parent;
+    }
+
+    private int parentLevel(SysMenu parent) {
+        return parent.getMenuLevel() == null || parent.getMenuLevel() < 1 ? 1 : parent.getMenuLevel();
+    }
+
+    private void requireMutableMenu(SysMenu menu) {
+        if (OPERATION_LOG_MENU_CODE.equals(menu.getMenuCode())) {
+            throw SystemManagementSupport.badRequest("操作日志菜单仅允许查询，不允许修改");
+        }
     }
 
     private SysMenuTreeVO toTreeVO(MutableMenuTreeNode node) {
@@ -325,6 +356,8 @@ public class SysRoleServiceImpl implements SysRoleService {
                 menu.getPath(),
                 menu.getComponent(),
                 menu.getIcon(),
+                menu.getMenuLevel(),
+                menu.getButtonFlag(),
                 menu.getSortOrder(),
                 menu.getVisible(),
                 menu.getStatus(),

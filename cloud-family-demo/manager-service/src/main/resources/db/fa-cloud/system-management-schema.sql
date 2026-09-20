@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS sys_menu (
     path varchar(255) DEFAULT NULL,
     component varchar(255) DEFAULT NULL,
     icon varchar(100) DEFAULT NULL,
+    menu_level int NOT NULL DEFAULT 1,
+    button_flag tinyint(1) NOT NULL DEFAULT 0,
     sort_order int NOT NULL DEFAULT 0,
     visible tinyint(1) NOT NULL DEFAULT 1,
     status varchar(32) NOT NULL DEFAULT 'ENABLED',
@@ -132,39 +134,39 @@ VALUES
     ('system:menu:delete', '菜单删除', 'Allows deleting system menus', 'ENABLED'),
     ('system:menu:button-permission', '按钮权限', 'Allows configuring menu button permissions', 'ENABLED');
 
-INSERT IGNORE INTO sys_menu (menu_code, menu_name, path, component, icon, sort_order, visible, status)
+INSERT IGNORE INTO sys_menu (menu_code, menu_name, path, component, icon, menu_level, button_flag, sort_order, visible, status)
 VALUES
-    ('user-profile', 'User Profile', '/api/users/me', 'UserProfile', 'User', 10, 1, 'ENABLED'),
-    ('manager-dashboard', 'Manager Dashboard', '/api/manager/dashboard', 'ManagerDashboard', 'LayoutDashboard', 20, 1, 'ENABLED'),
-    ('system-management', 'System Management', '/api/manager/system', 'SystemManagement', 'Settings', 30, 1, 'ENABLED');
+    ('user-profile', 'User Profile', '/api/users/me', 'UserProfile', 'User', 1, 0, 10, 1, 'ENABLED'),
+    ('manager-dashboard', 'Manager Dashboard', '/api/manager/dashboard', 'ManagerDashboard', 'LayoutDashboard', 1, 0, 20, 1, 'ENABLED'),
+    ('system-management', 'System Management', '/api/manager/system', 'SystemManagement', 'Settings', 1, 0, 30, 1, 'ENABLED');
 
-INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, sort_order, visible, status)
-SELECT parent.id, 'system-users', 'User Management', '/api/manager/system/users', 'SystemUsers', 'Users', 31, 1, 'ENABLED'
+INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, menu_level, button_flag, sort_order, visible, status)
+SELECT parent.id, 'system-users', 'User Management', '/api/manager/system/users', 'SystemUsers', 'Users', 2, 0, 31, 1, 'ENABLED'
 FROM sys_menu parent
 WHERE parent.menu_code = 'system-management';
 
-INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, sort_order, visible, status)
-SELECT parent.id, 'system-roles', 'Role Management', '/api/manager/system/roles', 'SystemRoles', 'ShieldCheck', 32, 1, 'ENABLED'
+INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, menu_level, button_flag, sort_order, visible, status)
+SELECT parent.id, 'system-roles', 'Role Management', '/api/manager/system/roles', 'SystemRoles', 'ShieldCheck', 2, 0, 32, 1, 'ENABLED'
 FROM sys_menu parent
 WHERE parent.menu_code = 'system-management';
 
-INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, sort_order, visible, status)
-SELECT parent.id, 'system-permissions', 'Permission Management', '/api/manager/system/permissions', 'SystemPermissions', 'KeyRound', 33, 1, 'ENABLED'
+INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, menu_level, button_flag, sort_order, visible, status)
+SELECT parent.id, 'system-permissions', 'Permission Management', '/api/manager/system/permissions', 'SystemPermissions', 'KeyRound', 2, 0, 33, 1, 'ENABLED'
 FROM sys_menu parent
 WHERE parent.menu_code = 'system-management';
 
-INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, sort_order, visible, status)
-SELECT parent.id, 'system-menus', '菜单查询', '/api/manager/system/menus', 'SystemMenuQuery', 'FolderSearch', 34, 1, 'ENABLED'
+INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, menu_level, button_flag, sort_order, visible, status)
+SELECT parent.id, 'system-menus', '菜单查询', '/api/manager/system/menus', 'SystemMenuQuery', 'FolderSearch', 2, 0, 34, 1, 'ENABLED'
 FROM sys_menu parent
 WHERE parent.menu_code = 'system-management';
 
-INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, sort_order, visible, status)
-SELECT parent.id, 'system-operation-logs', '操作日志', '/api/manager/system/operation-logs', 'SystemOperationLogs', 'ScrollText', 35, 1, 'ENABLED'
+INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, menu_level, button_flag, sort_order, visible, status)
+SELECT parent.id, 'system-operation-logs', '操作日志', '/api/manager/system/operation-logs', 'SystemOperationLogs', 'ScrollText', 2, 0, 35, 1, 'ENABLED'
 FROM sys_menu parent
 WHERE parent.menu_code = 'system-management';
 
-INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, sort_order, visible, status)
-SELECT parent.id, item.menu_code, item.menu_name, item.permission_code, 'ButtonPermission', 'MousePointerClick', item.sort_order, 0, 'ENABLED'
+INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, menu_level, button_flag, sort_order, visible, status)
+SELECT parent.id, item.menu_code, item.menu_name, item.permission_code, 'ButtonPermission', 'MousePointerClick', 3, 1, item.sort_order, 0, 'ENABLED'
 FROM sys_menu parent
 JOIN (
     SELECT 'system-users' parent_code, 'system-users-add' menu_code, '新增' menu_name, 'system:user:add' permission_code, 311 sort_order
