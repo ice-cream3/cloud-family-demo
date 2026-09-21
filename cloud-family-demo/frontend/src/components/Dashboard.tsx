@@ -1701,9 +1701,11 @@ function RoleMenuTreeOption({
 }
 
 function OperationLogDetailDialog({ record, onClose }: { record: OperationLog; onClose: () => void }) {
-  const before = parseLogData(record.beforeData);
-  const after = parseLogData(record.afterData);
-  const rows = buildLogCompareRows(before, after, record.businessType);
+  const before = parseLogData(readLogPayload(record, 'beforeData', 'before_data'));
+  const after = parseLogData(readLogPayload(record, 'afterData', 'after_data'));
+  const operationType = readLogText(record, 'operationType', 'operation_type');
+  const businessType = readLogText(record, 'businessType', 'business_type');
+  const rows = buildLogCompareRows(before, after, businessType);
   const changedRows = rows.filter((row) => row.changeType !== 'same');
 
   return (
@@ -1712,7 +1714,7 @@ function OperationLogDetailDialog({ record, onClose }: { record: OperationLog; o
         <div className="dialog-heading">
           <div>
             <h3>操作日志详情</h3>
-            <p>ID {record.id} · {formatDate(record.operationAt)}</p>
+            <p>ID {record.id} · {formatDate(readLogText(record, 'operationAt', 'operation_at'))}</p>
           </div>
           <button className="icon-button" type="button" onClick={onClose} title="关闭">
             <X size={18} />
@@ -1720,28 +1722,28 @@ function OperationLogDetailDialog({ record, onClose }: { record: OperationLog; o
         </div>
         <div className="log-detail-body">
           <div className="log-meta-grid">
-            <DetailItem label="操作类型" value={operationTypeLabel(record.operationType)} />
-            <DetailItem label="操作者" value={record.operatorUsername} />
-            <DetailItem label="用户类型" value={record.operatorUserType} />
-            <DetailItem label="业务模块" value={record.businessModule} />
-            <DetailItem label="业务类型" value={record.businessType} />
-            <DetailItem label="业务 ID" value={record.businessId} />
-            <DetailItem label="业务名称" value={record.businessName} />
-            <DetailItem label="请求方法" value={record.requestMethod} />
-            <DetailItem label="请求 URI" value={record.requestUri} />
-            <DetailItem label="客户端 IP" value={record.clientIp} />
+            <DetailItem label="操作类型" value={operationTypeLabel(operationType)} />
+            <DetailItem label="操作者" value={readLogText(record, 'operatorUsername', 'operator_username')} />
+            <DetailItem label="用户类型" value={readLogText(record, 'operatorUserType', 'operator_user_type')} />
+            <DetailItem label="业务模块" value={readLogText(record, 'businessModule', 'business_module')} />
+            <DetailItem label="业务类型" value={businessType} />
+            <DetailItem label="业务 ID" value={readLogText(record, 'businessId', 'business_id')} />
+            <DetailItem label="业务名称" value={readLogText(record, 'businessName', 'business_name')} />
+            <DetailItem label="请求方法" value={readLogText(record, 'requestMethod', 'request_method')} />
+            <DetailItem label="请求 URI" value={readLogText(record, 'requestUri', 'request_uri')} />
+            <DetailItem label="客户端 IP" value={readLogText(record, 'clientIp', 'client_ip')} />
           </div>
 
           <div className="diff-summary">
-            <span>{changedRows.length > 0 ? `本次变更 ${changedRows.length} 个字段` : '没有页面字段变化'}</span>
+            <span>{`页面字段 ${rows.length} 个，变更 ${changedRows.length} 个`}</span>
             <small>新增 {rows.filter((row) => row.changeType === 'added').length} · 删除 {rows.filter((row) => row.changeType === 'removed').length} · 修改 {rows.filter((row) => row.changeType === 'modified').length}</small>
           </div>
 
           <div className="diff-card-list">
-            {changedRows.length > 0 ? changedRows.map((row) => (
+            {rows.length > 0 ? rows.map((row) => (
               <DiffCard key={row.key} row={row} />
             )) : (
-              <div className="empty-state compact">暂无页面字段变化。</div>
+              <div className="empty-state compact">暂无页面字段。</div>
             )}
           </div>
 
@@ -1795,6 +1797,14 @@ function renderDiffHighlight(row: CompareRow) {
       <>
         <span className="diff-action-label">删除</span>
         <code>{row.beforeValue}</code>
+      </>
+    );
+  }
+  if (row.changeType === 'same') {
+    return (
+      <>
+        <span className="diff-action-label">未变化</span>
+        <code>{row.afterValue}</code>
       </>
     );
   }
@@ -2091,8 +2101,28 @@ type CompareRow = {
   changeType: 'added' | 'removed' | 'modified' | 'same';
 };
 
-function parseLogData(value?: string): ParsedLogData {
-  if (!value || !value.trim()) {
+function readLogPayload(record: OperationLog, camelKey: string, snakeKey: string) {
+  const values = record as Record<string, unknown>;
+  return values[camelKey] ?? values[snakeKey];
+}
+
+function readLogText(record: OperationLog, camelKey: string, snakeKey: string) {
+  const value = readLogPayload(record, camelKey, snakeKey);
+  return value === null || value === undefined || value === '' ? undefined : String(value);
+}
+
+function parseLogData(value?: unknown): ParsedLogData {
+  if (value === null || value === undefined || value === '') {
+    return { value: undefined, flattened: {}, raw: '' };
+  }
+  if (typeof value !== 'string') {
+    return {
+      value,
+      flattened: flattenLogValue(value),
+      raw: formatLogValue(value),
+    };
+  }
+  if (!value.trim()) {
     return { value: undefined, flattened: {}, raw: '' };
   }
   try {
@@ -2146,7 +2176,9 @@ function buildLogCompareRows(before: ParsedLogData, after: ParsedLogData, busine
   const fieldOrder = Object.keys(labels);
   const knownPageFields = new Set(fieldOrder);
   const supportsPageFields = fieldOrder.length > 0;
-  const keys = Array.from(new Set([...Object.keys(before.flattened), ...Object.keys(after.flattened)]))
+  const keys = (supportsPageFields
+    ? fieldOrder
+    : Array.from(new Set([...Object.keys(before.flattened), ...Object.keys(after.flattened)])))
     .filter((key) => !supportsPageFields || knownPageFields.has(baseLogFieldKey(key)))
     .sort((left, right) => {
       const leftIndex = fieldOrder.indexOf(baseLogFieldKey(left));
@@ -2160,8 +2192,8 @@ function buildLogCompareRows(before: ParsedLogData, after: ParsedLogData, busine
     keys.push('原始数据');
   }
   return keys.map((key) => {
-    const beforeValue = displayLogFieldValue(key, before.flattened[key] ?? (key === '原始数据' ? before.raw : '-'));
-    const afterValue = displayLogFieldValue(key, after.flattened[key] ?? (key === '原始数据' ? after.raw : '-'));
+    const beforeValue = displayLogFieldValue(key, readFlattenedLogField(before.flattened, key) ?? (key === '原始数据' ? before.raw : '-'));
+    const afterValue = displayLogFieldValue(key, readFlattenedLogField(after.flattened, key) ?? (key === '原始数据' ? after.raw : '-'));
     return {
       key,
       label: operationLogFieldLabel(labels, businessType, key),
@@ -2170,6 +2202,29 @@ function buildLogCompareRows(before: ParsedLogData, after: ParsedLogData, busine
       changeType: logChangeType(beforeValue, afterValue),
     };
   });
+}
+
+function readFlattenedLogField(flattened: Record<string, string>, key: string) {
+  const variants = logFieldKeyVariants(key);
+  for (const variant of variants) {
+    if (flattened[variant] !== undefined) {
+      return flattened[variant];
+    }
+  }
+  const matchedKey = Object.keys(flattened).find((item) => variants.includes(baseLogFieldKey(item)));
+  return matchedKey ? flattened[matchedKey] : undefined;
+}
+
+function logFieldKeyVariants(key: string) {
+  const baseKey = baseLogFieldKey(key);
+  return Array.from(new Set([
+    key,
+    baseKey,
+    camelToSnakeCase(key),
+    camelToSnakeCase(baseKey),
+    snakeToCamelCase(key),
+    snakeToCamelCase(baseKey),
+  ]));
 }
 
 function buildRelationCompareRows(beforeValue: unknown, afterValue: unknown, businessType?: string): CompareRow[] | null {
@@ -2393,6 +2448,14 @@ function baseLogFieldKey(key: string) {
   const withoutArrayPrefix = key.replace(/^\[\d+]\./, '');
   const segments = withoutArrayPrefix.split('.');
   return segments[segments.length - 1] || key;
+}
+
+function camelToSnakeCase(value: string) {
+  return value.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
+
+function snakeToCamelCase(value: string) {
+  return value.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
 }
 
 function logChangeType(beforeValue: string, afterValue: string): CompareRow['changeType'] {
