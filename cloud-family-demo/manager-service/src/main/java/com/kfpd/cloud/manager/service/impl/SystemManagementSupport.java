@@ -19,7 +19,7 @@ final class SystemManagementSupport {
 
     private static final Logger log = LoggerFactory.getLogger(SystemManagementSupport.class);
     private static final int DEFAULT_PAGE_NUM = 1;
-    private static final int DEFAULT_PAGE_SIZE = 10;
+    private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
 
     private SystemManagementSupport() {

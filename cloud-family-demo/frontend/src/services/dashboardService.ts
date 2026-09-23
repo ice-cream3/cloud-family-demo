@@ -29,7 +29,7 @@ export function loadSystemMenuTree() {
   return post<MenuTreeNode[]>('/api/manager/system/menus/tree');
 }
 
-export function loadSystemUsers(pageNum = 1, pageSize = 10) {
+export function loadSystemUsers(pageNum = 1, pageSize = 20) {
   return post<PageResult<SysUser>>('/api/manager/system/users/page', {
     form: {
       pageNum,
@@ -38,7 +38,7 @@ export function loadSystemUsers(pageNum = 1, pageSize = 10) {
   });
 }
 
-export function loadSystemRoles(pageNum = 1, pageSize = 10) {
+export function loadSystemRoles(pageNum = 1, pageSize = 20) {
   return post<PageResult<SysRole>>('/api/manager/system/roles/page', {
     form: {
       pageNum,
@@ -47,7 +47,7 @@ export function loadSystemRoles(pageNum = 1, pageSize = 10) {
   });
 }
 
-export function loadSystemPermissions(pageNum = 1, pageSize = 10) {
+export function loadSystemPermissions(pageNum = 1, pageSize = 20) {
   return post<PageResult<SysPermission>>('/api/manager/system/permissions/page', {
     form: {
       pageNum,
@@ -56,7 +56,7 @@ export function loadSystemPermissions(pageNum = 1, pageSize = 10) {
   });
 }
 
-export function loadSystemMenuPage(pageNum = 1, pageSize = 10, query: PageQuery = {}) {
+export function loadSystemMenuPage(pageNum = 1, pageSize = 20, query: PageQuery = {}) {
   return post<PageResult<SysMenu>>('/api/manager/system/menus/page', {
     form: {
       pageNum,
@@ -67,13 +67,17 @@ export function loadSystemMenuPage(pageNum = 1, pageSize = 10, query: PageQuery 
   });
 }
 
-export function loadSystemOperationLogs(pageNum = 1, pageSize = 10, query: PageQuery = {}) {
+export function loadSystemOperationLogs(pageNum = 1, pageSize = 20, query: PageQuery = {}) {
   return post<PageResult<SystemPageRecord>>('/api/manager/system/operation-logs/page', {
     form: {
       pageNum,
       pageSize,
       keyword: query.keyword,
       status: query.status,
+      operatorUsername: query.operatorUsername,
+      businessName: query.businessName,
+      businessModule: query.businessModule,
+      businessType: query.businessType,
     },
   });
 }

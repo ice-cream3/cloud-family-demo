@@ -55,8 +55,16 @@ public class OperationLogServiceImpl implements OperationLogService {
         int pageSize = SystemManagementSupport.pageSize(query);
         String keyword = SystemManagementSupport.keyword(query);
         String operationType = SystemManagementSupport.status(query);
+        String operatorUsername = normalize(query.operatorUsername());
+        String businessName = normalize(query.businessName());
+        String businessModule = normalize(query.businessModule());
+        String businessType = normalize(query.businessType());
         LambdaQueryWrapper<OperationLog> wrapper = Wrappers.lambdaQuery(OperationLog.class)
                 .eq(SystemManagementSupport.hasText(operationType), OperationLog::getOperationType, operationType)
+                .like(SystemManagementSupport.hasText(operatorUsername), OperationLog::getOperatorUsername, operatorUsername)
+                .like(SystemManagementSupport.hasText(businessName), OperationLog::getBusinessName, businessName)
+                .eq(SystemManagementSupport.hasText(businessModule), OperationLog::getBusinessModule, businessModule)
+                .eq(SystemManagementSupport.hasText(businessType), OperationLog::getBusinessType, businessType)
                 .and(SystemManagementSupport.hasText(keyword), condition -> condition
                         .like(OperationLog::getOperatorUsername, keyword)
                         .or()
@@ -77,6 +85,10 @@ public class OperationLogServiceImpl implements OperationLogService {
                 wrapper
         );
         return SystemManagementSupport.pageVO(page, pageNum, pageSize);
+    }
+
+    private String normalize(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private void record(String operationType,

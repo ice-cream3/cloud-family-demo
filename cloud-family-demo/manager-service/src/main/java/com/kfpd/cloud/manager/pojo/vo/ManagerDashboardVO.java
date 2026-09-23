@@ -11,6 +11,7 @@ public record ManagerDashboardVO(
         String displayName,
         List<String> roles,
         List<String> permissions,
+        List<LoginTrendPointVO> loginTrend,
         LocalDateTime requestTime
 ) {
 }

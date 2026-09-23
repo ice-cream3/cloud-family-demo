@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ChevronRight, Eye, EyeOff, FolderTree, KeyRound, Layers3, ListTree, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
-import type { ManagerDashboard, MenuTreeNode, OperationLog, PageQuery, PageResult, SysMenu, SysPermission, SysRole, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
+import type { LoginTrendPoint, ManagerDashboard, MenuTreeNode, OperationLog, PageQuery, PageResult, SysMenu, SysPermission, SysRole, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
 import type { Session } from '../services/tokenStore';
 import { loadSystemMenuTree } from '../services/dashboardService';
 
@@ -18,6 +18,7 @@ type DashboardProps = {
   systemPageError: string | null;
   onMenuSelect: (menu: MenuTreeNode) => void;
   onSystemPageChange: (pageNum: number) => void;
+  onSystemPageSizeChange: (pageSize: number) => void;
   onSystemPageSearch: (query: PageQuery) => void;
   onCreateSystemRecord: (payload: SystemRecordPayload) => Promise<void>;
   onUpdateSystemRecord: (id: number, payload: SystemRecordPayload) => Promise<void>;
@@ -50,6 +51,7 @@ export function Dashboard({
   systemPageError,
   onMenuSelect,
   onSystemPageChange,
+  onSystemPageSizeChange,
   onSystemPageSearch,
   onCreateSystemRecord,
   onUpdateSystemRecord,
@@ -119,6 +121,7 @@ export function Dashboard({
             loading={systemPageLoading}
             error={systemPageError}
             onPageChange={onSystemPageChange}
+            onPageSizeChange={onSystemPageSizeChange}
             onSearch={onSystemPageSearch}
             onCreate={onCreateSystemRecord}
             onUpdate={onUpdateSystemRecord}
@@ -135,6 +138,7 @@ export function Dashboard({
           />
         ) : (
           <>
+            <LoginTrendPanel trend={managerDashboard?.loginTrend || []} />
             <MenuTreePanel nodes={menuTree} total={menuCount} error={menuError} />
             <div className="content-grid">
               <DataPanel title="用户服务 /api/users/me" data={userProfile} emptyText="当前账号暂无用户端响应" />
@@ -164,6 +168,140 @@ function DataPanel({ title, data, emptyText }: { title: string; data: unknown; e
       {data ? <pre>{JSON.stringify(data, null, 2)}</pre> : <div className="empty-state">{emptyText}</div>}
     </article>
   );
+}
+
+function LoginTrendPanel({ trend }: { trend: LoginTrendPoint[] }) {
+  const width = 760;
+  const height = 260;
+  const padding = { top: 24, right: 26, bottom: 42, left: 42 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const maxValue = Math.max(1, ...trend.flatMap((point) => [point.managerLoginCount, point.partnerLoginCount]));
+  const managerPath = trendPath(trend, 'managerLoginCount', width, height, padding, maxValue);
+  const partnerPath = trendPath(trend, 'partnerLoginCount', width, height, padding, maxValue);
+  const managerArea = trendAreaPath(trend, 'managerLoginCount', width, height, padding, maxValue);
+  const partnerArea = trendAreaPath(trend, 'partnerLoginCount', width, height, padding, maxValue);
+  const latest = trend[trend.length - 1];
+  const totalManager = trend.reduce((sum, point) => sum + point.managerLoginCount, 0);
+  const totalPartner = trend.reduce((sum, point) => sum + point.partnerLoginCount, 0);
+  const yTicks = [0, Math.ceil(maxValue / 2), maxValue];
+
+  return (
+    <article className="trend-panel">
+      <div className="section-heading">
+        <div>
+          <h2>登录趋势</h2>
+          <p>最近 {trend.length || 14} 天 管理员 与 会员 成功登录次数。</p>
+        </div>
+        <div className="trend-stats" aria-label="登录趋势汇总">
+          <span><strong>{totalManager}</strong>管理员</span>
+          <span><strong>{totalPartner}</strong>会员</span>
+        </div>
+      </div>
+      {trend.length > 0 ? (
+        <div className="trend-chart-wrap">
+          <svg className="trend-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Manager 和 Partner 登录趋势图">
+            <defs>
+              <linearGradient id="managerTrendFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#0f766e" stopOpacity="0.22" />
+                <stop offset="100%" stopColor="#0f766e" stopOpacity="0.02" />
+              </linearGradient>
+              <linearGradient id="partnerTrendFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#d97706" stopOpacity="0.2" />
+                <stop offset="100%" stopColor="#d97706" stopOpacity="0.02" />
+              </linearGradient>
+            </defs>
+            {yTicks.map((tick) => {
+              const y = padding.top + chartHeight - (tick / maxValue) * chartHeight;
+              return (
+                <g key={tick}>
+                  <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} />
+                  <text x={padding.left - 10} y={y + 4} textAnchor="end">{tick}</text>
+                </g>
+              );
+            })}
+            <path className="trend-area manager" d={managerArea} />
+            <path className="trend-area partner" d={partnerArea} />
+            <path className="trend-line manager" d={managerPath} />
+            <path className="trend-line partner" d={partnerPath} />
+            {trend.map((point, index) => {
+              const x = trendX(index, trend.length, width, padding);
+              const showLabel = index === 0 || index === trend.length - 1 || index % 3 === 0;
+              return showLabel ? (
+                <text key={point.date} className="trend-x-label" x={x} y={height - 14} textAnchor="middle">
+                  {formatTrendDate(point.date)}
+                </text>
+              ) : null;
+            })}
+          </svg>
+          <div className="trend-legend">
+            <span><i className="manager" />管理员 登录</span>
+            <span><i className="partner" />会员 登录</span>
+            <small>{latest ? `最新：${formatTrendDate(latest.date)} Manager ${latest.managerLoginCount} / Partner ${latest.partnerLoginCount}` : ''}</small>
+          </div>
+        </div>
+      ) : (
+        <div className="empty-state compact">暂无登录趋势数据。</div>
+      )}
+    </article>
+  );
+}
+
+type TrendPadding = {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+};
+
+function trendPath(
+  trend: LoginTrendPoint[],
+  key: 'managerLoginCount' | 'partnerLoginCount',
+  width: number,
+  height: number,
+  padding: TrendPadding,
+  maxValue: number,
+) {
+  return trend.map((point, index) => {
+    const x = trendX(index, trend.length, width, padding);
+    const y = trendY(point[key], height, padding, maxValue);
+    return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+  }).join(' ');
+}
+
+function trendAreaPath(
+  trend: LoginTrendPoint[],
+  key: 'managerLoginCount' | 'partnerLoginCount',
+  width: number,
+  height: number,
+  padding: TrendPadding,
+  maxValue: number,
+) {
+  if (trend.length === 0) {
+    return '';
+  }
+  const line = trendPath(trend, key, width, height, padding, maxValue);
+  const firstX = trendX(0, trend.length, width, padding);
+  const lastX = trendX(trend.length - 1, trend.length, width, padding);
+  const baseline = height - padding.bottom;
+  return `${line} L ${lastX} ${baseline} L ${firstX} ${baseline} Z`;
+}
+
+function trendX(index: number, length: number, width: number, padding: TrendPadding) {
+  if (length <= 1) {
+    return padding.left;
+  }
+  return padding.left + (index / (length - 1)) * (width - padding.left - padding.right);
+}
+
+function trendY(value: number, height: number, padding: TrendPadding, maxValue: number) {
+  const chartHeight = height - padding.top - padding.bottom;
+  return padding.top + chartHeight - (value / maxValue) * chartHeight;
+}
+
+function formatTrendDate(value: string) {
+  const [, month, day] = value.split('-');
+  return month && day ? `${month}/${day}` : value;
 }
 
 function SidebarMenu({
@@ -276,6 +414,7 @@ function SystemPagePanel({
   loading,
   error,
   onPageChange,
+  onPageSizeChange,
   onSearch,
   onCreate,
   onUpdate,
@@ -296,6 +435,7 @@ function SystemPagePanel({
   loading: boolean;
   error: string | null;
   onPageChange: (pageNum: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   onSearch: (query: PageQuery) => void;
   onCreate: (payload: SystemRecordPayload) => Promise<void>;
   onUpdate: (id: number, payload: SystemRecordPayload) => Promise<void>;
@@ -625,6 +765,14 @@ function SystemPagePanel({
             </button>
           ) : null}
           <div className="pager-actions">
+            <label>
+              每页
+              <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))} disabled={loading}>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </label>
             <button type="button" disabled={loading || pageNum <= 1} onClick={() => onPageChange(pageNum - 1)}>
               上一页
             </button>
@@ -637,22 +785,22 @@ function SystemPagePanel({
           </div>
         </div>
       </div>
-      {(isMenuManagement && viewMode === 'table') || isOperationLogPage ? (
+      {isOperationLogPage ? (
+        <OperationLogQueryBar
+          query={query}
+          loading={loading}
+          onSearch={onSearch}
+        />
+      ) : isMenuManagement && viewMode === 'table' ? (
         <MenuQueryBar
           query={query}
           loading={loading}
-          keywordPlaceholder={isOperationLogPage ? '操作者 / 模块 / 类型 / 业务 ID / URI' : '菜单编码 / 名称 / 路径 / 组件'}
-          statusLabel={isOperationLogPage ? '操作类型' : '状态'}
-          statusOptions={isOperationLogPage
-            ? [
-                { label: '新增', value: 'CREATE' },
-                { label: '修改', value: 'UPDATE' },
-                { label: '删除', value: 'DELETE' },
-              ]
-            : [
-                { label: '启用', value: 'ENABLED' },
-                { label: '禁用', value: 'DISABLED' },
-              ]}
+          keywordPlaceholder="菜单编码 / 名称 / 路径 / 组件"
+          statusLabel="状态"
+          statusOptions={[
+            { label: '启用', value: 'ENABLED' },
+            { label: '禁用', value: 'DISABLED' },
+          ]}
           onSearch={onSearch}
         />
       ) : null}
@@ -1074,6 +1222,127 @@ function DetailItem({ label, value }: { label: string; value: string | number | 
       <span>{label}</span>
       <strong>{value === null || value === undefined || value === '' ? '-' : value}</strong>
     </div>
+  );
+}
+
+function OperationLogQueryBar({
+  query,
+  loading,
+  onSearch,
+}: {
+  query: PageQuery;
+  loading: boolean;
+  onSearch: (query: PageQuery) => void;
+}) {
+  const [operatorUsername, setOperatorUsername] = useState(query.operatorUsername || '');
+  const [businessName, setBusinessName] = useState(query.businessName || '');
+  const [businessModule, setBusinessModule] = useState(query.businessModule || '');
+  const [businessType, setBusinessType] = useState(query.businessType || '');
+  const [status, setStatus] = useState(query.status || '');
+
+  useEffect(() => {
+    setOperatorUsername(query.operatorUsername || '');
+    setBusinessName(query.businessName || '');
+    setBusinessModule(query.businessModule || '');
+    setBusinessType(query.businessType || '');
+    setStatus(query.status || '');
+  }, [query.operatorUsername, query.businessName, query.businessModule, query.businessType, query.status]);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSearch({
+      operatorUsername: operatorUsername.trim() || undefined,
+      businessName: businessName.trim() || undefined,
+      businessModule: businessModule || undefined,
+      businessType: businessType || undefined,
+      status: status || undefined,
+    });
+  }
+
+  function reset() {
+    setOperatorUsername('');
+    setBusinessName('');
+    setBusinessModule('');
+    setBusinessType('');
+    setStatus('');
+    onSearch({});
+  }
+
+  const businessTypeOptions = operationLogBusinessTypeOptions(businessModule);
+  const hasQuery = operatorUsername || businessName || businessModule || businessType || status;
+
+  return (
+    <form className="query-bar operation-log-query" onSubmit={submit}>
+      <label>
+        操作者
+        <span className="query-input">
+          <Search size={16} />
+          <input
+            value={operatorUsername}
+            onChange={(event) => setOperatorUsername(event.target.value)}
+            placeholder="输入操作者账号"
+          />
+        </span>
+      </label>
+      <label>
+        业务名称
+        <span className="query-input">
+          <Search size={16} />
+          <input
+            value={businessName}
+            onChange={(event) => setBusinessName(event.target.value)}
+            placeholder="输入业务名称"
+          />
+        </span>
+      </label>
+      <label>
+        模块
+        <select
+          value={businessModule}
+          onChange={(event) => {
+            setBusinessModule(event.target.value);
+            setBusinessType('');
+          }}
+        >
+          <option value="">全部模块</option>
+          {operationLogBusinessModuleOptions().map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        业务类型
+        <select value={businessType} onChange={(event) => setBusinessType(event.target.value)}>
+          <option value="">全部业务类型</option>
+          {businessTypeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        操作类型
+        <select value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option value="">全部操作类型</option>
+          <option value="CREATE">新增</option>
+          <option value="UPDATE">修改</option>
+          <option value="DELETE">删除</option>
+        </select>
+      </label>
+      <div className="query-actions">
+        <button className="primary-button small" type="submit" disabled={loading}>
+          <Search size={16} />
+          查询
+        </button>
+        <button className="ghost-button small" type="button" onClick={reset} disabled={loading && !hasQuery}>
+          <X size={16} />
+          重置
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -2093,6 +2362,36 @@ function isSystemPageMenu(path?: string) {
 function isOperationLogMenuRecord(record: SystemPageRecord) {
   return readField(record, 'menuCode') === 'system-operation-logs'
     || readField(record, 'path') === '/api/manager/system/operation-logs';
+}
+
+function operationLogBusinessModuleOptions() {
+  return [
+    { label: '系统模块', value: 'SYSTEM' },
+    { label: 'Partner 模块', value: 'PARTNER' },
+  ];
+}
+
+function operationLogBusinessTypeOptions(businessModule?: string) {
+  const systemOptions = [
+    { label: '系统用户', value: 'SYS_USER' },
+    { label: '用户角色', value: 'SYS_USER_ROLE' },
+    { label: '系统角色', value: 'SYS_ROLE' },
+    { label: '角色权限', value: 'SYS_ROLE_PERMISSION' },
+    { label: '角色菜单', value: 'SYS_ROLE_MENU' },
+    { label: '系统权限', value: 'SYS_PERMISSION' },
+    { label: '系统菜单', value: 'SYS_MENU' },
+    { label: '菜单权限', value: 'SYS_MENU_PERMISSION' },
+  ];
+  const partnerOptions = [
+    { label: 'VIP 用户', value: 'VIP_USER' },
+  ];
+  if (businessModule === 'SYSTEM') {
+    return systemOptions;
+  }
+  if (businessModule === 'PARTNER') {
+    return partnerOptions;
+  }
+  return [...systemOptions, ...partnerOptions];
 }
 
 function StatusValue({ value }: { value?: string }) {

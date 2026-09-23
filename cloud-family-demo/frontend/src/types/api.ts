@@ -22,8 +22,15 @@ export type ManagerDashboard = {
   displayName?: string;
   roles?: string[];
   permissions?: string[];
+  loginTrend?: LoginTrendPoint[];
   requestTime?: string;
   [key: string]: unknown;
+};
+
+export type LoginTrendPoint = {
+  date: string;
+  managerLoginCount: number;
+  partnerLoginCount: number;
 };
 
 export type UserProfile = {
@@ -44,6 +51,10 @@ export type PageResult<T> = {
 export type PageQuery = {
   keyword?: string;
   status?: string;
+  operatorUsername?: string;
+  businessName?: string;
+  businessModule?: string;
+  businessType?: string;
 };
 
 export type SysMenu = {

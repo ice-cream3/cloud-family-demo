@@ -34,6 +34,7 @@ export default function App() {
   const [activeMenu, setActiveMenu] = useState<MenuTreeNode | null>(null);
   const [systemPage, setSystemPage] = useState<PageResult<SystemPageRecord> | null>(null);
   const [systemPageQuery, setSystemPageQuery] = useState<PageQuery>({});
+  const [systemPageSize, setSystemPageSize] = useState(20);
   const [systemPageLoading, setSystemPageLoading] = useState(false);
   const [systemPageError, setSystemPageError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -106,7 +107,7 @@ export default function App() {
     }
   }
 
-  async function loadSystemPage(menu: MenuTreeNode | null, pageNum: number, query = systemPageQuery) {
+  async function loadSystemPage(menu: MenuTreeNode | null, pageNum: number, query = systemPageQuery, pageSize = systemPageSize) {
     if (!menu || !isSystemPageMenu(menu.path)) {
       return;
     }
@@ -114,7 +115,7 @@ export default function App() {
     setSystemPageLoading(true);
     setSystemPageError(null);
     try {
-      setSystemPage(await getSystemPageLoader(menu.path)(pageNum, systemPage?.pageSize || 10, query));
+      setSystemPage(await getSystemPageLoader(menu.path)(pageNum, pageSize, query));
     } catch (err) {
       setSystemPage(null);
       setSystemPageError(readError(err));
@@ -196,7 +197,12 @@ export default function App() {
   }
 
   async function reloadCurrentSystemPage(pageNum: number) {
-    await loadSystemPage(activeMenu, pageNum, systemPageQuery);
+    await loadSystemPage(activeMenu, pageNum, systemPageQuery, systemPageSize);
+  }
+
+  async function handleSystemPageSizeChange(pageSize: number) {
+    setSystemPageSize(pageSize);
+    await loadSystemPage(activeMenu, 1, systemPageQuery, pageSize);
   }
 
   async function refreshMenus() {
@@ -221,6 +227,7 @@ export default function App() {
     setActiveMenu(null);
     setSystemPage(null);
     setSystemPageQuery({});
+    setSystemPageSize(20);
     setSystemPageError(null);
     setSystemPageLoading(false);
     setMenuError(null);
@@ -244,9 +251,10 @@ export default function App() {
       systemPageError={systemPageError}
       onMenuSelect={handleMenuSelect}
       onSystemPageChange={(pageNum) => loadSystemPage(activeMenu, pageNum)}
+      onSystemPageSizeChange={handleSystemPageSizeChange}
       onSystemPageSearch={(query) => {
         setSystemPageQuery(query);
-        void loadSystemPage(activeMenu, 1, query);
+        void loadSystemPage(activeMenu, 1, query, systemPageSize);
       }}
       onCreateSystemRecord={handleCreateSystemRecord}
       onUpdateSystemRecord={handleUpdateSystemRecord}

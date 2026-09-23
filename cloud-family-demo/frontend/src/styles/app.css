@@ -471,6 +471,7 @@ button:disabled {
 
 .info-card,
 .data-panel,
+.trend-panel,
 .menu-tree-panel,
 .table-panel {
   border: 1px solid #e1e7ef;
@@ -537,6 +538,129 @@ button:disabled {
   padding: 18px;
 }
 
+.trend-panel {
+  min-width: 0;
+  overflow: hidden;
+  margin-bottom: 16px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+}
+
+.trend-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.trend-stats span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid #dce6ee;
+  border-radius: 6px;
+  color: #596779;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.trend-stats strong {
+  color: #273142;
+  font-size: 18px;
+}
+
+.trend-chart-wrap {
+  min-width: 0;
+  padding: 16px 18px 18px;
+  background: #fbfcfd;
+}
+
+.trend-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 260px;
+}
+
+.trend-chart line {
+  stroke: #e4ebf2;
+  stroke-width: 1;
+}
+
+.trend-chart text {
+  fill: #728094;
+  font-size: 11px;
+}
+
+.trend-x-label {
+  font-weight: 700;
+}
+
+.trend-area {
+  stroke: none;
+}
+
+.trend-area.manager {
+  fill: url("#managerTrendFill");
+}
+
+.trend-area.partner {
+  fill: url("#partnerTrendFill");
+}
+
+.trend-line {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trend-line.manager {
+  stroke: #0f766e;
+}
+
+.trend-line.partner {
+  stroke: #d97706;
+}
+
+.trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  padding-top: 12px;
+  color: #596779;
+  font-size: 13px;
+}
+
+.trend-legend span {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  font-weight: 700;
+}
+
+.trend-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.trend-legend i.manager {
+  background: #0f766e;
+}
+
+.trend-legend i.partner {
+  background: #d97706;
+}
+
+.trend-legend small {
+  margin-left: auto;
+  color: #728094;
+}
+
 .menu-tree-panel {
   margin-bottom: 16px;
   overflow: hidden;
@@ -581,6 +705,14 @@ button:disabled {
   padding: 3px 0;
 }
 
+.pager-actions label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.pager-actions select,
 .pager-actions button {
   height: 32px;
   padding: 0 10px;
@@ -588,6 +720,11 @@ button:disabled {
   border-radius: 6px;
   color: #354052;
   background: #ffffff;
+}
+
+.pager-actions select {
+  min-width: 70px;
+  outline: none;
 }
 
 .view-switch {
@@ -681,6 +818,16 @@ button:disabled {
 .query-actions {
   display: flex;
   gap: 8px;
+}
+
+.query-bar.operation-log-query {
+  grid-template-columns:
+    minmax(150px, 1fr)
+    minmax(150px, 1fr)
+    minmax(130px, 0.72fr)
+    minmax(150px, 0.86fr)
+    minmax(130px, 0.72fr)
+    auto;
 }
 
 .primary-button.small,
