@@ -28,7 +28,7 @@ public class ManagerMyBatisConfig {
     ) throws Exception {
         MybatisSqlSessionFactoryBean factoryBean = new MybatisSqlSessionFactoryBean();
         factoryBean.setDataSource(dataSource);
-        factoryBean.setMapperLocations(applicationContext.getResources("classpath*:mapper/system/**/*.xml"));
+        factoryBean.setMapperLocations(applicationContext.getResources("classpath*:mapper/cloud/**/*.xml"));
         factoryBean.setPlugins(managerMybatisPlusInterceptor);
         return factoryBean.getObject();
     }
