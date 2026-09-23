@@ -64,9 +64,11 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                     Jwt jwt = authentication.getToken();
                     String authorization = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
                     return validateWithAuthService(authorization)
-                            .flatMap(validation -> routeAuthenticatedRequest(exchange, chain, request, path, jwt, validation));
+                            .flatMap(validation -> routeAuthenticatedRequest(exchange, chain, request, path, jwt, validation))
+                            .thenReturn(Boolean.TRUE);
                 })
-                .switchIfEmpty(Mono.defer(() -> writeError(exchange, ErrorCode.GATEWAY_MISSING_AUTHENTICATED_JWT)));
+                .switchIfEmpty(Mono.defer(() -> writeError(exchange, ErrorCode.GATEWAY_MISSING_AUTHENTICATED_JWT).thenReturn(Boolean.TRUE)))
+                .then();
     }
 
     @Override
@@ -75,6 +77,9 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     }
 
     private Mono<Void> writeError(ServerWebExchange exchange, ErrorCode errorCode) {
+        if (exchange.getResponse().isCommitted()) {
+            return Mono.empty();
+        }
         log.warn("Gateway authentication exception: code={}, status={}, method={}, path={}, message={}",
                 errorCode.getCode(),
                 errorCode.getHttpStatus(),

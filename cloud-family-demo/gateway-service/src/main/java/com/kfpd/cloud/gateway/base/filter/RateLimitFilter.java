@@ -156,6 +156,9 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     }
 
     private Mono<Void> writeError(ServerWebExchange exchange, ErrorCode errorCode) {
+        if (exchange.getResponse().isCommitted()) {
+            return Mono.empty();
+        }
         byte[] body = errorBody(errorCode);
         exchange.getResponse().setStatusCode(HttpStatus.valueOf(errorCode.getHttpStatus()));
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);

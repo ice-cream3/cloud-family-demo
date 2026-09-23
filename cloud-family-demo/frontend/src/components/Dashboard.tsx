@@ -391,6 +391,10 @@ function SystemPagePanel({
 
   function openEdit(record: SystemPageRecord) {
     if (isMenuManagement) {
+      if (isOperationLogMenuRecord(record)) {
+        setOperationMessage({ type: 'error', text: '操作日志菜单仅允许查询，不允许修改' });
+        return;
+      }
       void openMenuEditor(record);
       return;
     }
@@ -441,6 +445,10 @@ function SystemPagePanel({
   }
 
   async function deleteRecord(record: SystemPageRecord) {
+    if (isMenuManagement && isOperationLogMenuRecord(record)) {
+      setOperationMessage({ type: 'error', text: '操作日志菜单仅允许查询，不允许修改' });
+      return;
+    }
     if (!window.confirm(`确认删除 ${recordLabel(record)}？`)) {
       return;
     }
@@ -480,6 +488,10 @@ function SystemPagePanel({
   }
 
   async function openPermissionDialog(record: SystemPageRecord) {
+    if (isMenuManagement && isOperationLogMenuRecord(record)) {
+      setOperationMessage({ type: 'error', text: '操作日志菜单仅允许查询，不允许修改' });
+      return;
+    }
     setSaving(true);
     setPermissionError(null);
     try {
@@ -659,6 +671,10 @@ function SystemPagePanel({
           onReload={reloadMenuTree}
           onSelect={setSelectedTreeMenu}
           onCreateChild={(parent) => {
+            if (isOperationLogMenuRecord(parent)) {
+              setOperationMessage({ type: 'error', text: '操作日志菜单仅允许查询，不允许修改' });
+              return;
+            }
             void openMenuEditor(null, {
               id: 0,
               parentId: parent.id,
@@ -710,10 +726,12 @@ function SystemPagePanel({
                   {!readOnly ? (
                     <td>
                       <div className="row-actions">
-                        <button type="button" onClick={() => openEdit(record)} disabled={saving}>
-                          <Pencil size={14} />
-                          修改
-                        </button>
+                        {!isMenuManagement || !isOperationLogMenuRecord(record) ? (
+                          <button type="button" onClick={() => openEdit(record)} disabled={saving}>
+                            <Pencil size={14} />
+                            修改
+                          </button>
+                        ) : null}
                         {menu?.path === '/api/manager/system/users' ? (
                           <>
                             <button type="button" onClick={() => setPasswordRecord(record)} disabled={saving}>
@@ -732,16 +750,20 @@ function SystemPagePanel({
                             分配菜单
                           </button>
                         ) : null}
-                        {menu?.path === '/api/manager/system/menus' ? (
+                        {menu?.path === '/api/manager/system/menus' && !isOperationLogMenuRecord(record) ? (
                           <button type="button" onClick={() => openPermissionDialog(record)} disabled={saving}>
                             <KeyRound size={14} />
                             分配权限
                           </button>
                         ) : null}
-                        <button className="danger" type="button" onClick={() => deleteRecord(record)} disabled={saving}>
-                          <Trash2 size={14} />
-                          删除
-                        </button>
+                        {!isMenuManagement || !isOperationLogMenuRecord(record) ? (
+                          <button className="danger" type="button" onClick={() => deleteRecord(record)} disabled={saving}>
+                            <Trash2 size={14} />
+                            删除
+                          </button>
+                        ) : (
+                          <span className="muted-pill">只读</span>
+                        )}
                       </div>
                     </td>
                   ) : null}
@@ -859,6 +881,7 @@ function MenuTreeConfigPanel({
 }) {
   const total = countAllMenuNodes(nodes);
   const visibleTotal = countMenuNodes(nodes);
+  const selectedMenuReadonly = selectedMenu ? isOperationLogMenuRecord(selectedMenu) : false;
   const [expandedIds, setExpandedIds] = useState<Set<number>>(() => new Set());
 
   useEffect(() => {
@@ -940,18 +963,24 @@ function MenuTreeConfigPanel({
                 <p>ID {selectedMenu.id}</p>
               </div>
               <div className="detail-actions">
-                <button className="ghost-button small" type="button" onClick={() => onCreateChild(selectedMenu)} disabled={saving}>
-                  <Plus size={15} />
-                  子菜单
-                </button>
-                <button className="ghost-button small" type="button" onClick={() => onEdit(selectedMenu)} disabled={saving}>
-                  <Pencil size={15} />
-                  修改
-                </button>
-                <button className="ghost-button small" type="button" onClick={() => onPermissions(selectedMenu)} disabled={saving}>
-                  <KeyRound size={15} />
-                  权限
-                </button>
+                {selectedMenuReadonly ? (
+                  <span className="muted-pill">只读</span>
+                ) : (
+                  <>
+                    <button className="ghost-button small" type="button" onClick={() => onCreateChild(selectedMenu)} disabled={saving}>
+                      <Plus size={15} />
+                      子菜单
+                    </button>
+                    <button className="ghost-button small" type="button" onClick={() => onEdit(selectedMenu)} disabled={saving}>
+                      <Pencil size={15} />
+                      修改
+                    </button>
+                    <button className="ghost-button small" type="button" onClick={() => onPermissions(selectedMenu)} disabled={saving}>
+                      <KeyRound size={15} />
+                      权限
+                    </button>
+                  </>
+                )}
               </div>
             </div>
             <div className="menu-detail-grid">
@@ -2061,6 +2090,11 @@ function isSystemPageMenu(path?: string) {
     || path === '/api/manager/system/operation-logs';
 }
 
+function isOperationLogMenuRecord(record: SystemPageRecord) {
+  return readField(record, 'menuCode') === 'system-operation-logs'
+    || readField(record, 'path') === '/api/manager/system/operation-logs';
+}
+
 function StatusValue({ value }: { value?: string }) {
   return <span className={value === 'ENABLED' ? 'status-pill' : 'muted-pill'}>{value || '-'}</span>;
 }
@@ -2126,7 +2160,7 @@ function parseLogData(value?: unknown): ParsedLogData {
     return { value: undefined, flattened: {}, raw: '' };
   }
   try {
-    const parsed = JSON.parse(value) as unknown;
+    const parsed = parsePossiblyNestedJson(value);
     return {
       value: parsed,
       flattened: flattenLogValue(parsed),
@@ -2139,6 +2173,21 @@ function parseLogData(value?: unknown): ParsedLogData {
       raw: value,
     };
   }
+}
+
+function parsePossiblyNestedJson(value: string): unknown {
+  let parsed: unknown = JSON.parse(value);
+  for (let index = 0; index < 2; index += 1) {
+    if (typeof parsed !== 'string') {
+      break;
+    }
+    const trimmed = parsed.trim();
+    if (!trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+      break;
+    }
+    parsed = JSON.parse(trimmed) as unknown;
+  }
+  return parsed;
 }
 
 function flattenLogValue(value: unknown, prefix = ''): Record<string, string> {
@@ -2191,7 +2240,7 @@ function buildLogCompareRows(before: ParsedLogData, after: ParsedLogData, busine
   if (keys.length === 0 && (before.raw || after.raw)) {
     keys.push('原始数据');
   }
-  return keys.map((key) => {
+  const rows = keys.map((key) => {
     const beforeValue = displayLogFieldValue(key, readFlattenedLogField(before.flattened, key) ?? (key === '原始数据' ? before.raw : '-'));
     const afterValue = displayLogFieldValue(key, readFlattenedLogField(after.flattened, key) ?? (key === '原始数据' ? after.raw : '-'));
     return {
@@ -2202,6 +2251,16 @@ function buildLogCompareRows(before: ParsedLogData, after: ParsedLogData, busine
       changeType: logChangeType(beforeValue, afterValue),
     };
   });
+  if (rows.every((row) => row.changeType === 'same') && before.raw !== after.raw && (before.raw || after.raw)) {
+    rows.push({
+      key: 'raw-diff',
+      label: '修改内容',
+      beforeValue: before.raw || '-',
+      afterValue: after.raw || '-',
+      changeType: logChangeType(before.raw || '-', after.raw || '-'),
+    });
+  }
+  return rows;
 }
 
 function readFlattenedLogField(flattened: Record<string, string>, key: string) {
@@ -2289,7 +2348,11 @@ function relationCompareConfig(businessType?: string) {
 function relationItemKey(item: unknown, index: number) {
   if (item && typeof item === 'object') {
     const record = item as Record<string, unknown>;
-    const stableValue = record.id ?? record.permissionCode ?? record.menuCode ?? record.roleCode ?? record.username;
+    const stableValue = readObjectField(record, 'id')
+      ?? readObjectField(record, 'permissionCode')
+      ?? readObjectField(record, 'menuCode')
+      ?? readObjectField(record, 'roleCode')
+      ?? readObjectField(record, 'username');
     if (stableValue !== undefined && stableValue !== null && stableValue !== '') {
       return String(stableValue);
     }
@@ -2307,7 +2370,7 @@ function relationItemTitle(item: unknown, config: { title: string; nameKeys: str
   if (name && code) {
     return `${name}（${code}）`;
   }
-  return name || code || `${config.title} ${textValueFromUnknown(record.id)}`;
+  return name || code || `${config.title} ${textValueFromUnknown(readObjectField(record, 'id'))}`;
 }
 
 function relationItemSummary(item: unknown, config: { nameKeys: string[]; codeKeys: string[]; extraKeys: string[] }) {
@@ -2324,7 +2387,7 @@ function relationItemSummary(item: unknown, config: { nameKeys: string[]; codeKe
 }
 
 function relationSummaryLine(record: Record<string, unknown>, key: string) {
-  const value = textValueFromUnknown(record[key]);
+  const value = textValueFromUnknown(readObjectField(record, key));
   if (!value) {
     return '';
   }
@@ -2333,12 +2396,21 @@ function relationSummaryLine(record: Record<string, unknown>, key: string) {
 
 function firstTextValue(record: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
-    const value = textValueFromUnknown(record[key]);
+    const value = textValueFromUnknown(readObjectField(record, key));
     if (value) {
       return value;
     }
   }
   return '';
+}
+
+function readObjectField(record: Record<string, unknown>, key: string) {
+  for (const variant of logFieldKeyVariants(key)) {
+    if (record[variant] !== undefined) {
+      return record[variant];
+    }
+  }
+  return undefined;
 }
 
 function textValueFromUnknown(value: unknown) {

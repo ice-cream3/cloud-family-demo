@@ -1,5 +1,6 @@
 package com.kfpd.cloud.manager.service.impl;
 
+import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -92,8 +93,8 @@ public class OperationLogServiceImpl implements OperationLogService {
                 businessType,
                 businessId,
                 businessName,
-                beforeData,
-                afterData,
+                JSONObject.toJSONString(beforeData),
+                JSONObject.toJSONString(afterData),
                 header(request, GatewayHeaders.USER_NAME, "anonymous"),
                 header(request, GatewayHeaders.USER_TYPE, null),
                 resolveClientIp(request),

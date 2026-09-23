@@ -2,8 +2,10 @@ package com.kfpd.cloud.manager.service.impl;
 
 import java.time.LocalDateTime;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kfpd.cloud.manager.dao.model.OperationLogDao;
 import com.kfpd.cloud.manager.pojo.entity.OperationLog;
 import com.kfpd.cloud.manager.service.event.OperationLogEvent;
@@ -41,8 +43,8 @@ public class OperationLogEventListener {
             operationLog.setBusinessType(event.businessType());
             operationLog.setBusinessId(event.businessId() == null ? null : String.valueOf(event.businessId()));
             operationLog.setBusinessName(event.businessName());
-            operationLog.setBeforeData(toJson(event.beforeData()));
-            operationLog.setAfterData(toJson(event.afterData()));
+            operationLog.setBeforeData(toJsonObject(event.beforeData()));
+            operationLog.setAfterData(toJsonObject(event.afterData()));
             operationLog.setClientIp(event.clientIp());
             operationLog.setRequestUri(event.requestUri());
             operationLog.setRequestMethod(event.requestMethod());
@@ -59,18 +61,35 @@ public class OperationLogEventListener {
         }
     }
 
-    private String toJson(Object value) {
+    private String toJsonObject(Object value) {
         if (value == null) {
             return null;
         }
         try {
-            return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException ex) {
-            try {
-                return objectMapper.writeValueAsString(String.valueOf(value));
-            } catch (JsonProcessingException fallbackEx) {
-                return "\"<unserializable operation log payload>\"";
+            JsonNode node = toJsonNode(value);
+            return objectMapper.writeValueAsString(node.isValueNode() ? wrapValueNode(node) : node);
+        } catch (Exception ex) {
+            ObjectNode fallback = objectMapper.createObjectNode();
+            fallback.put("value", "<unserializable operation log payload>");
+            return fallback.toString();
+        }
+    }
+
+    private JsonNode toJsonNode(Object value) throws Exception {
+        if (value instanceof String text) {
+            String trimmed = text.trim();
+            if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+                try (JsonParser parser = objectMapper.createParser(trimmed)) {
+                    return objectMapper.readTree(parser);
+                }
             }
         }
+        return objectMapper.valueToTree(value);
+    }
+
+    private ObjectNode wrapValueNode(JsonNode node) {
+        ObjectNode objectNode = objectMapper.createObjectNode();
+        objectNode.set("value", node);
+        return objectNode;
     }
 }
