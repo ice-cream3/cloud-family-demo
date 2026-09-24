@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,16 +39,19 @@ public class SysPermissionController {
     }
 
     @PostMapping("/permissions")
+    @PreAuthorize("hasAuthority('system:permission:add')")
     public ResponseEntity<ApiResponse<SysPermission>> createPermission(@Valid @RequestBody SysPermissionRequestVO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(permissionService.createPermission(request)));
     }
 
     @PostMapping("/permissions/update/{id}")
+    @PreAuthorize("hasAuthority('system:permission:edit')")
     public ApiResponse<SysPermission> updatePermission(@PathVariable Long id, @Valid @RequestBody SysPermissionRequestVO request) {
         return ApiResponse.success(permissionService.updatePermission(id, request));
     }
 
     @PostMapping("/permissions/delete/{id}")
+    @PreAuthorize("hasAuthority('system:permission:delete')")
     public ApiResponse<Void> deletePermission(@PathVariable Long id) {
         permissionService.deletePermission(id);
         return ApiResponse.success();

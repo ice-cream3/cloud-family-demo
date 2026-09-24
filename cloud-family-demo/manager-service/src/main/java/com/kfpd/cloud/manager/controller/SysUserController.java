@@ -16,6 +16,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -49,21 +50,25 @@ public class SysUserController {
     }
 
     @PostMapping("/users")
+    @PreAuthorize("hasAuthority('system:user:add')")
     public ResponseEntity<ApiResponse<SysUserVO>> createUser(@Valid @RequestBody(required = false) SysUserRequestVO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(userService.createUser(request)));
     }
 
     @PostMapping("/users/update/{id}")
+    @PreAuthorize("hasAuthority('system:user:edit')")
     public ApiResponse<SysUserVO> updateUser(@PathVariable Long id, @Valid @RequestBody(required = false) SysUserRequestVO request) {
         return ApiResponse.success(userService.updateUser(id, request));
     }
 
     @PostMapping("/users/password/reset/{id}")
+    @PreAuthorize("hasAuthority('system:user:reset-password')")
     public ApiResponse<SysUserVO> resetUserPassword(@PathVariable Long id, @Valid @RequestBody(required = false) PasswordResetRequestVO request) {
         return ApiResponse.success(userService.resetUserPassword(id, request));
     }
 
     @PostMapping("/users/delete/{id}")
+    @PreAuthorize("hasAuthority('system:user:delete')")
     public ApiResponse<Void> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
         return ApiResponse.success();
@@ -75,6 +80,7 @@ public class SysUserController {
     }
 
     @PostMapping("/users/roles/replace/{id}")
+    @PreAuthorize("hasAuthority('system:user:edit')")
     public ApiResponse<List<SysRole>> replaceUserRoles(@PathVariable Long id, @Valid @RequestBody IdListVO request) {
         return ApiResponse.success(userService.replaceUserRoles(id, request));
     }

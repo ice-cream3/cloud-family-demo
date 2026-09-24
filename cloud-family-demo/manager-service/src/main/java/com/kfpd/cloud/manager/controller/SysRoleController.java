@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,16 +44,19 @@ public class SysRoleController {
     }
 
     @PostMapping("/roles")
+    @PreAuthorize("hasAuthority('system:role:add')")
     public ResponseEntity<ApiResponse<SysRole>> createRole(@Valid @RequestBody SysRoleRequestVO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(roleService.createRole(request)));
     }
 
     @PostMapping("/roles/update/{id}")
+    @PreAuthorize("hasAuthority('system:role:edit')")
     public ApiResponse<SysRole> updateRole(@PathVariable Long id, @Valid @RequestBody SysRoleRequestVO request) {
         return ApiResponse.success(roleService.updateRole(id, request));
     }
 
     @PostMapping("/roles/delete/{id}")
+    @PreAuthorize("hasAuthority('system:role:delete')")
     public ApiResponse<Void> deleteRole(@PathVariable Long id) {
         roleService.deleteRole(id);
         return ApiResponse.success();
@@ -64,6 +68,7 @@ public class SysRoleController {
     }
 
     @PostMapping("/roles/permissions/replace/{id}")
+    @PreAuthorize("hasAuthority('system:role:edit')")
     public ApiResponse<List<SysPermission>> replaceRolePermissions(@PathVariable Long id, @Valid @RequestBody IdListVO request) {
         return ApiResponse.success(roleService.replaceRolePermissions(id, request));
     }
@@ -74,6 +79,7 @@ public class SysRoleController {
     }
 
     @PostMapping("/roles/menus/replace/{id}")
+    @PreAuthorize("hasAuthority('system:role:menu')")
     public ApiResponse<List<SysMenu>> replaceRoleMenus(@PathVariable Long id, @Valid @RequestBody IdListVO request) {
         return ApiResponse.success(roleService.replaceRoleMenus(id, request));
     }

@@ -7,6 +7,7 @@ import com.kfpd.cloud.common.web.GatewayHeaders;
 import com.kfpd.cloud.manager.pojo.vo.ManagerDashboardVO;
 import com.kfpd.cloud.manager.service.ManagerService;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,6 +24,7 @@ public class ManagerController {
     }
 
     @PostMapping("/dashboard")
+    @PreAuthorize("hasAuthority('manager:dashboard:read')")
     public ApiResponse<ManagerDashboardVO> dashboard(@RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
                                       @RequestHeader(value = GatewayHeaders.USER_ROLES, defaultValue = "") String roles,
                                       @RequestHeader(value = GatewayHeaders.USER_PERMISSIONS, defaultValue = "") String permissions) {

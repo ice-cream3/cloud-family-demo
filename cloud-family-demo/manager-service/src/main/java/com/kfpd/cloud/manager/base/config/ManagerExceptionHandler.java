@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -64,6 +65,14 @@ public class ManagerExceptionHandler {
                 errorCode.getCode(), ex.getStatusCode().value(), request.getMethod(), request.getRequestURI(), ex.getReason());
         return ResponseEntity.status(status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status)
                 .body(ApiResponse.error(errorCode, ex.getReason()));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(AccessDeniedException ex, HttpServletRequest request) {
+        log.warn("Access denied: code={}, method={}, path={}, message={}",
+                ErrorCode.COMMON_FORBIDDEN.getCode(), request.getMethod(), request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(ErrorCode.COMMON_FORBIDDEN, "Permission denied"));
     }
 
     @ExceptionHandler(Exception.class)

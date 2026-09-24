@@ -17,6 +17,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,16 +60,19 @@ public class SysMenuController {
     }
 
     @PostMapping("/menus")
+    @PreAuthorize("hasAuthority('system:menu:add')")
     public ResponseEntity<ApiResponse<SysMenu>> createMenu(@Valid @RequestBody SysMenuRequestVO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(roleService.createMenu(request)));
     }
 
     @PostMapping("/menus/update/{id}")
+    @PreAuthorize("hasAuthority('system:menu:edit')")
     public ApiResponse<SysMenu> updateMenu(@PathVariable Long id, @Valid @RequestBody SysMenuRequestVO request) {
         return ApiResponse.success(roleService.updateMenu(id, request));
     }
 
     @PostMapping("/menus/delete/{id}")
+    @PreAuthorize("hasAuthority('system:menu:delete')")
     public ApiResponse<Void> deleteMenu(@PathVariable Long id) {
         roleService.deleteMenu(id);
         return ApiResponse.success();
@@ -80,6 +84,7 @@ public class SysMenuController {
     }
 
     @PostMapping("/menus/permissions/replace/{id}")
+    @PreAuthorize("hasAuthority('system:menu:button-permission')")
     public ApiResponse<List<SysPermission>> replaceMenuPermissions(@PathVariable Long id, @Valid @RequestBody IdListVO request) {
         return ApiResponse.success(roleService.replaceMenuPermissions(id, request));
     }
