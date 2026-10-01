@@ -10,6 +10,7 @@ import {
   loadCurrentUser,
   loadManagerDashboard,
   loadMenus,
+  loadPartnerInfo,
   loadSystemMenuPage,
   loadSystemOperationLogs,
   loadSystemPermissions,
@@ -75,6 +76,10 @@ export default function App() {
   }
 
   async function reloadData() {
+    if (!session) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -305,6 +310,7 @@ function getSystemPageLoaders(): Record<string, (pageNum: number, pageSize: numb
     '/api/manager/system/menus': loadSystemMenuPage,
     '/api/manager/system/operation-logs': loadSystemOperationLogs,
     '/api/manager/vip-users': loadManagerVipUsers,
+    '/api/manager/partner/info': loadPartnerInfo,
   };
 }
 

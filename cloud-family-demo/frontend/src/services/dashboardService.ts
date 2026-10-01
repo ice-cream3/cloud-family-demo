@@ -96,6 +96,19 @@ export function loadManagerVipUsers(pageNum = 1, pageSize = 10, query: PageQuery
   });
 }
 
+export function loadPartnerInfo(pageNum = 1, pageSize = 10, query: PageQuery = {}) {
+  return post<PageResult<VipUser>>('/api/manager/partner/info/page', {
+    form: {
+      pageNum,
+      pageSize,
+      username: query.keyword,
+      displayName: query.businessName,
+      vipLevel: query.businessType,
+      status: query.status,
+    },
+  });
+}
+
 export function createSystemRecord(path: string, payload: SystemRecordPayload) {
   return post<SystemPageRecord>(getSystemEndpoint(path), {
     body: payload,
@@ -165,6 +178,7 @@ function getSystemEndpoint(path: string) {
     '/api/manager/system/permissions': '/api/manager/system/permissions',
     '/api/manager/system/menus': '/api/manager/system/menus',
     '/api/manager/vip-users': '/api/manager/vip-users',
+    '/api/manager/partner/info': '/api/manager/partner/info',
   };
   const endpoint = endpoints[path];
   if (!endpoint) {

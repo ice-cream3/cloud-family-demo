@@ -11,6 +11,7 @@ JDK 21 + Spring Boot 4.0.8 + Spring Cloud 2025.1.3 microservice demo.
 - `manager-service`: protected manager API service on port `38083`.
 - `job-service`: XXL-JOB executor service on HTTP port `38084` and executor port `39999`.
 - `frontend`: standalone React frontend on port `35173`, separated from backend services.
+- `mobile-frontend`: standalone responsive partner frontend for PC Web and H5 on port `35175`.
 
 System users, roles, permissions, menus, and their relationships are manager-service features backed by the `fa-cloud` MySQL database. API user profile data is stored in `fa-cloud.vip_user`.
 
@@ -79,6 +80,16 @@ npm run dev
 The frontend runs at `http://localhost:35173` and proxies `/auth/**` and `/api/**`
 requests to the gateway at `http://localhost:38080` by default. Override the gateway
 target with `VITE_GATEWAY_URL`.
+
+Start the independent partner mobile frontend in another terminal:
+
+```bash
+cd mobile-frontend
+npm install
+npm run dev
+```
+
+The partner mobile frontend runs at `http://localhost:35175` and uses the same gateway proxy.
 
 In IntelliJ IDEA, use the shared `All Services` compound run configuration
 to start all services together.

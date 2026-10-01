@@ -148,7 +148,7 @@ export function Dashboard({
             <LoginTrendPanel trend={managerDashboard?.loginTrend || []} />
             <MenuTreePanel nodes={menuTree} total={menuCount} error={menuError} />
             <div className="content-grid">
-              <DataPanel title="用户服务 /api/users/me" data={userProfile} emptyText="当前账号暂无用户端响应" />
+              <DataPanel title="用户资料 /api/users/me" data={userProfile} emptyText="当前账号暂无用户资料响应" />
               <DataPanel title="管理服务 /api/manager/dashboard" data={managerDashboard} emptyText="非管理账号可能无法访问该接口" />
             </div>
           </>
@@ -2522,10 +2522,11 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
     };
   }
 
-  if (path === '/api/manager/vip-users') {
+  if (path === '/api/manager/vip-users' || path === '/api/manager/partner/info') {
+    const isPartnerInfo = path === '/api/manager/partner/info';
     return {
-      title: '会员管理',
-      apiPath: '/api/manager/vip-users/page',
+      title: isPartnerInfo ? 'Partner Info' : '会员管理',
+      apiPath: isPartnerInfo ? '/api/manager/partner/info/page' : '/api/manager/vip-users/page',
       columns: [
         commonColumns[0],
         { key: 'username', title: '账号', render: (record) => textValue(readField(record, 'username')) },
@@ -2575,7 +2576,8 @@ function isSystemPageMenu(path?: string) {
     || path === '/api/manager/system/permissions'
     || path === '/api/manager/system/menus'
     || path === '/api/manager/system/operation-logs'
-    || path === '/api/manager/vip-users';
+    || path === '/api/manager/vip-users'
+    || path === '/api/manager/partner/info';
 }
 
 function systemActionPermissions(menu: MenuTreeNode | null, action: 'add' | 'edit' | 'delete') {
@@ -2605,6 +2607,11 @@ function systemActionPermissions(menu: MenuTreeNode | null, action: 'add' | 'edi
       add: ['vip:user:add', 'vip-user:add', 'partner:vip-user:add', 'manager:vip-user:add'],
       edit: ['vip:user:edit', 'vip-user:edit', 'partner:vip-user:edit', 'manager:vip-user:edit'],
       delete: ['vip:user:delete', 'vip-user:delete', 'partner:vip-user:delete', 'manager:vip-user:delete'],
+    },
+    '/api/manager/partner/info': {
+      add: ['partner:info:add'],
+      edit: ['partner:info:edit'],
+      delete: ['partner:info:delete'],
     },
   };
   return Array.from(new Set([

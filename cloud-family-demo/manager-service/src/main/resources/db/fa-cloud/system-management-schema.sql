@@ -133,13 +133,17 @@ VALUES
     ('system:menu:add', '菜单新增', 'Allows creating system menus', 'ENABLED'),
     ('system:menu:edit', '菜单修改', 'Allows updating system menus', 'ENABLED'),
     ('system:menu:delete', '菜单删除', 'Allows deleting system menus', 'ENABLED'),
-    ('system:menu:button-permission', '分配权限', 'Allows configuring menu button permissions', 'ENABLED');
+    ('system:menu:button-permission', '分配权限', 'Allows configuring menu button permissions', 'ENABLED'),
+    ('partner:info:add', 'Partner Info 新增', 'Allows creating partner info records', 'ENABLED'),
+    ('partner:info:edit', 'Partner Info 修改', 'Allows updating partner info records', 'ENABLED'),
+    ('partner:info:delete', 'Partner Info 删除', 'Allows deleting partner info records', 'ENABLED');
 
 INSERT IGNORE INTO sys_menu (menu_code, menu_name, path, component, icon, menu_level, button_flag, sort_order, visible, status)
 VALUES
     ('user-profile', 'User Profile', '/api/users/me', 'UserProfile', 'User', 1, 0, 10, 1, 'ENABLED'),
     ('manager-dashboard', 'Manager Dashboard', '/api/manager/dashboard', 'ManagerDashboard', 'LayoutDashboard', 1, 0, 20, 1, 'ENABLED'),
-    ('system-management', 'System Management', '/api/manager/system', 'SystemManagement', 'Settings', 1, 0, 30, 1, 'ENABLED');
+    ('system-management', 'System Management', '/api/manager/system', 'SystemManagement', 'Settings', 1, 0, 30, 1, 'ENABLED'),
+    ('partner-management', 'Partner Management', '/api/manager/partner', 'PartnerManagement', 'Handshake', 1, 0, 40, 1, 'ENABLED');
 
 INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, menu_level, button_flag, sort_order, visible, status)
 SELECT parent.id, 'system-users', 'User Management', '/api/manager/system/users', 'SystemUsers', 'Users', 2, 0, 31, 1, 'ENABLED'
@@ -167,6 +171,11 @@ FROM sys_menu parent
 WHERE parent.menu_code = 'system-management';
 
 INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, menu_level, button_flag, sort_order, visible, status)
+SELECT parent.id, 'partner-info', 'Partner Info', '/api/manager/partner/info', 'PartnerInfo', 'UsersRound', 2, 0, 41, 1, 'ENABLED'
+FROM sys_menu parent
+WHERE parent.menu_code = 'partner-management';
+
+INSERT IGNORE INTO sys_menu (parent_id, menu_code, menu_name, path, component, icon, menu_level, button_flag, sort_order, visible, status)
 SELECT parent.id, item.menu_code, item.menu_name, item.permission_code, 'ButtonPermission', 'MousePointerClick', 3, 1, item.sort_order, 0, 'ENABLED'
 FROM sys_menu parent
 JOIN (
@@ -185,6 +194,9 @@ JOIN (
     UNION ALL SELECT 'system-menus', 'system-menus-edit', '修改', 'system:menu:edit', 342
     UNION ALL SELECT 'system-menus', 'system-menus-delete', '删除', 'system:menu:delete', 343
     UNION ALL SELECT 'system-menus', 'system-menus-button-permission', '分配权限', 'system:menu:button-permission', 344
+    UNION ALL SELECT 'partner-info', 'partner-info-add', '新增', 'partner:info:add', 411
+    UNION ALL SELECT 'partner-info', 'partner-info-edit', '修改', 'partner:info:edit', 412
+    UNION ALL SELECT 'partner-info', 'partner-info-delete', '删除', 'partner:info:delete', 413
 ) item ON item.parent_code = parent.menu_code;
 
 INSERT IGNORE INTO sys_menu_permission (menu_id, permission_id)
@@ -235,5 +247,6 @@ WHERE r.role_code = 'SUPER_ADMIN'
       'system-users-add', 'system-users-edit', 'system-users-delete', 'system-users-reset-password',
       'system-roles-add', 'system-roles-edit', 'system-roles-delete', 'system-roles-menu',
       'system-permissions-add', 'system-permissions-edit', 'system-permissions-delete',
-      'system-menus-add', 'system-menus-edit', 'system-menus-delete', 'system-menus-button-permission'
+      'system-menus-add', 'system-menus-edit', 'system-menus-delete', 'system-menus-button-permission',
+      'partner-management', 'partner-info', 'partner-info-add', 'partner-info-edit', 'partner-info-delete'
   );

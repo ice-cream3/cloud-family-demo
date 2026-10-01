@@ -1,25 +1,24 @@
 import { FormEvent, useState } from 'react';
-import { KeyRound, LockKeyhole, LogIn, Network, ServerCog, ShieldCheck, UserRound } from 'lucide-react';
-import type { LoginMode } from '../types/api';
+import { KeyRound, LockKeyhole, LogIn, Network, ShieldCheck, Smartphone, UserRound } from 'lucide-react';
 
-type LoginPanelProps = {
+type LoginPageProps = {
   loading: boolean;
   error: string | null;
-  onLogin: (mode: LoginMode, username: string, password: string) => Promise<void>;
+  onLogin: (username: string, password: string) => Promise<void>;
 };
 
-export function LoginPanel({ loading, error, onLogin }: LoginPanelProps) {
+export function LoginPage({ loading, error, onLogin }: LoginPageProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onLogin('manager', username.trim(), password);
+    await onLogin(username.trim(), password);
   }
 
   return (
     <main className="login-surface">
-      <section className="login-panel" aria-label="登录">
+      <section className="login-panel" aria-label="Partner 用户登录">
         <div className="login-visual" aria-hidden="true">
           <div className="login-brand">
             <div className="icon-box login-logo">
@@ -27,14 +26,16 @@ export function LoginPanel({ loading, error, onLogin }: LoginPanelProps) {
             </div>
             <div>
               <span>Cloud Family</span>
-              <strong>Manager Console</strong>
+              <strong>Partner Portal</strong>
             </div>
           </div>
+
           <div className="login-hero-copy">
-            <p className="login-kicker">Secure access console</p>
-            <h1>统一管理端业务入口</h1>
-            <p>面向管理端的轻量控制台，集中呈现认证、网关转发、系统菜单和业务管理能力。</p>
+            <p className="login-kicker">Responsive partner access</p>
+            <h1>PC Web 与 H5 共用入口</h1>
+            <p>一套用户端工程同时适配桌面和移动端，登录后进入 partner 首页。</p>
           </div>
+
           <div className="login-status-grid">
             <div>
               <ShieldCheck size={18} />
@@ -47,8 +48,8 @@ export function LoginPanel({ loading, error, onLogin }: LoginPanelProps) {
               <strong>Proxy</strong>
             </div>
             <div>
-              <ServerCog size={18} />
-              <span>Services</span>
+              <Smartphone size={18} />
+              <span>H5</span>
               <strong>Ready</strong>
             </div>
           </div>
@@ -58,8 +59,8 @@ export function LoginPanel({ loading, error, onLogin }: LoginPanelProps) {
           <div className="panel-header">
             <div>
               <p className="login-kicker">Welcome back</p>
-              <h2>登录管理端</h2>
-              <p>使用具备管理端权限的账号密码登录。</p>
+              <h2>Partner 用户登录</h2>
+              <p>使用 partner 账号密码访问用户端首页。</p>
             </div>
           </div>
 
