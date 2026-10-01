@@ -116,7 +116,7 @@ public class SysUserServiceImpl implements SysUserService {
         });
         return buildMenuTree(
                 userDao.findMenusByUserId(user.getId()).stream()
-                        .filter(menu -> Boolean.TRUE.equals(menu.getVisible()))
+                        .filter(menu -> Boolean.TRUE.equals(menu.getVisible()) || Boolean.TRUE.equals(menu.getButtonFlag()))
                         .filter(menu -> "ENABLED".equalsIgnoreCase(menu.getStatus()))
                         .toList()
         );

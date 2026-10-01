@@ -10,6 +10,7 @@ spring:
 
 demo:
   redisson:
+    enabled: ${REDISSON_ENABLED:false}
     lock:
       key-prefix: ${REDIS_LOCK_KEY_PREFIX:cloud-family-demo:lock}
       wait-time-seconds: ${REDIS_LOCK_WAIT_TIME_SECONDS:5}

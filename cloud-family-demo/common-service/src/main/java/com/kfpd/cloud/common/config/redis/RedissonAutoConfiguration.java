@@ -23,6 +23,7 @@ import org.springframework.util.StringUtils;
 
 @AutoConfiguration
 @ConditionalOnClass(RedissonClient.class)
+@ConditionalOnProperty(prefix = "demo.redisson", name = "enabled", havingValue = "true", matchIfMissing = true)
 @ConditionalOnProperty(prefix = "spring.data.redis.cluster", name = "nodes")
 @EnableConfigurationProperties(RedissonProperties.class)
 public class RedissonAutoConfiguration {
@@ -46,12 +47,6 @@ public class RedissonAutoConfiguration {
     @ConditionalOnMissingBean
     RedissonReactiveClient redissonReactiveClient(RedissonClient redissonClient) {
         return redissonClient.reactive();
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    ObjectMapper objectMapper() {
-        return new ObjectMapper();
     }
 
     @Bean

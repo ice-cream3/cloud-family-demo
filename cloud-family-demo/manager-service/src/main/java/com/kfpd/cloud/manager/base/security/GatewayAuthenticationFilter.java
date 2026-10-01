@@ -11,6 +11,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -25,7 +27,8 @@ public class GatewayAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String username = request.getHeader(GatewayHeaders.USER_NAME);
-        if (hasText(username) && SecurityContextHolder.getContext().getAuthentication() == null) {
+        Authentication currentAuthentication = SecurityContextHolder.getContext().getAuthentication();
+        if (hasText(username) && (currentAuthentication == null || currentAuthentication instanceof AnonymousAuthenticationToken)) {
             List<SimpleGrantedAuthority> authorities = parseAuthorities(request.getHeader(GatewayHeaders.USER_PERMISSIONS));
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     username,

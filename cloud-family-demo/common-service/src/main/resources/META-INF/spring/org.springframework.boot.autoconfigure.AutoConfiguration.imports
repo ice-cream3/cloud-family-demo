@@ -1,3 +1,4 @@
 com.kfpd.cloud.common.config.datasource.MultiDataSourceAutoConfiguration
+com.kfpd.cloud.common.config.json.JacksonAutoConfiguration
 com.kfpd.cloud.common.config.rocketmq.RocketMqAutoConfiguration
 com.kfpd.cloud.common.config.redis.RedissonAutoConfiguration

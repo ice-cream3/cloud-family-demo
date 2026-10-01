@@ -30,6 +30,8 @@ type DashboardProps = {
   onLoadUserRoleOptions: () => Promise<SysRole[]>;
   onLoadUserRoles: (id: number) => Promise<SysRole[]>;
   onReplaceUserRoles: (id: number, ids: number[]) => Promise<void>;
+  onLoadRolePermissions: (id: number) => Promise<SysPermission[]>;
+  onReplaceRolePermissions: (id: number, ids: number[]) => Promise<void>;
   onLoadRoleMenus: (id: number) => Promise<SysMenu[]>;
   onReplaceRoleMenus: (id: number, ids: number[]) => Promise<void>;
   loading: boolean;
@@ -63,6 +65,8 @@ export function Dashboard({
   onLoadUserRoleOptions,
   onLoadUserRoles,
   onReplaceUserRoles,
+  onLoadRolePermissions,
+  onReplaceRolePermissions,
   onLoadRoleMenus,
   onReplaceRoleMenus,
   loading,
@@ -133,8 +137,11 @@ export function Dashboard({
             onLoadUserRoleOptions={onLoadUserRoleOptions}
             onLoadUserRoles={onLoadUserRoles}
             onReplaceUserRoles={onReplaceUserRoles}
+            onLoadRolePermissions={onLoadRolePermissions}
+            onReplaceRolePermissions={onReplaceRolePermissions}
             onLoadRoleMenus={onLoadRoleMenus}
             onReplaceRoleMenus={onReplaceRoleMenus}
+            permissions={session.permissions}
           />
         ) : (
           <>
@@ -171,6 +178,7 @@ function DataPanel({ title, data, emptyText }: { title: string; data: unknown; e
 }
 
 function LoginTrendPanel({ trend }: { trend: LoginTrendPoint[] }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const width = 760;
   const height = 260;
   const padding = { top: 24, right: 26, bottom: 42, left: 42 };
@@ -185,6 +193,18 @@ function LoginTrendPanel({ trend }: { trend: LoginTrendPoint[] }) {
   const totalManager = trend.reduce((sum, point) => sum + point.managerLoginCount, 0);
   const totalPartner = trend.reduce((sum, point) => sum + point.partnerLoginCount, 0);
   const yTicks = [0, Math.ceil(maxValue / 2), maxValue];
+  const activePoint = activeIndex === null ? null : trend[activeIndex];
+  const tooltipX = activeIndex === null ? 0 : trendX(activeIndex, trend.length, width, padding);
+  const tooltipY = activePoint
+    ? Math.min(
+        trendY(activePoint.managerLoginCount, height, padding, maxValue),
+        trendY(activePoint.partnerLoginCount, height, padding, maxValue)
+      )
+    : 0;
+  const tooltipWidth = 156;
+  const tooltipHeight = 70;
+  const tooltipLeft = Math.min(Math.max(tooltipX - tooltipWidth / 2, padding.left), width - padding.right - tooltipWidth);
+  const tooltipTop = Math.max(8, tooltipY - tooltipHeight - 12);
 
   return (
     <article className="trend-panel">
@@ -224,14 +244,42 @@ function LoginTrendPanel({ trend }: { trend: LoginTrendPoint[] }) {
             <path className="trend-area partner" d={partnerArea} />
             <path className="trend-line manager" d={managerPath} />
             <path className="trend-line partner" d={partnerPath} />
+            {activePoint ? (
+              <g className="trend-tooltip" pointerEvents="none">
+                <line className="trend-hover-line" x1={tooltipX} x2={tooltipX} y1={padding.top} y2={height - padding.bottom} />
+                <circle className="trend-point manager active" cx={tooltipX} cy={trendY(activePoint.managerLoginCount, height, padding, maxValue)} r={5} />
+                <circle className="trend-point partner active" cx={tooltipX} cy={trendY(activePoint.partnerLoginCount, height, padding, maxValue)} r={5} />
+                <rect x={tooltipLeft} y={tooltipTop} width={tooltipWidth} height={tooltipHeight} rx={8} />
+                <text className="trend-tooltip-title" x={tooltipLeft + 12} y={tooltipTop + 21}>{formatTrendDate(activePoint.date)}</text>
+                <text className="trend-tooltip-value" x={tooltipLeft + 12} y={tooltipTop + 43}>管理员 {activePoint.managerLoginCount}</text>
+                <text className="trend-tooltip-value" x={tooltipLeft + 12} y={tooltipTop + 61}>会员 {activePoint.partnerLoginCount}</text>
+              </g>
+            ) : null}
             {trend.map((point, index) => {
               const x = trendX(index, trend.length, width, padding);
               const showLabel = index === 0 || index === trend.length - 1 || index % 3 === 0;
-              return showLabel ? (
-                <text key={point.date} className="trend-x-label" x={x} y={height - 14} textAnchor="middle">
-                  {formatTrendDate(point.date)}
-                </text>
-              ) : null;
+              return (
+                <g
+                  key={point.date}
+                  className="trend-hit-area"
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`${formatTrendDate(point.date)} 管理员 ${point.managerLoginCount} 会员 ${point.partnerLoginCount}`}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onMouseLeave={() => setActiveIndex(null)}
+                  onFocus={() => setActiveIndex(index)}
+                  onBlur={() => setActiveIndex(null)}
+                >
+                  <rect x={x - 14} y={padding.top} width={28} height={chartHeight} />
+                  <circle className="trend-point manager" cx={x} cy={trendY(point.managerLoginCount, height, padding, maxValue)} r={3.5} />
+                  <circle className="trend-point partner" cx={x} cy={trendY(point.partnerLoginCount, height, padding, maxValue)} r={3.5} />
+                  {showLabel ? (
+                    <text className="trend-x-label" x={x} y={height - 14} textAnchor="middle">
+                      {formatTrendDate(point.date)}
+                    </text>
+                  ) : null}
+                </g>
+              );
             })}
           </svg>
           <div className="trend-legend">
@@ -373,7 +421,8 @@ function SidebarMenuNode({
   onToggle: (menu: MenuTreeNode) => void;
   onMenuSelect: (menu: MenuTreeNode) => void;
 }) {
-  const hasChildren = node.children.length > 0;
+  const visibleChildren = node.children.filter((child) => !child.buttonFlag);
+  const hasChildren = visibleChildren.length > 0;
   const expanded = expandedIds.has(node.id);
 
   return (
@@ -390,7 +439,7 @@ function SidebarMenuNode({
       </button>
       {hasChildren && expanded ? (
         <div className="nav-tree-children">
-          {node.children.map((child) => (
+          {visibleChildren.map((child) => (
             <SidebarMenuNode
               key={child.id}
               node={child}
@@ -426,8 +475,11 @@ function SystemPagePanel({
   onLoadUserRoleOptions,
   onLoadUserRoles,
   onReplaceUserRoles,
+  onLoadRolePermissions,
+  onReplaceRolePermissions,
   onLoadRoleMenus,
   onReplaceRoleMenus,
+  permissions,
 }: {
   menu: MenuTreeNode | null;
   page: PageResult<SystemPageRecord> | null;
@@ -447,8 +499,11 @@ function SystemPagePanel({
   onLoadUserRoleOptions: () => Promise<SysRole[]>;
   onLoadUserRoles: (id: number) => Promise<SysRole[]>;
   onReplaceUserRoles: (id: number, ids: number[]) => Promise<void>;
+  onLoadRolePermissions: (id: number) => Promise<SysPermission[]>;
+  onReplaceRolePermissions: (id: number, ids: number[]) => Promise<void>;
   onLoadRoleMenus: (id: number) => Promise<SysMenu[]>;
   onReplaceRoleMenus: (id: number, ids: number[]) => Promise<void>;
+  permissions: string[];
 }) {
   const config = getSystemPageConfig(menu?.path);
   const isMenuManagement = menu?.path === '/api/manager/system/menus';
@@ -459,6 +514,16 @@ function SystemPagePanel({
   const pageSize = page?.pageSize || 10;
   const total = page?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const canCreate = hasAnyPermission(permissions, systemActionPermissions(menu, 'add')) || hasActionButton(menu, 'add');
+  const canEdit = hasAnyPermission(permissions, systemActionPermissions(menu, 'edit')) || hasActionButton(menu, 'edit');
+  const canDelete = hasAnyPermission(permissions, systemActionPermissions(menu, 'delete')) || hasActionButton(menu, 'delete');
+  const canResetPassword = hasPermission(permissions, 'system:user:reset-password');
+  const canAssignUserRoles = hasPermission(permissions, 'system:user:edit');
+  const canAssignRolePermissions = hasPermission(permissions, 'system:role:edit');
+  const canAssignRoleMenus = hasPermission(permissions, 'system:role:menu');
+  const canAssignMenuPermissions = hasPermission(permissions, 'system:menu:button-permission');
+  const canShowOperationColumn = isOperationLogPage
+    || (!readOnly && (canEdit || canDelete || canResetPassword || canAssignUserRoles || canAssignRolePermissions || canAssignRoleMenus || canAssignMenuPermissions));
   const [viewMode, setViewMode] = useState<'table' | 'tree'>('table');
   const [editorRecord, setEditorRecord] = useState<SystemPageRecord | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -475,6 +540,8 @@ function SystemPagePanel({
   const [roleOptions, setRoleOptions] = useState<SysRole[]>([]);
   const [selectedRoleIds, setSelectedRoleIds] = useState<Set<number>>(() => new Set());
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [rolePermissionRecord, setRolePermissionRecord] = useState<SystemPageRecord | null>(null);
+  const [rolePermissionError, setRolePermissionError] = useState<string | null>(null);
   const [roleMenuRecord, setRoleMenuRecord] = useState<SystemPageRecord | null>(null);
   const [roleMenuOptions, setRoleMenuOptions] = useState<MenuTreeNode[]>([]);
   const [selectedRoleMenuIds, setSelectedRoleMenuIds] = useState<Set<number>>(() => new Set());
@@ -704,6 +771,45 @@ function SystemPagePanel({
     }
   }
 
+  async function openRolePermissionDialog(record: SystemPageRecord) {
+    setSaving(true);
+    setRolePermissionError(null);
+    try {
+      const [options, selected, nodes] = await Promise.all([
+        onLoadMenuPermissionOptions(),
+        onLoadRolePermissions(record.id),
+        loadSystemMenuTree(),
+      ]);
+      setPermissionOptions(options);
+      setPermissionMenuTree(nodes);
+      setSelectedPermissionIds(new Set(selected.map((permission) => permission.id)));
+      setRolePermissionRecord(record);
+    } catch (err) {
+      setOperationMessage({ type: 'error', text: readErrorMessage(err) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveRolePermissions(ids: number[]) {
+    if (!rolePermissionRecord) {
+      return;
+    }
+    setSaving(true);
+    setRolePermissionError(null);
+    try {
+      await onReplaceRolePermissions(rolePermissionRecord.id, ids);
+      setRolePermissionRecord(null);
+      setOperationMessage({ type: 'success', text: '角色权限保存成功' });
+    } catch (err) {
+      const message = readErrorMessage(err);
+      setRolePermissionError(message);
+      setOperationMessage({ type: 'error', text: message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function openRoleMenuDialog(record: SystemPageRecord) {
     setSaving(true);
     setRoleMenuError(null);
@@ -758,7 +864,7 @@ function SystemPagePanel({
               </button>
             </div>
           ) : null}
-          {!readOnly ? (
+          {!readOnly && canCreate ? (
             <button className="primary-button small" type="button" onClick={openCreate} disabled={loading || saving}>
               <Plus size={16} />
               新增
@@ -768,6 +874,7 @@ function SystemPagePanel({
             <label>
               每页
               <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))} disabled={loading}>
+                <option value={10}>10</option>
                 <option value={20}>20</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>
@@ -840,6 +947,9 @@ function SystemPagePanel({
           }}
           onEdit={(record) => openEdit(record)}
           onPermissions={(record) => openPermissionDialog(record)}
+          canCreate={canCreate}
+          canEdit={canEdit}
+          canAssignPermissions={canAssignMenuPermissions}
         />
       ) : error ? (
         <div className="empty-state compact">{error}</div>
@@ -852,7 +962,7 @@ function SystemPagePanel({
                   <th key={column.key}>{column.title}</th>
                 ))}
                 {isOperationLogPage ? <th>详情</th> : null}
-                {!readOnly ? <th>操作</th> : null}
+                {canShowOperationColumn && !isOperationLogPage ? <th>操作</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -871,10 +981,10 @@ function SystemPagePanel({
                       </div>
                     </td>
                   ) : null}
-                  {!readOnly ? (
+                  {canShowOperationColumn && !isOperationLogPage ? (
                     <td>
                       <div className="row-actions">
-                        {!isMenuManagement || !isOperationLogMenuRecord(record) ? (
+                        {canEdit && (!isMenuManagement || !isOperationLogMenuRecord(record)) ? (
                           <button type="button" onClick={() => openEdit(record)} disabled={saving}>
                             <Pencil size={14} />
                             修改
@@ -882,36 +992,50 @@ function SystemPagePanel({
                         ) : null}
                         {menu?.path === '/api/manager/system/users' ? (
                           <>
-                            <button type="button" onClick={() => setPasswordRecord(record)} disabled={saving}>
-                              <KeyRound size={14} />
-                            重置密码
-                            </button>
-                            <button type="button" onClick={() => openRoleDialog(record)} disabled={saving}>
-                              <Users size={14} />
-                              分配角色
-                            </button>
+                            {canResetPassword ? (
+                              <button type="button" onClick={() => setPasswordRecord(record)} disabled={saving}>
+                                <KeyRound size={14} />
+                                重置密码
+                              </button>
+                            ) : null}
+                            {canAssignUserRoles ? (
+                              <button type="button" onClick={() => openRoleDialog(record)} disabled={saving}>
+                                <Users size={14} />
+                                分配角色
+                              </button>
+                            ) : null}
                           </>
                         ) : null}
                         {menu?.path === '/api/manager/system/roles' ? (
-                          <button type="button" onClick={() => openRoleMenuDialog(record)} disabled={saving}>
-                            <ListTree size={14} />
-                            分配菜单
-                          </button>
+                          <>
+                            {canAssignRolePermissions ? (
+                              <button type="button" onClick={() => openRolePermissionDialog(record)} disabled={saving}>
+                                <KeyRound size={14} />
+                                分配权限
+                              </button>
+                            ) : null}
+                            {canAssignRoleMenus ? (
+                              <button type="button" onClick={() => openRoleMenuDialog(record)} disabled={saving}>
+                                <ListTree size={14} />
+                                分配菜单
+                              </button>
+                            ) : null}
+                          </>
                         ) : null}
-                        {menu?.path === '/api/manager/system/menus' && !isOperationLogMenuRecord(record) ? (
+                        {canAssignMenuPermissions && menu?.path === '/api/manager/system/menus' && !isOperationLogMenuRecord(record) ? (
                           <button type="button" onClick={() => openPermissionDialog(record)} disabled={saving}>
                             <KeyRound size={14} />
                             分配权限
                           </button>
                         ) : null}
-                        {!isMenuManagement || !isOperationLogMenuRecord(record) ? (
+                        {canDelete && (!isMenuManagement || !isOperationLogMenuRecord(record)) ? (
                           <button className="danger" type="button" onClick={() => deleteRecord(record)} disabled={saving}>
                             <Trash2 size={14} />
                             删除
                           </button>
-                        ) : (
+                        ) : isMenuManagement && isOperationLogMenuRecord(record) ? (
                           <span className="muted-pill">只读</span>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                   ) : null}
@@ -980,6 +1104,22 @@ function SystemPagePanel({
           onSave={saveUserRoles}
         />
       ) : null}
+      {rolePermissionRecord ? (
+        <MenuPermissionDialog
+          record={rolePermissionRecord}
+          permissions={permissionOptions}
+          menuTree={permissionMenuTree}
+          selectedIds={selectedPermissionIds}
+          saving={saving}
+          error={rolePermissionError}
+          onClose={() => {
+            setRolePermissionRecord(null);
+            setRolePermissionError(null);
+            setPermissionMenuTree([]);
+          }}
+          onSave={saveRolePermissions}
+        />
+      ) : null}
       {roleMenuRecord ? (
         <RoleMenuDialog
           record={roleMenuRecord}
@@ -1015,6 +1155,9 @@ function MenuTreeConfigPanel({
   onCreateChild,
   onEdit,
   onPermissions,
+  canCreate,
+  canEdit,
+  canAssignPermissions,
 }: {
   nodes: MenuTreeNode[];
   selectedMenu: MenuTreeNode | null;
@@ -1026,6 +1169,9 @@ function MenuTreeConfigPanel({
   onCreateChild: (menu: MenuTreeNode) => void;
   onEdit: (menu: MenuTreeNode) => void;
   onPermissions: (menu: MenuTreeNode) => void;
+  canCreate: boolean;
+  canEdit: boolean;
+  canAssignPermissions: boolean;
 }) {
   const total = countAllMenuNodes(nodes);
   const visibleTotal = countMenuNodes(nodes);
@@ -1115,18 +1261,24 @@ function MenuTreeConfigPanel({
                   <span className="muted-pill">只读</span>
                 ) : (
                   <>
-                    <button className="ghost-button small" type="button" onClick={() => onCreateChild(selectedMenu)} disabled={saving}>
-                      <Plus size={15} />
-                      子菜单
-                    </button>
-                    <button className="ghost-button small" type="button" onClick={() => onEdit(selectedMenu)} disabled={saving}>
-                      <Pencil size={15} />
-                      修改
-                    </button>
-                    <button className="ghost-button small" type="button" onClick={() => onPermissions(selectedMenu)} disabled={saving}>
-                      <KeyRound size={15} />
-                      权限
-                    </button>
+                    {canCreate ? (
+                      <button className="ghost-button small" type="button" onClick={() => onCreateChild(selectedMenu)} disabled={saving}>
+                        <Plus size={15} />
+                        子菜单
+                      </button>
+                    ) : null}
+                    {canEdit ? (
+                      <button className="ghost-button small" type="button" onClick={() => onEdit(selectedMenu)} disabled={saving}>
+                        <Pencil size={15} />
+                        修改
+                      </button>
+                    ) : null}
+                    {canAssignPermissions ? (
+                      <button className="ghost-button small" type="button" onClick={() => onPermissions(selectedMenu)} disabled={saving}>
+                        <KeyRound size={15} />
+                        权限
+                      </button>
+                    ) : null}
                   </>
                 )}
               </div>
@@ -2005,6 +2157,24 @@ function OperationLogDetailDialog({ record, onClose }: { record: OperationLog; o
   const businessType = readLogText(record, 'businessType', 'business_type');
   const rows = buildLogCompareRows(before, after, businessType);
   const changedRows = rows.filter((row) => row.changeType !== 'same');
+  const [activeDiffTarget, setActiveDiffTarget] = useState<string | null>(null);
+  const changedCounts = {
+    added: rows.filter((row) => row.changeType === 'added').length,
+    removed: rows.filter((row) => row.changeType === 'removed').length,
+    modified: rows.filter((row) => row.changeType === 'modified').length,
+  };
+
+  function jumpToDiffType(type: CompareRow['changeType']) {
+    const targetIndex = rows.findIndex((row) => row.changeType === type);
+    if (targetIndex < 0) {
+      return;
+    }
+    const targetId = diffCardDomId(type, targetIndex);
+    setActiveDiffTarget(targetId);
+    window.setTimeout(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 0);
+  }
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -2034,12 +2204,21 @@ function OperationLogDetailDialog({ record, onClose }: { record: OperationLog; o
 
           <div className="diff-summary">
             <span>{`页面字段 ${rows.length} 个，变更 ${changedRows.length} 个`}</span>
-            <small>新增 {rows.filter((row) => row.changeType === 'added').length} · 删除 {rows.filter((row) => row.changeType === 'removed').length} · 修改 {rows.filter((row) => row.changeType === 'modified').length}</small>
+            <div className="diff-summary-actions" aria-label="跳转到变动项">
+              <DiffSummaryButton label="新增" count={changedCounts.added} onClick={() => jumpToDiffType('added')} />
+              <DiffSummaryButton label="删除" count={changedCounts.removed} onClick={() => jumpToDiffType('removed')} />
+              <DiffSummaryButton label="修改" count={changedCounts.modified} onClick={() => jumpToDiffType('modified')} />
+            </div>
           </div>
 
           <div className="diff-card-list">
-            {rows.length > 0 ? rows.map((row) => (
-              <DiffCard key={row.key} row={row} />
+            {rows.length > 0 ? rows.map((row, index) => (
+              <DiffCard
+                key={row.key}
+                row={row}
+                domId={diffCardDomId(row.changeType, index)}
+                active={activeDiffTarget === diffCardDomId(row.changeType, index)}
+              />
             )) : (
               <div className="empty-state compact">暂无页面字段。</div>
             )}
@@ -2056,9 +2235,18 @@ function OperationLogDetailDialog({ record, onClose }: { record: OperationLog; o
   );
 }
 
-function DiffCard({ row }: { row: CompareRow }) {
+function DiffSummaryButton({ label, count, onClick }: { label: string; count: number; onClick: () => void }) {
   return (
-    <div className={`diff-card ${row.changeType}`}>
+    <button className="diff-summary-button" type="button" onClick={onClick} disabled={count === 0}>
+      <span>{label}</span>
+      <strong>{count}</strong>
+    </button>
+  );
+}
+
+function DiffCard({ row, domId, active }: { row: CompareRow; domId: string; active: boolean }) {
+  return (
+    <div id={domId} className={`diff-card ${row.changeType}${active ? ' active' : ''}`}>
       <div className="diff-card-head">
         <strong>{row.label}</strong>
         <span>{changeTypeLabel(row.changeType)}</span>
@@ -2079,6 +2267,10 @@ function DiffCard({ row }: { row: CompareRow }) {
       </div>
     </div>
   );
+}
+
+function diffCardDomId(type: CompareRow['changeType'], index: number) {
+  return `log-diff-${type}-${index}`;
 }
 
 function renderDiffHighlight(row: CompareRow) {
@@ -2330,6 +2522,32 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
     };
   }
 
+  if (path === '/api/manager/vip-users') {
+    return {
+      title: '会员管理',
+      apiPath: '/api/manager/vip-users/page',
+      columns: [
+        commonColumns[0],
+        { key: 'username', title: '账号', render: (record) => textValue(readField(record, 'username')) },
+        { key: 'displayName', title: '显示名称', render: (record) => textValue(readField(record, 'displayName')) },
+        { key: 'email', title: '邮箱', render: (record) => textValue(readField(record, 'email')) },
+        { key: 'phone', title: '手机号', render: (record) => textValue(readField(record, 'phone')) },
+        { key: 'vipLevel', title: '会员等级', render: (record) => textValue(readField(record, 'vipLevel')) },
+        commonColumns[1],
+        commonColumns[2],
+      ],
+      fields: [
+        { key: 'username', label: '账号', required: true, readonlyOnEdit: true },
+        { key: 'passwordHash', label: '密码', type: 'password', createOnly: true, required: true },
+        { key: 'displayName', label: '显示名称', required: true },
+        { key: 'email', label: '邮箱' },
+        { key: 'phone', label: '手机号' },
+        { key: 'vipLevel', label: '会员等级', placeholder: '例如 NORMAL / GOLD' },
+        statusField,
+      ],
+    };
+  }
+
   return {
     title: '用户管理',
     apiPath: '/api/manager/system/users/page',
@@ -2356,7 +2574,70 @@ function isSystemPageMenu(path?: string) {
     || path === '/api/manager/system/roles'
     || path === '/api/manager/system/permissions'
     || path === '/api/manager/system/menus'
-    || path === '/api/manager/system/operation-logs';
+    || path === '/api/manager/system/operation-logs'
+    || path === '/api/manager/vip-users';
+}
+
+function systemActionPermissions(menu: MenuTreeNode | null, action: 'add' | 'edit' | 'delete') {
+  const path = menu?.path;
+  const permissionsByPath: Record<string, Record<'add' | 'edit' | 'delete', string[]>> = {
+    '/api/manager/system/users': {
+      add: ['system:user:add'],
+      edit: ['system:user:edit'],
+      delete: ['system:user:delete'],
+    },
+    '/api/manager/system/roles': {
+      add: ['system:role:add'],
+      edit: ['system:role:edit'],
+      delete: ['system:role:delete'],
+    },
+    '/api/manager/system/permissions': {
+      add: ['system:permission:add'],
+      edit: ['system:permission:edit'],
+      delete: ['system:permission:delete'],
+    },
+    '/api/manager/system/menus': {
+      add: ['system:menu:add'],
+      edit: ['system:menu:edit'],
+      delete: ['system:menu:delete'],
+    },
+    '/api/manager/vip-users': {
+      add: ['vip:user:add', 'vip-user:add', 'partner:vip-user:add', 'manager:vip-user:add'],
+      edit: ['vip:user:edit', 'vip-user:edit', 'partner:vip-user:edit', 'manager:vip-user:edit'],
+      delete: ['vip:user:delete', 'vip-user:delete', 'partner:vip-user:delete', 'manager:vip-user:delete'],
+    },
+  };
+  return Array.from(new Set([
+    ...(path ? permissionsByPath[path]?.[action] || [] : []),
+    ...menuActionPermissions(menu, action),
+  ]));
+}
+
+function menuActionPermissions(menu: MenuTreeNode | null, action: 'add' | 'edit' | 'delete') {
+  if (!menu) {
+    return [];
+  }
+  const actionKeywords: Record<typeof action, string[]> = {
+    add: ['新增', '添加', '创建', 'add', 'create'],
+    edit: ['修改', '编辑', 'edit', 'update'],
+    delete: ['删除', 'delete', 'remove'],
+  };
+  const keywords = actionKeywords[action];
+  return menu.children
+    .filter((child) => child.buttonFlag && child.path && keywords.some((keyword) => `${child.menuName || ''} ${child.menuCode || ''}`.toLowerCase().includes(keyword.toLowerCase())))
+    .map((child) => child.path as string);
+}
+
+function hasActionButton(menu: MenuTreeNode | null, action: 'add' | 'edit' | 'delete') {
+  return menuActionPermissions(menu, action).length > 0;
+}
+
+function hasAnyPermission(permissions: string[], candidates: string[]) {
+  return candidates.some((permission) => permissions.includes(permission));
+}
+
+function hasPermission(permissions: string[], permission: string) {
+  return permissions.includes(permission);
 }
 
 function isOperationLogMenuRecord(record: SystemPageRecord) {

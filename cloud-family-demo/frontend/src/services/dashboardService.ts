@@ -10,6 +10,7 @@ import type {
   SystemPageRecord,
   SystemRecordPayload,
   UserProfile,
+  VipUser,
 } from '../types/api';
 import { post } from './apiClient';
 
@@ -29,7 +30,7 @@ export function loadSystemMenuTree() {
   return post<MenuTreeNode[]>('/api/manager/system/menus/tree');
 }
 
-export function loadSystemUsers(pageNum = 1, pageSize = 20) {
+export function loadSystemUsers(pageNum = 1, pageSize = 10) {
   return post<PageResult<SysUser>>('/api/manager/system/users/page', {
     form: {
       pageNum,
@@ -38,7 +39,7 @@ export function loadSystemUsers(pageNum = 1, pageSize = 20) {
   });
 }
 
-export function loadSystemRoles(pageNum = 1, pageSize = 20) {
+export function loadSystemRoles(pageNum = 1, pageSize = 10) {
   return post<PageResult<SysRole>>('/api/manager/system/roles/page', {
     form: {
       pageNum,
@@ -47,7 +48,7 @@ export function loadSystemRoles(pageNum = 1, pageSize = 20) {
   });
 }
 
-export function loadSystemPermissions(pageNum = 1, pageSize = 20) {
+export function loadSystemPermissions(pageNum = 1, pageSize = 10) {
   return post<PageResult<SysPermission>>('/api/manager/system/permissions/page', {
     form: {
       pageNum,
@@ -56,7 +57,7 @@ export function loadSystemPermissions(pageNum = 1, pageSize = 20) {
   });
 }
 
-export function loadSystemMenuPage(pageNum = 1, pageSize = 20, query: PageQuery = {}) {
+export function loadSystemMenuPage(pageNum = 1, pageSize = 10, query: PageQuery = {}) {
   return post<PageResult<SysMenu>>('/api/manager/system/menus/page', {
     form: {
       pageNum,
@@ -67,7 +68,7 @@ export function loadSystemMenuPage(pageNum = 1, pageSize = 20, query: PageQuery 
   });
 }
 
-export function loadSystemOperationLogs(pageNum = 1, pageSize = 20, query: PageQuery = {}) {
+export function loadSystemOperationLogs(pageNum = 1, pageSize = 10, query: PageQuery = {}) {
   return post<PageResult<SystemPageRecord>>('/api/manager/system/operation-logs/page', {
     form: {
       pageNum,
@@ -78,6 +79,19 @@ export function loadSystemOperationLogs(pageNum = 1, pageSize = 20, query: PageQ
       businessName: query.businessName,
       businessModule: query.businessModule,
       businessType: query.businessType,
+    },
+  });
+}
+
+export function loadManagerVipUsers(pageNum = 1, pageSize = 10, query: PageQuery = {}) {
+  return post<PageResult<VipUser>>('/api/manager/vip-users/page', {
+    form: {
+      pageNum,
+      pageSize,
+      username: query.keyword,
+      displayName: query.businessName,
+      vipLevel: query.businessType,
+      status: query.status,
     },
   });
 }
@@ -124,6 +138,16 @@ export function replaceSystemUserRoles(id: number, ids: number[]) {
   });
 }
 
+export function loadSystemRolePermissions(id: number) {
+  return post<SysPermission[]>(`/api/manager/system/roles/permissions/${id}`);
+}
+
+export function replaceSystemRolePermissions(id: number, ids: number[]) {
+  return post<SysPermission[]>(`/api/manager/system/roles/permissions/replace/${id}`, {
+    body: { ids },
+  });
+}
+
 export function loadSystemRoleMenus(id: number) {
   return post<SysMenu[]>(`/api/manager/system/roles/menus/${id}`);
 }
@@ -140,6 +164,7 @@ function getSystemEndpoint(path: string) {
     '/api/manager/system/roles': '/api/manager/system/roles',
     '/api/manager/system/permissions': '/api/manager/system/permissions',
     '/api/manager/system/menus': '/api/manager/system/menus',
+    '/api/manager/vip-users': '/api/manager/vip-users',
   };
   const endpoint = endpoints[path];
   if (!endpoint) {

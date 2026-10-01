@@ -126,7 +126,19 @@ export type OperationLog = {
   createdAt?: string;
 };
 
-export type SystemPageRecord = SysUser | SysRole | SysPermission | SysMenu | OperationLog;
+export type VipUser = {
+  id: number;
+  username: string;
+  displayName?: string;
+  email?: string;
+  phone?: string;
+  vipLevel?: string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type SystemPageRecord = SysUser | SysRole | SysPermission | SysMenu | OperationLog | VipUser;
 
 export type SystemRecordPayload = {
   [key: string]: string | number | boolean | null | undefined;

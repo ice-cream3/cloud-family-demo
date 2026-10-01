@@ -5,6 +5,7 @@ import { login, logout } from './services/authService';
 import {
   createSystemRecord,
   deleteSystemRecord,
+  loadManagerVipUsers,
   loadSystemMenuPermissions,
   loadCurrentUser,
   loadManagerDashboard,
@@ -13,12 +14,14 @@ import {
   loadSystemOperationLogs,
   loadSystemPermissions,
   loadSystemRoleMenus,
+  loadSystemRolePermissions,
   loadSystemRoles,
   loadSystemUserRoles,
   loadSystemUsers,
   resetSystemUserPassword,
   replaceSystemMenuPermissions,
   replaceSystemRoleMenus,
+  replaceSystemRolePermissions,
   replaceSystemUserRoles,
   updateSystemRecord,
 } from './services/dashboardService';
@@ -34,7 +37,7 @@ export default function App() {
   const [activeMenu, setActiveMenu] = useState<MenuTreeNode | null>(null);
   const [systemPage, setSystemPage] = useState<PageResult<SystemPageRecord> | null>(null);
   const [systemPageQuery, setSystemPageQuery] = useState<PageQuery>({});
-  const [systemPageSize, setSystemPageSize] = useState(20);
+  const [systemPageSize, setSystemPageSize] = useState(10);
   const [systemPageLoading, setSystemPageLoading] = useState(false);
   const [systemPageError, setSystemPageError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -188,6 +191,14 @@ export default function App() {
     await replaceSystemUserRoles(id, ids);
   }
 
+  async function handleLoadRolePermissions(id: number) {
+    return loadSystemRolePermissions(id);
+  }
+
+  async function handleReplaceRolePermissions(id: number, ids: number[]) {
+    await replaceSystemRolePermissions(id, ids);
+  }
+
   async function handleLoadRoleMenus(id: number) {
     return loadSystemRoleMenus(id);
   }
@@ -227,7 +238,7 @@ export default function App() {
     setActiveMenu(null);
     setSystemPage(null);
     setSystemPageQuery({});
-    setSystemPageSize(20);
+    setSystemPageSize(10);
     setSystemPageError(null);
     setSystemPageLoading(false);
     setMenuError(null);
@@ -266,6 +277,8 @@ export default function App() {
       onLoadUserRoleOptions={handleLoadUserRoleOptions}
       onLoadUserRoles={handleLoadUserRoles}
       onReplaceUserRoles={handleReplaceUserRoles}
+      onLoadRolePermissions={handleLoadRolePermissions}
+      onReplaceRolePermissions={handleReplaceRolePermissions}
       onLoadRoleMenus={handleLoadRoleMenus}
       onReplaceRoleMenus={handleReplaceRoleMenus}
       loading={loading}
@@ -291,6 +304,7 @@ function getSystemPageLoaders(): Record<string, (pageNum: number, pageSize: numb
     '/api/manager/system/permissions': loadSystemPermissions,
     '/api/manager/system/menus': loadSystemMenuPage,
     '/api/manager/system/operation-logs': loadSystemOperationLogs,
+    '/api/manager/vip-users': loadManagerVipUsers,
   };
 }
 

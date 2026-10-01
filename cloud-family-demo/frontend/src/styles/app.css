@@ -625,6 +625,61 @@ button:disabled {
   stroke: #d97706;
 }
 
+.trend-hit-area {
+  cursor: crosshair;
+  outline: none;
+}
+
+.trend-hit-area rect {
+  fill: transparent;
+}
+
+.trend-point {
+  stroke: #ffffff;
+  stroke-width: 2;
+  opacity: 0;
+  transition: opacity 0.15s ease, r 0.15s ease;
+}
+
+.trend-hit-area:hover .trend-point,
+.trend-hit-area:focus .trend-point,
+.trend-point.active {
+  opacity: 1;
+}
+
+.trend-point.manager {
+  fill: #0f766e;
+}
+
+.trend-point.partner {
+  fill: #d97706;
+}
+
+.trend-hover-line {
+  stroke: #94a3b8;
+  stroke-dasharray: 4 4;
+  stroke-width: 1.3;
+}
+
+.trend-tooltip rect {
+  fill: rgba(15, 23, 42, 0.92);
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 1;
+}
+
+.trend-tooltip text {
+  fill: #ffffff;
+  font-size: 12px;
+}
+
+.trend-tooltip-title {
+  font-weight: 900;
+}
+
+.trend-tooltip-value {
+  font-weight: 700;
+}
+
 .trend-legend {
   display: flex;
   flex-wrap: wrap;
@@ -976,9 +1031,46 @@ button:disabled {
   font-weight: 800;
 }
 
-.diff-summary small {
-  color: #516173;
-  font-weight: 700;
+.diff-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.diff-summary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid #cfe0dc;
+  border-radius: 999px;
+  color: #33514f;
+  background: #ffffff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.diff-summary-button:hover:not(:disabled),
+.diff-summary-button:focus-visible {
+  border-color: #0f766e;
+  color: #0f4f49;
+  background: #e9fbf5;
+  outline: none;
+}
+
+.diff-summary-button:disabled {
+  color: #98a2b3;
+  background: #f6f8fb;
+  cursor: not-allowed;
+}
+
+.diff-summary-button strong {
+  color: inherit;
+  font-size: 13px;
 }
 
 .diff-card-list {
@@ -992,6 +1084,12 @@ button:disabled {
   border-radius: 8px;
   background: #ffffff;
   overflow: hidden;
+  scroll-margin: 24px;
+}
+
+.diff-card.active {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.16);
 }
 
 .diff-card.modified {

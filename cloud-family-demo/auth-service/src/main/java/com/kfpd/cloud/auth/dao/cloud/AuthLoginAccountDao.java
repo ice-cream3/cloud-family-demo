@@ -10,6 +10,11 @@ public interface AuthLoginAccountDao {
 
     AuthLoginAccount findApiByUsername(@Param("username") String username);
 
+    /**
+     * 查询用户:关联角色和权限,留意功能
+     * @param username
+     * @return
+     */
     AuthLoginAccount findManagerByUsername(@Param("username") String username);
 
     List<String> findRolesByUsername(@Param("username") String username);
