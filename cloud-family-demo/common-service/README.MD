@@ -18,6 +18,7 @@ gateway-service/auth-service/partner-service/manager-service/job-service -> comm
 - JWT 公共配置和 HMAC 密钥工具：`CommonJwtProperties`、`JwtSecretKeys`
 - MySQL 双数据源自动配置：`fa-cloud`、`fa-model`
 - 数据源用户名和密码的 `ENC(...)` 加解密工具
+- Jackson `ObjectMapper` 默认 Bean 自动配置
 - Redis Cluster 的 Redisson / Redisson Reactive / RedisTemplate 自动配置
 - `RedissonService` 缓存、集合、计数器和分布式锁封装
 - RocketMQ producer 和通用收发封装
@@ -46,6 +47,7 @@ common-service/src/main/resources/META-INF/spring/org.springframework.boot.autoc
 
 ```text
 com.kfpd.cloud.common.config.datasource.MultiDataSourceAutoConfiguration
+com.kfpd.cloud.common.config.json.JacksonAutoConfiguration
 com.kfpd.cloud.common.config.rocketmq.RocketMqAutoConfiguration
 com.kfpd.cloud.common.config.redis.RedissonAutoConfiguration
 ```
@@ -61,6 +63,8 @@ common-service/src/main/java/com/kfpd/cloud/common
 │   │   ├── MultiDataSourceAutoConfiguration.java
 │   │   ├── MultiDataSourceNames.java
 │   │   └── MultiDataSourceProperties.java
+│   ├── json
+│   │   └── JacksonAutoConfiguration.java
 │   ├── redis
 │   │   ├── RedissonAutoConfiguration.java
 │   │   ├── RedissonProperties.java
@@ -182,6 +186,17 @@ demo:
 ```java
 SecretKey key = JwtSecretKeys.hmacSha256Key(secret);
 ```
+
+## Jackson 自动配置
+
+类：`com.kfpd.cloud.common.config.json.JacksonAutoConfiguration`
+
+自动配置行为：
+
+- 当 Spring 容器中没有自定义 `ObjectMapper` 时，提供一个默认 `ObjectMapper` Bean。
+- 当业务服务已经声明自己的 `ObjectMapper` 时，本配置不会覆盖业务服务配置。
+
+这个配置主要用于 `RedisTemplate` JSON 序列化等公共基础设施，避免服务没有显式声明 `ObjectMapper` 时启动失败。
 
 ## MySQL 双数据源
 
@@ -575,12 +590,19 @@ mvn -pl common-service,gateway-service,auth-service,partner-service,manager-serv
 mvn test
 ```
 
+当前单元测试覆盖：
+
+| 测试类 | 覆盖点 |
+| --- | --- |
+| `EncryptedDataSourceValuesTests` | `ENC(...)` 密文解密、明文透传、加密后可解密。 |
+
 ## 维护约定
 
 - 新增公共错误码时，先在 `ErrorCode` 中分配清晰模块区间，再由各服务异常处理器统一转换为 `ApiResponse`。
 - 新增跨服务 Header 时，统一放入 `GatewayHeaders`，避免各服务手写字符串。
 - 新增共享配置类时，优先使用 `@ConfigurationProperties`，并在 README 中补充绑定前缀和字段说明。
 - 新增自动配置类时，必须写入 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`。
+- 新增默认 Bean 时，优先使用 `@ConditionalOnMissingBean`，让业务服务可以覆盖公共默认实现。
 - `common-service` 不依赖业务服务模块；业务逻辑不要下沉到本模块。
 - 数据库脚本按逻辑库放置，例如 `db/fa-cloud/`、`db/fa-model/`。
 
