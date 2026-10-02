@@ -25,9 +25,9 @@ type HomePageProps = {
 };
 
 const quickActions = [
-  { icon: WalletCards, title: '账户权益', desc: '查看等级、积分与权益包' },
-  { icon: TicketPercent, title: '优惠中心', desc: '领取可用活动与券包' },
-  { icon: ShieldCheck, title: '安全设置', desc: '维护登录与认证信息' },
+  { icon: WalletCards, title: '账户权益', desc: '等级、积分与权益包' },
+  { icon: TicketPercent, title: '优惠中心', desc: '活动与可用券包' },
+  { icon: ShieldCheck, title: '安全设置', desc: '登录与认证信息' },
 ];
 
 const timelineItems = [
@@ -48,7 +48,7 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
           <div className="partner-brand-mark">CF</div>
           <div>
             <strong>Cloud Family</strong>
-            <span>Partner Portal</span>
+            <span>Mobile Portal</span>
           </div>
         </div>
 
@@ -75,7 +75,7 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
       <section className="partner-page">
         <header className="partner-topbar">
           <div>
-            <span>Partner Home</span>
+            <span>今天</span>
             <h1>{displayName}</h1>
           </div>
           <div className="partner-topbar-actions">
@@ -93,9 +93,9 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
 
         <section className="partner-hero">
           <div className="partner-hero-copy">
-            <p>统一用户端首页</p>
-            <h2>桌面和 H5 使用同一套业务入口</h2>
-            <span>当前账号通过 gateway 完成 JWT 校验后访问 partner-service，可继续扩展会员、权益、订单和消息等业务模块。</span>
+            <p>Partner 首页</p>
+            <h2>服务在线，账户已同步</h2>
+            <span>查看权益、消息和账号状态，继续完成用户端业务流程。</span>
             <div className="partner-hero-actions">
               <button className="primary-button" type="button">
                 <Sparkles size={18} />
@@ -117,12 +117,12 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
           <article>
             <span>用户类型</span>
             <strong>{session.userType || 'API'}</strong>
-            <p>由认证服务返回</p>
+            <p>认证服务</p>
           </article>
           <article>
             <span>角色</span>
             <strong>{roleText}</strong>
-            <p>用于后续菜单和能力控制</p>
+            <p>访问范围</p>
           </article>
           <article>
             <span>服务状态</span>
@@ -136,7 +136,7 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
             <div className="partner-section-heading">
               <div>
                 <h2>快捷入口</h2>
-                <p>面向移动端高频操作的首屏入口。</p>
+                <p>常用操作</p>
               </div>
             </div>
             <div className="quick-action-list">
@@ -162,7 +162,7 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
             <div className="partner-section-heading">
               <div>
                 <h2>最近动态</h2>
-                <p>首页基础布局预留真实业务流。</p>
+                <p>账号状态</p>
               </div>
             </div>
             <div className="partner-timeline">

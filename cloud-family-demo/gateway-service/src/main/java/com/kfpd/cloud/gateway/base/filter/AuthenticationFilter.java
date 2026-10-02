@@ -39,7 +39,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
             };
 
     // Login and actuator health endpoints must be reachable before a token exists.
-    private final List<String> publicPaths = List.of("/auth/api/login", "/auth/manager/login", "/auth/refresh", "/actuator/health");
+    private final List<String> publicPaths = List.of("/auth/api/login", "/auth/api/register", "/auth/manager/login", "/auth/refresh", "/actuator/health");
     private final WebClient authWebClient;
     private final String internalToken;
 

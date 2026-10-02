@@ -33,6 +33,17 @@
           AND status = 'ENABLED'
     </select>
 
+    <select id="countApiByUsername" resultType="long">
+        SELECT COUNT(*)
+        FROM vip_user
+        WHERE username = #{username}
+    </select>
+
+    <insert id="insertApiUser">
+        INSERT INTO vip_user (username, password_hash, display_name, email, phone, vip_level, status)
+        VALUES (#{username}, #{passwordHash}, #{displayName}, #{email}, #{phone}, 'NORMAL', 'ENABLED')
+    </insert>
+
     <select id="findManagerByUsername" resultMap="AuthLoginAccountResultMap">
         SELECT u.username,
                u.password_hash,

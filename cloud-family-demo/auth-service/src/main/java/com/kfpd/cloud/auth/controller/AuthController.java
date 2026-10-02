@@ -5,6 +5,7 @@ import com.kfpd.cloud.auth.pojo.dto.LoginRequestContext;
 import com.kfpd.cloud.auth.pojo.dto.LoginResponse;
 import com.kfpd.cloud.auth.pojo.vo.KickOutVO;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
+import com.kfpd.cloud.auth.pojo.vo.RegisterVO;
 import com.kfpd.cloud.auth.pojo.dto.TokenValidation;
 import com.kfpd.cloud.auth.service.AuthService;
 import com.kfpd.cloud.common.web.ApiResponse;
@@ -32,6 +33,11 @@ public class AuthController {
     public ApiResponse<LoginResponse> apiLogin(@Valid @RequestBody LoginVO request, HttpServletRequest servletRequest) {
         // API users are rate-limited by username and client IP in AuthService.
         return ApiResponse.success(authService.apiLogin(request, resolveLoginRequestContext(servletRequest)));
+    }
+
+    @PostMapping("/api/register")
+    public ApiResponse<LoginResponse> apiRegister(@Valid @RequestBody RegisterVO request, HttpServletRequest servletRequest) {
+        return ApiResponse.success(authService.apiRegister(request, resolveLoginRequestContext(servletRequest)));
     }
 
     @PostMapping("/manager/login")

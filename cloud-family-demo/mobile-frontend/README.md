@@ -5,6 +5,7 @@
 ## 功能
 
 - partner 用户登录：`POST /auth/api/login`
+- partner 用户注册：`POST /auth/api/register`
 - 登录态本地保存和失效清理
 - 当前用户信息：`POST /api/users/me`
 - partner 服务状态：`POST /api/users/health`

@@ -10,6 +10,14 @@ public interface AuthLoginAccountDao {
 
     AuthLoginAccount findApiByUsername(@Param("username") String username);
 
+    long countApiByUsername(@Param("username") String username);
+
+    int insertApiUser(@Param("username") String username,
+                      @Param("passwordHash") String passwordHash,
+                      @Param("displayName") String displayName,
+                      @Param("email") String email,
+                      @Param("phone") String phone);
+
     /**
      * 查询用户:关联角色和权限,留意功能
      * @param username

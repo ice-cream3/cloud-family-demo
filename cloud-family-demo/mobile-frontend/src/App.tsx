@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { HomePage } from './components/HomePage';
 import { LoginPage } from './components/LoginPage';
 import { ApiError } from './services/apiClient';
-import { loadCurrentUser, loadPartnerHealth, loginPartner, logoutPartner } from './services/partnerService';
+import { loadCurrentUser, loadPartnerHealth, loginPartner, logoutPartner, registerPartner } from './services/partnerService';
 import { AUTH_UNAUTHORIZED_EVENT, readSession, type Session } from './services/tokenStore';
-import type { PartnerHealth, UserProfile } from './types/api';
+import type { PartnerHealth, RegisterRequest, UserProfile } from './types/api';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(() => readSession());
@@ -43,6 +43,18 @@ export default function App() {
     }
   }
 
+  async function handleRegister(request: RegisterRequest) {
+    setLoading(true);
+    setError(null);
+    try {
+      setSession(await registerPartner(request));
+    } catch (err) {
+      setError(readError(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function reloadData() {
     setLoading(true);
     setError(null);
@@ -74,7 +86,7 @@ export default function App() {
   }
 
   if (!session) {
-    return <LoginPage loading={loading} error={error} onLogin={handleLogin} />;
+    return <LoginPage loading={loading} error={error} onLogin={handleLogin} onRegister={handleRegister} />;
   }
 
   return (

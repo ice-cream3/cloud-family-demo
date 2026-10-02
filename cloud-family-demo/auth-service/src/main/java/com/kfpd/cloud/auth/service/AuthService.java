@@ -6,10 +6,13 @@ import com.kfpd.cloud.auth.pojo.dto.TokenValidation;
 import com.kfpd.cloud.auth.pojo.vo.KickOutVO;
 import com.kfpd.cloud.auth.pojo.vo.LoginVO;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
+import com.kfpd.cloud.auth.pojo.vo.RegisterVO;
 
 public interface AuthService {
 
     LoginResponse apiLogin(LoginVO request, LoginRequestContext context);
+
+    LoginResponse apiRegister(RegisterVO request, LoginRequestContext context);
 
     LoginResponse managerLogin(LoginVO request, LoginRequestContext context);
 

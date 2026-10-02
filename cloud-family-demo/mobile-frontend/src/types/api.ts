@@ -17,6 +17,14 @@ export type LoginResponse = {
   permissions?: string[];
 };
 
+export type RegisterRequest = {
+  username: string;
+  password: string;
+  displayName: string;
+  email?: string;
+  phone?: string;
+};
+
 export type UserProfile = {
   username?: string;
   displayName?: string;

@@ -1,20 +1,41 @@
 import { FormEvent, useState } from 'react';
-import { KeyRound, LockKeyhole, LogIn, Network, ShieldCheck, Smartphone, UserRound } from 'lucide-react';
+import { KeyRound, LockKeyhole, LogIn, Mail, Network, Phone, ShieldCheck, Smartphone, UserRound } from 'lucide-react';
+import type { RegisterRequest } from '../types/api';
 
 type LoginPageProps = {
   loading: boolean;
   error: string | null;
   onLogin: (username: string, password: string) => Promise<void>;
+  onRegister: (request: RegisterRequest) => Promise<void>;
 };
 
-export function LoginPage({ loading, error, onLogin }: LoginPageProps) {
+export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProps) {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (mode === 'register') {
+      await onRegister({
+        username: username.trim(),
+        password,
+        displayName: displayName.trim(),
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
+      });
+      return;
+    }
     await onLogin(username.trim(), password);
   }
+
+  const submitDisabled = loading
+    || !username.trim()
+    || !password
+    || (mode === 'register' && !displayName.trim());
 
   return (
     <main className="login-surface">
@@ -26,31 +47,31 @@ export function LoginPage({ loading, error, onLogin }: LoginPageProps) {
             </div>
             <div>
               <span>Cloud Family</span>
-              <strong>Partner Portal</strong>
+              <strong>Partner</strong>
             </div>
           </div>
 
           <div className="login-hero-copy">
-            <p className="login-kicker">Responsive partner access</p>
-            <h1>PC Web 与 H5 共用入口</h1>
-            <p>一套用户端工程同时适配桌面和移动端，登录后进入 partner 首页。</p>
+            <p className="login-kicker">Partner Access</p>
+            <h1>移动端用户中心</h1>
+            <p>账号、权益、通知和服务状态集中在一个适合手机访问的入口。</p>
           </div>
 
           <div className="login-status-grid">
             <div>
               <ShieldCheck size={18} />
-              <span>JWT Token</span>
-              <strong>Active</strong>
+              <span>身份</span>
+              <strong>安全</strong>
             </div>
             <div>
               <Network size={18} />
-              <span>Gateway</span>
-              <strong>Proxy</strong>
+              <span>服务</span>
+              <strong>在线</strong>
             </div>
             <div>
               <Smartphone size={18} />
-              <span>H5</span>
-              <strong>Ready</strong>
+              <span>体验</span>
+              <strong>H5</strong>
             </div>
           </div>
         </div>
@@ -58,10 +79,19 @@ export function LoginPage({ loading, error, onLogin }: LoginPageProps) {
         <div className="login-card">
           <div className="panel-header">
             <div>
-              <p className="login-kicker">Welcome back</p>
-              <h2>Partner 用户登录</h2>
-              <p>使用 partner 账号密码访问用户端首页。</p>
+              <p className="login-kicker">Welcome</p>
+              <h2>{mode === 'register' ? '创建账号' : '欢迎回来'}</h2>
+              <p>{mode === 'register' ? '填写基础资料，注册后自动登录。' : '登录后查看你的 Partner 首页。'}</p>
             </div>
+          </div>
+
+          <div className="auth-switch" role="tablist" aria-label="账号入口">
+            <button className={mode === 'login' ? 'active' : ''} type="button" onClick={() => setMode('login')}>
+              登录
+            </button>
+            <button className={mode === 'register' ? 'active' : ''} type="button" onClick={() => setMode('register')}>
+              注册
+            </button>
           </div>
 
           <form className="login-form" onSubmit={handleSubmit}>
@@ -77,6 +107,47 @@ export function LoginPage({ loading, error, onLogin }: LoginPageProps) {
                 />
               </span>
             </label>
+            {mode === 'register' ? (
+              <>
+                <label>
+                  昵称
+                  <span className="input-wrap">
+                    <UserRound size={18} />
+                    <input
+                      autoComplete="name"
+                      value={displayName}
+                      onChange={(event) => setDisplayName(event.target.value)}
+                      placeholder="请输入昵称"
+                    />
+                  </span>
+                </label>
+                <label>
+                  邮箱
+                  <span className="input-wrap">
+                    <Mail size={18} />
+                    <input
+                      autoComplete="email"
+                      type="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="可选"
+                    />
+                  </span>
+                </label>
+                <label>
+                  手机号
+                  <span className="input-wrap">
+                    <Phone size={18} />
+                    <input
+                      autoComplete="tel"
+                      value={phone}
+                      onChange={(event) => setPhone(event.target.value)}
+                      placeholder="可选"
+                    />
+                  </span>
+                </label>
+              </>
+            ) : null}
             <label>
               密码
               <span className="input-wrap">
@@ -91,9 +162,9 @@ export function LoginPage({ loading, error, onLogin }: LoginPageProps) {
               </span>
             </label>
             {error ? <div className="error-banner">{error}</div> : null}
-            <button className="primary-button" type="submit" disabled={loading || !username.trim() || !password}>
+            <button className="primary-button" type="submit" disabled={submitDisabled}>
               <LogIn size={18} />
-              {loading ? '登录中' : '登录'}
+              {loading ? (mode === 'register' ? '注册中' : '登录中') : (mode === 'register' ? '注册并登录' : '登录')}
             </button>
           </form>
         </div>

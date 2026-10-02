@@ -29,10 +29,12 @@ import com.kfpd.cloud.auth.pojo.dto.LoginResponse;
 import com.kfpd.cloud.auth.pojo.dto.RedisLoginSession;
 import com.kfpd.cloud.auth.pojo.vo.KickOutVO;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
+import com.kfpd.cloud.auth.pojo.vo.RegisterVO;
 import com.kfpd.cloud.auth.pojo.dto.TokenValidation;
 import com.kfpd.cloud.auth.dao.cloud.AuthLoginAccountDao;
 import com.kfpd.cloud.auth.pojo.dto.AuthLoginAccount;
 import com.kfpd.cloud.auth.service.AuthService;
+import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.common.exception.BusinessException;
 import com.kfpd.cloud.common.exception.ErrorCode;
 import com.kfpd.cloud.common.config.security.CommonJwtProperties;
@@ -61,6 +63,7 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -135,6 +138,28 @@ public class AuthServiceImpl implements AuthService {
         apiLoginAttempts.remove(attemptKey);
         log.info("API login authenticated: username={}, clientIp={}", request.username(), clientIp);
         return login(account.get(), AuthOAuth2JdbcConfig.API_CLIENT_ID, AuthOAuth2JdbcConfig.API_LOGIN_GRANT_TYPE, context);
+    }
+
+    @Override
+    @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public LoginResponse apiRegister(RegisterVO request, LoginRequestContext context) {
+        requireRegisterText(request.username(), "username is required");
+        requireRegisterText(request.password(), "password is required");
+        requireRegisterText(request.displayName(), "displayName is required");
+        String username = request.username().trim();
+        if (loginAccountDao.countApiByUsername(username) > 0) {
+            log.warn("API register rejected: username={}, reason=duplicate_username", username);
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "username already exists");
+        }
+        loginAccountDao.insertApiUser(
+                username,
+                request.password(),
+                request.displayName().trim(),
+                blankToNull(request.email()),
+                blankToNull(request.phone())
+        );
+        log.info("API user registered: username={}, clientIp={}", username, context.clientIp());
+        return apiLogin(new LoginVO(username, request.password()), context);
     }
 
     @Override
@@ -710,6 +735,16 @@ public class AuthServiceImpl implements AuthService {
             log.error("Login failure log write failed: username={}, userType={}, clientId={}, failureReason={}, message={}",
                     username, userType, clientId, failureReason, ex.getMessage(), ex);
         }
+    }
+
+    private void requireRegisterText(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, message);
+        }
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private void insertLoginLog(String userType,
