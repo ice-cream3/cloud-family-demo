@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS vip_user (
     updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_vip_user_username (username),
+    UNIQUE KEY uk_vip_user_email (email),
     KEY idx_vip_user_status (status),
     KEY idx_vip_user_vip_level (vip_level)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

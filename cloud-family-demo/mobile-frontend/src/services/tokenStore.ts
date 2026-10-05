@@ -14,7 +14,7 @@ export type Session = {
 };
 
 export function readSession(): Session | null {
-  const raw = localStorage.getItem(SESSION_KEY);
+  const raw = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
   if (!raw) {
     return null;
   }
@@ -23,11 +23,12 @@ export function readSession(): Session | null {
     return JSON.parse(raw) as Session;
   } catch {
     localStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
     return null;
   }
 }
 
-export function saveSession(response: LoginResponse): Session {
+export function saveSession(response: LoginResponse, remember = true): Session {
   const session: Session = {
     accessToken: response.accessToken,
     refreshToken: response.refreshToken,
@@ -37,12 +38,20 @@ export function saveSession(response: LoginResponse): Session {
     roles: response.roles || [],
     permissions: response.permissions || [],
   };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  const serialized = JSON.stringify(session);
+  if (remember) {
+    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.setItem(SESSION_KEY, serialized);
+  } else {
+    localStorage.removeItem(SESSION_KEY);
+    sessionStorage.setItem(SESSION_KEY, serialized);
+  }
   return session;
 }
 
 export function clearSession() {
   localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
 }
 
 export function notifyUnauthorized() {

@@ -65,6 +65,26 @@
           AND status = 'ENABLED'
     </select>
 
+    <select id="countByEmailExcludingUsername" resultType="long">
+        SELECT COUNT(*)
+        FROM vip_user
+        WHERE LOWER(TRIM(email)) = LOWER(TRIM(#{email}))
+          AND username != #{username}
+    </select>
+
+    <select id="countByEmail" resultType="long">
+        SELECT COUNT(*)
+        FROM vip_user
+        WHERE LOWER(TRIM(email)) = LOWER(TRIM(#{email}))
+    </select>
+
+    <select id="countByEmailExcludingId" resultType="long">
+        SELECT COUNT(*)
+        FROM vip_user
+        WHERE LOWER(TRIM(email)) = LOWER(TRIM(#{email}))
+          AND id != #{id}
+    </select>
+
     <insert id="insert" parameterType="com.kfpd.cloud.partner.pojo.entity.VipUser"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO vip_user (username, password_hash, display_name, email, phone, vip_level, status)

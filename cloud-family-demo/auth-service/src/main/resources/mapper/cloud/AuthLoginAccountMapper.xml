@@ -29,8 +29,22 @@
                password_hash,
                'API' AS user_type
         FROM vip_user
-        WHERE username = #{username}
-          AND status = 'ENABLED'
+        WHERE status = 'ENABLED'
+          AND (
+              username = #{username}
+              OR LOWER(TRIM(email)) = LOWER(TRIM(#{username}))
+              OR phone = #{username}
+              OR phone = CONCAT('+86', #{username})
+              OR REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+86', '') = REPLACE(REPLACE(REPLACE(#{username}, ' ', ''), '-', ''), '+86', '')
+          )
+        ORDER BY CASE
+            WHEN username = #{username} THEN 0
+            WHEN LOWER(TRIM(email)) = LOWER(TRIM(#{username})) THEN 1
+            WHEN phone = #{username} THEN 2
+            ELSE 3
+        END,
+        id ASC
+        LIMIT 1
     </select>
 
     <select id="countApiByUsername" resultType="long">

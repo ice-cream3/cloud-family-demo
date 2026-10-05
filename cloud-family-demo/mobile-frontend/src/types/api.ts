@@ -33,8 +33,90 @@ export type UserProfile = {
   [key: string]: unknown;
 };
 
+export type AccountSecurity = {
+  username: string;
+  displayName: string;
+  email?: string | null;
+  phone?: string | null;
+  vipLevel?: string | null;
+  status?: string | null;
+  updatedAt?: string | null;
+};
+
+export type AccountSecurityUpdateRequest = {
+  displayName: string;
+  email?: string | null;
+  phone?: string | null;
+};
+
+export type PasswordChangeRequest = {
+  currentPassword: string;
+  newPassword: string;
+};
+
 export type PartnerHealth = {
   status?: string;
   service?: string;
   [key: string]: unknown;
+};
+
+export type NotificationSettings = {
+  systemEnabled: boolean;
+  activityEnabled: boolean;
+  taskEnabled: boolean;
+};
+
+export type AppDocument = {
+  documentType: string;
+  title: string;
+  content: string;
+  updatedAt?: string | null;
+};
+
+export type AppVersion = {
+  versionName: string;
+  latest: boolean;
+  releaseNote?: string | null;
+};
+
+export type Membership = {
+  username: string;
+  planName: string;
+  status: string;
+  expireAt?: string | null;
+  benefits?: string | null;
+};
+
+export type UserHistoryItem = {
+  id: number;
+  category: string;
+  title: string;
+  description?: string | null;
+  iconTone?: string | null;
+  occurredAt?: string | null;
+};
+
+export type FavoriteItem = {
+  id: number;
+  itemType: string;
+  title: string;
+  description?: string | null;
+  iconTone?: string | null;
+  createdAt?: string | null;
+};
+
+export type PageResult<T> = {
+  total: number;
+  pageNum: number;
+  pageSize: number;
+  records: T[];
+};
+
+export type ProfileDynamic = {
+  favoriteCount: number;
+  historyCount: number;
+  fileCount: number;
+  couponCount: number;
+  serviceStatus: string;
+  refreshedAt: string;
 };

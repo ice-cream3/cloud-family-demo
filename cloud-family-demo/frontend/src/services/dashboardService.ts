@@ -109,6 +109,18 @@ export function loadPartnerInfo(pageNum = 1, pageSize = 10, query: PageQuery = {
   });
 }
 
+export function loadPartnerFeaturePage(feature: string, pageNum = 1, pageSize = 10, query: PageQuery = {}) {
+  return post<PageResult<SystemPageRecord>>(`/api/manager/partner/features/${feature}/page`, {
+    form: {
+      pageNum,
+      pageSize,
+      keyword: query.keyword,
+      status: query.status,
+      businessType: query.businessType,
+    },
+  });
+}
+
 export function createSystemRecord(path: string, payload: SystemRecordPayload) {
   return post<SystemPageRecord>(getSystemEndpoint(path), {
     body: payload,
@@ -127,6 +139,12 @@ export function deleteSystemRecord(path: string, id: number) {
 
 export function resetSystemUserPassword(id: number, password: string) {
   return post<SystemPageRecord>(`/api/manager/system/users/password/reset/${id}`, {
+    body: { password },
+  });
+}
+
+export function resetPartnerInfoPassword(id: number, password: string) {
+  return post<SystemPageRecord>(`/api/manager/partner/info/password/reset/${id}`, {
     body: { password },
   });
 }
@@ -179,6 +197,12 @@ function getSystemEndpoint(path: string) {
     '/api/manager/system/menus': '/api/manager/system/menus',
     '/api/manager/vip-users': '/api/manager/vip-users',
     '/api/manager/partner/info': '/api/manager/partner/info',
+    '/api/manager/partner/settings/notifications': '/api/manager/partner/features/notifications',
+    '/api/manager/partner/settings/documents': '/api/manager/partner/features/documents',
+    '/api/manager/partner/settings/versions': '/api/manager/partner/features/versions',
+    '/api/manager/partner/memberships': '/api/manager/partner/features/memberships',
+    '/api/manager/partner/histories': '/api/manager/partner/features/histories',
+    '/api/manager/partner/favorites': '/api/manager/partner/features/favorites',
   };
   const endpoint = endpoints[path];
   if (!endpoint) {

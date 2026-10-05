@@ -7,6 +7,7 @@ import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.manager.dao.cloud.VipUserDao;
 import com.kfpd.cloud.manager.pojo.entity.VipUser;
 import com.kfpd.cloud.manager.pojo.vo.PageVO;
+import com.kfpd.cloud.manager.pojo.vo.PasswordResetRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.VipUserPageQueryVO;
 import com.kfpd.cloud.manager.pojo.vo.VipUserRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.VipUserVO;
@@ -58,8 +59,10 @@ public class VipUserServiceImpl implements VipUserService {
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public VipUserVO createVipUser(VipUserRequestVO request) {
+        requireRequest(request);
         SystemManagementSupport.requireText(request.username(), "username is required");
         SystemManagementSupport.requireText(request.displayName(), "displayName is required");
+        validateEmailUnique(request.email(), null);
         VipUser vipUser = new VipUser();
         apply(vipUser, request);
         vipUserDao.insert(vipUser);
@@ -71,9 +74,11 @@ public class VipUserServiceImpl implements VipUserService {
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public VipUserVO updateVipUser(Long id, VipUserRequestVO request) {
+        requireRequest(request);
         SystemManagementSupport.requireText(request.username(), "username is required");
         SystemManagementSupport.requireText(request.displayName(), "displayName is required");
         VipUser before = findVipUserEntityById(id);
+        validateEmailUnique(request.email(), id);
         VipUser vipUser = new VipUser();
         vipUser.setId(id);
         apply(vipUser, request);
@@ -83,6 +88,32 @@ public class VipUserServiceImpl implements VipUserService {
         }
         VipUserVO updated = findVipUserById(id);
         operationLogService.recordUpdate(MODULE_PARTNER, BUSINESS_VIP_USER, id, updated.username(), toVO(before), updated);
+        return updated;
+    }
+
+    @Override
+    @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public VipUserVO resetVipUserPassword(Long id, PasswordResetRequestVO request) {
+        if (request == null) {
+            throw SystemManagementSupport.badRequest("request body is required");
+        }
+        SystemManagementSupport.requireText(request.resolvedPasswordHash(), "password is required");
+        VipUser before = findVipUserEntityById(id);
+        VipUser vipUser = new VipUser();
+        vipUser.setId(id);
+        vipUser.setUsername(before.getUsername());
+        vipUser.setPasswordHash(request.resolvedPasswordHash());
+        vipUser.setDisplayName(before.getDisplayName());
+        vipUser.setEmail(before.getEmail());
+        vipUser.setPhone(before.getPhone());
+        vipUser.setVipLevel(before.getVipLevel());
+        vipUser.setStatus(before.getStatus());
+        if (vipUserDao.update(vipUser) == 0) {
+            log.warn("Vip user service exception: action=resetVipUserPassword, id={}, message=Vip user not found", id);
+            throw SystemManagementSupport.notFound("Vip user not found");
+        }
+        VipUserVO updated = findVipUserById(id);
+        operationLogService.recordUpdate(MODULE_PARTNER, BUSINESS_VIP_USER, id, updated.username(), "PASSWORD_RESET", updated);
         return updated;
     }
 
@@ -105,13 +136,39 @@ public class VipUserServiceImpl implements VipUserService {
     }
 
     private void apply(VipUser vipUser, VipUserRequestVO request) {
-        vipUser.setUsername(request.username());
+        vipUser.setUsername(request.username().trim());
         vipUser.setPasswordHash(request.passwordHash());
-        vipUser.setDisplayName(request.displayName());
-        vipUser.setEmail(request.email());
-        vipUser.setPhone(request.phone());
+        vipUser.setDisplayName(request.displayName().trim());
+        vipUser.setEmail(trimToNull(request.email()));
+        vipUser.setPhone(trimToNull(request.phone()));
         vipUser.setVipLevel(defaultValue(request.vipLevel(), "NORMAL"));
         vipUser.setStatus(SystemManagementSupport.defaultStatus(request.status()));
+    }
+
+    private void requireRequest(VipUserRequestVO request) {
+        if (request == null) {
+            throw SystemManagementSupport.badRequest("request body is required");
+        }
+    }
+
+    private void validateEmailUnique(String rawEmail, Long excludeId) {
+        String email = trimToNull(rawEmail);
+        if (email == null) {
+            return;
+        }
+        if (!isValidEmail(email)) {
+            throw SystemManagementSupport.badRequest("email format is invalid");
+        }
+        long count = excludeId == null
+                ? vipUserDao.countByEmail(email)
+                : vipUserDao.countByEmailExcludingId(email, excludeId);
+        if (count > 0) {
+            throw SystemManagementSupport.badRequest("email already exists");
+        }
+    }
+
+    private boolean isValidEmail(String value) {
+        return value != null && value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
     }
 
     private VipUserVO toVO(VipUser vipUser) {

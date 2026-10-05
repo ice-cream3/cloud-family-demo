@@ -518,12 +518,14 @@ function SystemPagePanel({
   const canEdit = hasAnyPermission(permissions, systemActionPermissions(menu, 'edit')) || hasActionButton(menu, 'edit');
   const canDelete = hasAnyPermission(permissions, systemActionPermissions(menu, 'delete')) || hasActionButton(menu, 'delete');
   const canResetPassword = hasPermission(permissions, 'system:user:reset-password');
+  const canResetPartnerPassword = menu?.path === '/api/manager/partner/info'
+    && (hasPermission(permissions, 'partner:info:reset-password') || hasMenuButton(menu, 'partner-info-reset-password'));
   const canAssignUserRoles = hasPermission(permissions, 'system:user:edit');
   const canAssignRolePermissions = hasPermission(permissions, 'system:role:edit');
   const canAssignRoleMenus = hasPermission(permissions, 'system:role:menu');
   const canAssignMenuPermissions = hasPermission(permissions, 'system:menu:button-permission');
   const canShowOperationColumn = isOperationLogPage
-    || (!readOnly && (canEdit || canDelete || canResetPassword || canAssignUserRoles || canAssignRolePermissions || canAssignRoleMenus || canAssignMenuPermissions));
+    || (!readOnly && (canEdit || canDelete || canResetPassword || canResetPartnerPassword || canAssignUserRoles || canAssignRolePermissions || canAssignRoleMenus || canAssignMenuPermissions));
   const [viewMode, setViewMode] = useState<'table' | 'tree'>('table');
   const [editorRecord, setEditorRecord] = useState<SystemPageRecord | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -555,7 +557,7 @@ function SystemPagePanel({
   const [selectedTreeMenu, setSelectedTreeMenu] = useState<MenuTreeNode | null>(null);
 
   useEffect(() => {
-    setViewMode('table');
+    setViewMode(menu?.path === '/api/manager/system/menus' ? 'tree' : 'table');
     setSelectedTreeMenu(null);
     setTreeNodes([]);
     setTreeError(null);
@@ -849,7 +851,7 @@ function SystemPagePanel({
       <div className="section-heading">
         <div>
           <h2>{config.title}</h2>
-          <p>调用 {config.apiPath} 展示分页数据。</p>
+          <p>{isMenuManagement && viewMode === 'tree' ? '调用 /api/manager/system/menus/tree 按树形结构展示菜单。' : `调用 ${config.apiPath} 展示分页数据。`}</p>
         </div>
         <div className="section-actions">
           {isMenuManagement ? (
@@ -870,26 +872,28 @@ function SystemPagePanel({
               新增
             </button>
           ) : null}
-          <div className="pager-actions">
-            <label>
-              每页
-              <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))} disabled={loading}>
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </label>
-            <button type="button" disabled={loading || pageNum <= 1} onClick={() => onPageChange(pageNum - 1)}>
-              上一页
-            </button>
-            <span>
-              {pageNum} / {totalPages}
-            </span>
-            <button type="button" disabled={loading || pageNum >= totalPages} onClick={() => onPageChange(pageNum + 1)}>
-              下一页
-            </button>
-          </div>
+          {!(isMenuManagement && viewMode === 'tree') ? (
+            <div className="pager-actions">
+              <label>
+                每页
+                <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))} disabled={loading}>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </label>
+              <button type="button" disabled={loading || pageNum <= 1} onClick={() => onPageChange(pageNum - 1)}>
+                上一页
+              </button>
+              <span>
+                {pageNum} / {totalPages}
+              </span>
+              <button type="button" disabled={loading || pageNum >= totalPages} onClick={() => onPageChange(pageNum + 1)}>
+                下一页
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
       {isOperationLogPage ? (
@@ -908,6 +912,19 @@ function SystemPagePanel({
             { label: '启用', value: 'ENABLED' },
             { label: '禁用', value: 'DISABLED' },
           ]}
+          onSearch={onSearch}
+        />
+      ) : menu?.path === '/api/manager/partner/info' ? (
+        <PartnerInfoQueryBar
+          query={query}
+          loading={loading}
+          onSearch={onSearch}
+        />
+      ) : isPartnerFeaturePage(menu?.path) ? (
+        <PartnerFeatureQueryBar
+          path={menu?.path}
+          query={query}
+          loading={loading}
           onSearch={onSearch}
         />
       ) : null}
@@ -1006,6 +1023,12 @@ function SystemPagePanel({
                             ) : null}
                           </>
                         ) : null}
+                        {canResetPartnerPassword ? (
+                          <button type="button" onClick={() => setPasswordRecord(record)} disabled={saving}>
+                            <KeyRound size={14} />
+                            修改密码
+                          </button>
+                        ) : null}
                         {menu?.path === '/api/manager/system/roles' ? (
                           <>
                             {canAssignRolePermissions ? (
@@ -1065,6 +1088,9 @@ function SystemPagePanel({
       {passwordRecord ? (
         <PasswordResetDialog
           record={passwordRecord}
+          title={menu?.path === '/api/manager/partner/info' ? '修改密码' : '重置密码'}
+          submitText={menu?.path === '/api/manager/partner/info' ? '修改' : '重置'}
+          savingText={menu?.path === '/api/manager/partner/info' ? '修改中' : '重置中'}
           saving={saving}
           error={passwordError}
           onClose={() => {
@@ -1573,6 +1599,201 @@ function MenuQueryBar({
   );
 }
 
+function PartnerInfoQueryBar({
+  query,
+  loading,
+  onSearch,
+}: {
+  query: PageQuery;
+  loading: boolean;
+  onSearch: (query: PageQuery) => void;
+}) {
+  const [keyword, setKeyword] = useState(query.keyword || '');
+  const [displayName, setDisplayName] = useState(query.businessName || '');
+  const [vipLevel, setVipLevel] = useState(query.businessType || '');
+  const [status, setStatus] = useState(query.status || '');
+
+  useEffect(() => {
+    setKeyword(query.keyword || '');
+    setDisplayName(query.businessName || '');
+    setVipLevel(query.businessType || '');
+    setStatus(query.status || '');
+  }, [query.keyword, query.businessName, query.businessType, query.status]);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSearch({
+      keyword: keyword.trim() || undefined,
+      businessName: displayName.trim() || undefined,
+      businessType: vipLevel.trim() || undefined,
+      status: status || undefined,
+    });
+  }
+
+  function reset() {
+    setKeyword('');
+    setDisplayName('');
+    setVipLevel('');
+    setStatus('');
+    onSearch({});
+  }
+
+  const hasQuery = Boolean(keyword || displayName || vipLevel || status);
+
+  return (
+    <form className="query-bar partner-info-query" onSubmit={submit}>
+      <label>
+        账号
+        <span className="query-input">
+          <Search size={16} />
+          <input
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder="账号 / 邮箱 / 手机号"
+          />
+        </span>
+      </label>
+      <label>
+        显示名称
+        <span className="query-input">
+          <Search size={16} />
+          <input
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            placeholder="显示名称"
+          />
+        </span>
+      </label>
+      <label>
+        会员等级
+        <span className="query-input">
+          <Search size={16} />
+          <input
+            value={vipLevel}
+            onChange={(event) => setVipLevel(event.target.value)}
+            placeholder="NORMAL / GOLD"
+          />
+        </span>
+      </label>
+      <label>
+        状态
+        <select value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option value="">全部状态</option>
+          <option value="ENABLED">启用</option>
+          <option value="DISABLED">禁用</option>
+        </select>
+      </label>
+      <div className="query-actions">
+        <button className="primary-button small" type="submit" disabled={loading}>
+          <Search size={16} />
+          查询
+        </button>
+        <button className="ghost-button small" type="button" onClick={reset} disabled={loading && !hasQuery}>
+          <X size={16} />
+          重置
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function PartnerFeatureQueryBar({
+  path,
+  query,
+  loading,
+  onSearch,
+}: {
+  path?: string;
+  query: PageQuery;
+  loading: boolean;
+  onSearch: (query: PageQuery) => void;
+}) {
+  const [keyword, setKeyword] = useState(query.keyword || '');
+  const [status, setStatus] = useState(query.status || '');
+  const [businessType, setBusinessType] = useState(query.businessType || '');
+  const showStatus = path === '/api/manager/partner/memberships';
+  const showCategory = path === '/api/manager/partner/histories';
+  const placeholder = path === '/api/manager/partner/settings/documents'
+    ? '文档类型 / 标题'
+    : path === '/api/manager/partner/settings/versions'
+      ? '版本号'
+      : '账号 / 标题';
+
+  useEffect(() => {
+    setKeyword(query.keyword || '');
+    setStatus(query.status || '');
+    setBusinessType(query.businessType || '');
+  }, [query.keyword, query.status, query.businessType]);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSearch({
+      keyword: keyword.trim() || undefined,
+      status: showStatus ? status || undefined : undefined,
+      businessType: showCategory ? businessType.trim() || undefined : undefined,
+    });
+  }
+
+  function reset() {
+    setKeyword('');
+    setStatus('');
+    setBusinessType('');
+    onSearch({});
+  }
+
+  const hasQuery = Boolean(keyword || status || businessType);
+
+  return (
+    <form className="query-bar partner-feature-query" onSubmit={submit}>
+      <label>
+        关键词
+        <span className="query-input">
+          <Search size={16} />
+          <input
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder={placeholder}
+          />
+        </span>
+      </label>
+      {showStatus ? (
+        <label>
+          状态
+          <select value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option value="">全部状态</option>
+            <option value="ACTIVE">生效中</option>
+            <option value="EXPIRED">已过期</option>
+            <option value="SUSPENDED">已暂停</option>
+          </select>
+        </label>
+      ) : null}
+      {showCategory ? (
+        <label>
+          分类
+          <span className="query-input">
+            <Search size={16} />
+            <input
+              value={businessType}
+              onChange={(event) => setBusinessType(event.target.value)}
+              placeholder="例如 图片处理"
+            />
+          </span>
+        </label>
+      ) : null}
+      <div className="query-actions">
+        <button className="primary-button small" type="submit" disabled={loading}>
+          <Search size={16} />
+          查询
+        </button>
+        <button className="ghost-button small" type="button" onClick={reset} disabled={loading && !hasQuery}>
+          <X size={16} />
+          重置
+        </button>
+      </div>
+    </form>
+  );
+}
+
 type TableColumn = {
   key: string;
   title: string;
@@ -1670,30 +1891,43 @@ function RecordEditorDialog({
 
 function PasswordResetDialog({
   record,
+  title = '重置密码',
+  submitText = '重置',
+  savingText = '重置中',
   saving,
   error,
   onClose,
   onReset,
 }: {
   record: SystemPageRecord;
+  title?: string;
+  submitText?: string;
+  savingText?: string;
   saving: boolean;
   error: string | null;
   onClose: () => void;
   onReset: (password: string) => void;
 }) {
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!isStrongPassword(password)) {
+      setValidationError('密码需为 6-20 位，并同时包含数字、小写字母、大写字母和特殊字符。');
+      return;
+    }
+    setValidationError(null);
     onReset(password);
   }
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="record-dialog" role="dialog" aria-modal="true" aria-label="重置密码">
+      <section className="record-dialog" role="dialog" aria-modal="true" aria-label={title}>
         <div className="dialog-heading">
           <div>
-            <h3>重置密码</h3>
+            <h3>{title}</h3>
             <p>{recordLabel(record)}</p>
           </div>
           <button className="icon-button" type="button" onClick={onClose} disabled={saving} title="关闭">
@@ -1703,21 +1937,36 @@ function PasswordResetDialog({
         <form className="record-form single-column" onSubmit={submit}>
           <label>
             <span>新密码</span>
-            <input
-              autoComplete="new-password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
+            <span className="password-input-wrap">
+              <input
+                autoComplete="new-password"
+                type={passwordVisible ? 'text' : 'password'}
+                value={password}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  setValidationError(null);
+                }}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setPasswordVisible((visible) => !visible)}
+                title={passwordVisible ? '隐藏密码' : '显示密码'}
+                aria-label={passwordVisible ? '隐藏密码' : '显示密码'}
+              >
+                {passwordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </span>
+            <small className="form-hint">6-20 位，包含数字、小写字母、大写字母和特殊字符。</small>
           </label>
+          {validationError ? <div className="error-banner compact">{validationError}</div> : null}
           {error ? <div className="error-banner compact">{error}</div> : null}
           <div className="dialog-actions">
             <button className="ghost-button" type="button" onClick={onClose} disabled={saving}>
               取消
             </button>
             <button className="primary-button" type="submit" disabled={saving || !password.trim()}>
-              {saving ? '重置中' : '重置'}
+              {saving ? savingText : submitText}
             </button>
           </div>
         </form>
@@ -2549,6 +2798,155 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
     };
   }
 
+  if (path === '/api/manager/partner/settings/notifications') {
+    return {
+      title: '通知设置',
+      apiPath: '/api/manager/partner/features/notifications/page',
+      columns: [
+        commonColumns[0],
+        { key: 'username', title: '账号', render: (record) => textValue(readField(record, 'username')) },
+        { key: 'systemEnabled', title: '系统通知', render: (record) => <BooleanValue value={readBooleanField(record, 'systemEnabled')} /> },
+        { key: 'activityEnabled', title: '活动通知', render: (record) => <BooleanValue value={readBooleanField(record, 'activityEnabled')} /> },
+        { key: 'taskEnabled', title: '任务通知', render: (record) => <BooleanValue value={readBooleanField(record, 'taskEnabled')} /> },
+        { key: 'updatedAt', title: '更新时间', render: (record) => formatDate(readField(record, 'updatedAt')) },
+      ],
+      fields: [
+        { key: 'username', label: '账号', required: true, readonlyOnEdit: true },
+        { key: 'systemEnabled', label: '系统通知', type: 'checkbox' },
+        { key: 'activityEnabled', label: '活动通知', type: 'checkbox' },
+        { key: 'taskEnabled', label: '任务通知', type: 'checkbox' },
+      ],
+    };
+  }
+
+  if (path === '/api/manager/partner/settings/documents') {
+    return {
+      title: '协议文档',
+      apiPath: '/api/manager/partner/features/documents/page',
+      columns: [
+        commonColumns[0],
+        { key: 'documentType', title: '文档类型', render: (record) => textValue(readField(record, 'documentType')) },
+        { key: 'title', title: '标题', render: (record) => textValue(readField(record, 'title')) },
+        { key: 'content', title: '内容', render: (record) => truncateText(readField(record, 'content'), 48) },
+        { key: 'updatedAt', title: '更新时间', render: (record) => formatDate(readField(record, 'updatedAt')) },
+      ],
+      fields: [
+        {
+          key: 'documentType',
+          label: '文档类型',
+          type: 'select',
+          required: true,
+          options: [
+            { label: '关于我们', value: 'about' },
+            { label: '隐私政策', value: 'privacy' },
+            { label: '用户协议', value: 'agreement' },
+          ],
+        },
+        { key: 'title', label: '标题', required: true },
+        { key: 'content', label: '内容', type: 'textarea', required: true },
+      ],
+    };
+  }
+
+  if (path === '/api/manager/partner/settings/versions') {
+    return {
+      title: '版本管理',
+      apiPath: '/api/manager/partner/features/versions/page',
+      columns: [
+        commonColumns[0],
+        { key: 'versionName', title: '版本号', render: (record) => textValue(readField(record, 'versionName')) },
+        { key: 'latest', title: '最新版本', render: (record) => <BooleanValue value={readBooleanField(record, 'latest')} /> },
+        { key: 'releaseNote', title: '更新说明', render: (record) => truncateText(readField(record, 'releaseNote'), 48) },
+        { key: 'createdAt', title: '创建时间', render: (record) => formatDate(readField(record, 'createdAt')) },
+      ],
+      fields: [
+        { key: 'versionName', label: '版本号', required: true, placeholder: '例如 v1.2.0' },
+        { key: 'latest', label: '最新版本', type: 'checkbox' },
+        { key: 'releaseNote', label: '更新说明', type: 'textarea' },
+      ],
+    };
+  }
+
+  if (path === '/api/manager/partner/memberships') {
+    return {
+      title: '会员中心配置',
+      apiPath: '/api/manager/partner/features/memberships/page',
+      columns: [
+        commonColumns[0],
+        { key: 'username', title: '账号', render: (record) => textValue(readField(record, 'username')) },
+        { key: 'planName', title: '会员方案', render: (record) => textValue(readField(record, 'planName')) },
+        { key: 'status', title: '状态', render: (record) => <StatusValue value={readField(record, 'status')} /> },
+        { key: 'expireAt', title: '到期时间', render: (record) => formatDate(readField(record, 'expireAt')) },
+        { key: 'benefits', title: '权益', render: (record) => truncateText(readField(record, 'benefits'), 40) },
+        { key: 'updatedAt', title: '更新时间', render: (record) => formatDate(readField(record, 'updatedAt')) },
+      ],
+      fields: [
+        { key: 'username', label: '账号', required: true, readonlyOnEdit: true },
+        { key: 'planName', label: '会员方案', required: true, placeholder: '例如 普通会员' },
+        {
+          key: 'status',
+          label: '状态',
+          type: 'select',
+          required: true,
+          options: [
+            { label: '生效中', value: 'ACTIVE' },
+            { label: '已过期', value: 'EXPIRED' },
+            { label: '已暂停', value: 'SUSPENDED' },
+          ],
+        },
+        { key: 'expireAt', label: '到期时间', placeholder: 'YYYY-MM-DD HH:mm:ss' },
+        { key: 'benefits', label: '权益', type: 'textarea' },
+      ],
+    };
+  }
+
+  if (path === '/api/manager/partner/histories') {
+    return {
+      title: '历史记录',
+      apiPath: '/api/manager/partner/features/histories/page',
+      columns: [
+        commonColumns[0],
+        { key: 'username', title: '账号', render: (record) => textValue(readField(record, 'username')) },
+        { key: 'category', title: '分类', render: (record) => textValue(readField(record, 'category')) },
+        { key: 'title', title: '标题', render: (record) => textValue(readField(record, 'title')) },
+        { key: 'description', title: '描述', render: (record) => truncateText(readField(record, 'description'), 40) },
+        { key: 'iconTone', title: '色调', render: (record) => textValue(readField(record, 'iconTone')) },
+        { key: 'occurredAt', title: '发生时间', render: (record) => formatDate(readField(record, 'occurredAt')) },
+      ],
+      fields: [
+        { key: 'username', label: '账号', required: true },
+        { key: 'category', label: '分类', required: true, placeholder: '例如 图片处理' },
+        { key: 'title', label: '标题', required: true },
+        { key: 'description', label: '描述', type: 'textarea' },
+        { key: 'iconTone', label: '色调', placeholder: 'green / orange / blue' },
+        { key: 'occurredAt', label: '发生时间', placeholder: 'YYYY-MM-DD HH:mm:ss' },
+      ],
+    };
+  }
+
+  if (path === '/api/manager/partner/favorites') {
+    return {
+      title: '我的收藏',
+      apiPath: '/api/manager/partner/features/favorites/page',
+      columns: [
+        commonColumns[0],
+        { key: 'username', title: '账号', render: (record) => textValue(readField(record, 'username')) },
+        { key: 'itemType', title: '收藏类型', render: (record) => textValue(readField(record, 'itemType')) },
+        { key: 'title', title: '标题', render: (record) => textValue(readField(record, 'title')) },
+        { key: 'description', title: '描述', render: (record) => truncateText(readField(record, 'description'), 40) },
+        { key: 'iconTone', title: '色调', render: (record) => textValue(readField(record, 'iconTone')) },
+        { key: 'createdAt', title: '收藏时间', render: (record) => formatDate(readField(record, 'createdAt')) },
+      ],
+      fields: [
+        { key: 'username', label: '账号', required: true },
+        { key: 'itemType', label: '收藏类型', required: true, placeholder: 'tool / document' },
+        { key: 'title', label: '标题', required: true },
+        { key: 'description', label: '描述', type: 'textarea' },
+        { key: 'iconTone', label: '色调', placeholder: 'green / orange / blue' },
+      ],
+    };
+  }
+
   return {
     title: '用户管理',
     apiPath: '/api/manager/system/users/page',
@@ -2577,7 +2975,22 @@ function isSystemPageMenu(path?: string) {
     || path === '/api/manager/system/menus'
     || path === '/api/manager/system/operation-logs'
     || path === '/api/manager/vip-users'
-    || path === '/api/manager/partner/info';
+    || path === '/api/manager/partner/info'
+    || path === '/api/manager/partner/settings/notifications'
+    || path === '/api/manager/partner/settings/documents'
+    || path === '/api/manager/partner/settings/versions'
+    || path === '/api/manager/partner/memberships'
+    || path === '/api/manager/partner/histories'
+    || path === '/api/manager/partner/favorites';
+}
+
+function isPartnerFeaturePage(path?: string) {
+  return path === '/api/manager/partner/settings/notifications'
+    || path === '/api/manager/partner/settings/documents'
+    || path === '/api/manager/partner/settings/versions'
+    || path === '/api/manager/partner/memberships'
+    || path === '/api/manager/partner/histories'
+    || path === '/api/manager/partner/favorites';
 }
 
 function systemActionPermissions(menu: MenuTreeNode | null, action: 'add' | 'edit' | 'delete') {
@@ -2613,11 +3026,25 @@ function systemActionPermissions(menu: MenuTreeNode | null, action: 'add' | 'edi
       edit: ['partner:info:edit'],
       delete: ['partner:info:delete'],
     },
+    '/api/manager/partner/settings/notifications': partnerFeaturePermissions(),
+    '/api/manager/partner/settings/documents': partnerFeaturePermissions(),
+    '/api/manager/partner/settings/versions': partnerFeaturePermissions(),
+    '/api/manager/partner/memberships': partnerFeaturePermissions(),
+    '/api/manager/partner/histories': partnerFeaturePermissions(),
+    '/api/manager/partner/favorites': partnerFeaturePermissions(),
   };
   return Array.from(new Set([
     ...(path ? permissionsByPath[path]?.[action] || [] : []),
     ...menuActionPermissions(menu, action),
   ]));
+}
+
+function partnerFeaturePermissions() {
+  return {
+    add: ['partner:feature:add'],
+    edit: ['partner:feature:edit'],
+    delete: ['partner:feature:delete'],
+  };
 }
 
 function menuActionPermissions(menu: MenuTreeNode | null, action: 'add' | 'edit' | 'delete') {
@@ -2637,6 +3064,10 @@ function menuActionPermissions(menu: MenuTreeNode | null, action: 'add' | 'edit'
 
 function hasActionButton(menu: MenuTreeNode | null, action: 'add' | 'edit' | 'delete') {
   return menuActionPermissions(menu, action).length > 0;
+}
+
+function hasMenuButton(menu: MenuTreeNode | null, menuCode: string) {
+  return Boolean(menu?.children.some((child) => child.buttonFlag && child.menuCode === menuCode));
 }
 
 function hasAnyPermission(permissions: string[], candidates: string[]) {
@@ -2672,6 +3103,12 @@ function operationLogBusinessTypeOptions(businessModule?: string) {
   ];
   const partnerOptions = [
     { label: 'VIP 用户', value: 'VIP_USER' },
+    { label: '通知设置', value: 'USER_NOTIFICATIONS' },
+    { label: '协议文档', value: 'USER_DOCUMENTS' },
+    { label: '版本管理', value: 'USER_VERSIONS' },
+    { label: '会员中心配置', value: 'USER_MEMBERSHIPS' },
+    { label: '历史记录', value: 'USER_HISTORIES' },
+    { label: '我的收藏', value: 'USER_FAVORITES' },
   ];
   if (businessModule === 'SYSTEM') {
     return systemOptions;
@@ -2688,6 +3125,10 @@ function StatusValue({ value }: { value?: string }) {
 
 function OperationTypeValue({ value }: { value?: string }) {
   return <span className={value === 'DELETE' ? 'danger-pill' : 'status-pill'}>{operationTypeLabel(value)}</span>;
+}
+
+function BooleanValue({ value }: { value: boolean }) {
+  return <span className={value ? 'status-pill' : 'muted-pill'}>{value ? '开启' : '关闭'}</span>;
 }
 
 function operationTypeLabel(value?: string) {
@@ -3295,4 +3736,15 @@ function formatDate(value?: string) {
 
 function textValue(value?: string) {
   return value && value.trim() ? value : '-';
+}
+
+function truncateText(value?: string, maxLength = 40) {
+  if (!value || !value.trim()) {
+    return '-';
+  }
+  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
+function isStrongPassword(value: string) {
+  return /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{6,20}$/.test(value);
 }

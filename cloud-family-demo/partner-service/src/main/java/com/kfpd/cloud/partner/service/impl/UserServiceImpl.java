@@ -1,5 +1,6 @@
 package com.kfpd.cloud.partner.service.impl;
 
+import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -8,9 +9,22 @@ import java.util.Optional;
 import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.common.exception.BusinessException;
 import com.kfpd.cloud.common.exception.ErrorCode;
+import com.kfpd.cloud.partner.dao.cloud.UserProfileFeatureDao;
 import com.kfpd.cloud.partner.dao.cloud.VipUserDao;
 import com.kfpd.cloud.partner.pojo.entity.VipUser;
+import com.kfpd.cloud.partner.pojo.vo.AccountSecurityUpdateVO;
+import com.kfpd.cloud.partner.pojo.vo.AccountSecurityVO;
+import com.kfpd.cloud.partner.pojo.vo.AppDocumentVO;
+import com.kfpd.cloud.partner.pojo.vo.AppVersionVO;
+import com.kfpd.cloud.partner.pojo.vo.FavoriteItemVO;
+import com.kfpd.cloud.partner.pojo.vo.MembershipVO;
+import com.kfpd.cloud.partner.pojo.vo.NotificationSettingsUpdateVO;
+import com.kfpd.cloud.partner.pojo.vo.NotificationSettingsVO;
+import com.kfpd.cloud.partner.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.partner.pojo.vo.PageVO;
+import com.kfpd.cloud.partner.pojo.vo.PasswordChangeVO;
+import com.kfpd.cloud.partner.pojo.vo.ProfileDynamicVO;
+import com.kfpd.cloud.partner.pojo.vo.UserHistoryItemVO;
 import com.kfpd.cloud.partner.pojo.vo.UserProfileVO;
 import com.kfpd.cloud.partner.pojo.vo.VipUserPageQueryVO;
 import com.kfpd.cloud.partner.pojo.vo.VipUserRequestVO;
@@ -31,9 +45,11 @@ public class UserServiceImpl implements UserService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final VipUserDao vipUserDao;
+    private final UserProfileFeatureDao userProfileFeatureDao;
 
-    public UserServiceImpl(VipUserDao vipUserDao) {
+    public UserServiceImpl(VipUserDao vipUserDao, UserProfileFeatureDao userProfileFeatureDao) {
         this.vipUserDao = vipUserDao;
+        this.userProfileFeatureDao = userProfileFeatureDao;
     }
 
     @Override
@@ -66,10 +82,151 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public AccountSecurityVO accountSecurity(String username) {
+        return toAccountSecurityVO(findCurrentVipUser(username));
+    }
+
+    @Override
+    @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public AccountSecurityVO updateAccountSecurity(String username, AccountSecurityUpdateVO request) {
+        VipUser vipUser = findCurrentVipUser(username);
+        if (request == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "request is required");
+        }
+        requireText(request.displayName(), "displayName is required");
+        String email = blankToNull(request.email());
+        if (email != null && !isValidEmail(email)) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "email format is invalid");
+        }
+        if (email != null && vipUserDao.countByEmailExcludingUsername(email, username) > 0) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "email already exists");
+        }
+        vipUser.setDisplayName(request.displayName().trim());
+        vipUser.setEmail(email);
+        vipUser.setPhone(blankToNull(request.phone()));
+        if (vipUserDao.update(vipUser) == 0) {
+            log.warn("Partner service exception: action=updateAccountSecurity, username={}, message=Vip user not found", username);
+            throw notFound("Vip user not found");
+        }
+        return toAccountSecurityVO(findCurrentVipUser(username));
+    }
+
+    @Override
+    @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public void changePassword(String username, PasswordChangeVO request) {
+        VipUser vipUser = findCurrentVipUser(username);
+        if (request == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "request is required");
+        }
+        requireText(request.currentPassword(), "currentPassword is required");
+        requireText(request.newPassword(), "newPassword is required");
+        if (vipUser.getPasswordHash() == null || !vipUser.getPasswordHash().equals(request.currentPassword())) {
+            log.warn("Partner service exception: action=changePassword, username={}, message=Current password is incorrect", username);
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "Current password is incorrect");
+        }
+        if (!isStrongPassword(request.newPassword())) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "newPassword is not strong enough");
+        }
+        vipUser.setPasswordHash(request.newPassword());
+        if (vipUserDao.update(vipUser) == 0) {
+            log.warn("Partner service exception: action=changePassword, username={}, message=Vip user not found", username);
+            throw notFound("Vip user not found");
+        }
+    }
+
+    @Override
+    @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public NotificationSettingsVO notificationSettings(String username) {
+        findCurrentVipUser(username);
+        userProfileFeatureDao.insertDefaultNotificationSettings(username);
+        return userProfileFeatureDao.findNotificationSettings(username);
+    }
+
+    @Override
+    @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public NotificationSettingsVO updateNotificationSettings(String username, NotificationSettingsUpdateVO request) {
+        findCurrentVipUser(username);
+        if (request == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "request is required");
+        }
+        userProfileFeatureDao.updateNotificationSettings(
+                username,
+                defaultBoolean(request.systemEnabled(), true),
+                defaultBoolean(request.activityEnabled(), true),
+                defaultBoolean(request.taskEnabled(), false)
+        );
+        return userProfileFeatureDao.findNotificationSettings(username);
+    }
+
+    @Override
+    public AppDocumentVO document(String documentType) {
+        String normalizedType = trimToNull(documentType);
+        if (normalizedType == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "documentType is required");
+        }
+        return Optional.ofNullable(userProfileFeatureDao.findDocument(normalizedType)).orElseThrow(() ->
+                new BusinessException(ErrorCode.COMMON_NOT_FOUND, "document not found"));
+    }
+
+    @Override
+    public AppVersionVO latestVersion() {
+        return Optional.ofNullable(userProfileFeatureDao.findLatestVersion())
+                .orElse(new AppVersionVO("v1.0.0", true, "当前已是最新版本"));
+    }
+
+    @Override
+    @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public MembershipVO membership(String username) {
+        findCurrentVipUser(username);
+        userProfileFeatureDao.insertDefaultMembership(username);
+        return userProfileFeatureDao.findMembership(username);
+    }
+
+    @Override
+    public PageVO<UserHistoryItemVO> history(String username, PageQueryVO query) {
+        findCurrentVipUser(username);
+        int pageNum = normalizePageNum(query == null ? null : query.pageNum());
+        int pageSize = normalizePageSize(query == null ? null : query.pageSize());
+        int offset = (pageNum - 1) * pageSize;
+        String category = trimToNull(query == null ? null : query.category());
+        long total = userProfileFeatureDao.countHistory(username, category);
+        List<UserHistoryItemVO> records = userProfileFeatureDao.findHistoryPage(username, category, offset, pageSize);
+        return new PageVO<>(total, pageNum, pageSize, records);
+    }
+
+    @Override
+    public PageVO<FavoriteItemVO> favorites(String username, PageQueryVO query) {
+        findCurrentVipUser(username);
+        int pageNum = normalizePageNum(query == null ? null : query.pageNum());
+        int pageSize = normalizePageSize(query == null ? null : query.pageSize());
+        int offset = (pageNum - 1) * pageSize;
+        long total = userProfileFeatureDao.countFavorites(username);
+        List<FavoriteItemVO> records = userProfileFeatureDao.findFavoritePage(username, offset, pageSize);
+        return new PageVO<>(total, pageNum, pageSize, records);
+    }
+
+    @Override
+    public ProfileDynamicVO refreshDynamic(String username) {
+        findCurrentVipUser(username);
+        long favoriteCount = userProfileFeatureDao.countFavorites(username);
+        long historyCount = userProfileFeatureDao.countHistory(username, null);
+        return new ProfileDynamicVO(
+                favoriteCount,
+                historyCount,
+                3,
+                0,
+                "UP",
+                LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+        );
+    }
+
+    @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public VipUserVO createVipUser(VipUserRequestVO request) {
+        requireRequest(request);
         requireText(request.username(), "username is required");
         requireText(request.displayName(), "displayName is required");
+        validateEmailUnique(request.email(), null);
         VipUser vipUser = new VipUser();
         apply(vipUser, request);
         vipUserDao.insert(vipUser);
@@ -79,8 +236,10 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public VipUserVO updateVipUser(Long id, VipUserRequestVO request) {
+        requireRequest(request);
         requireText(request.username(), "username is required");
         requireText(request.displayName(), "displayName is required");
+        validateEmailUnique(request.email(), id);
         VipUser vipUser = new VipUser();
         vipUser.setId(id);
         apply(vipUser, request);
@@ -114,6 +273,14 @@ public class UserServiceImpl implements UserService {
         });
     }
 
+    private VipUser findCurrentVipUser(String username) {
+        requireText(username, "username is required");
+        return Optional.ofNullable(vipUserDao.findByUsername(username)).orElseThrow(() -> {
+            log.warn("Partner service exception: action=findCurrentVipUser, username={}, message=Vip user not found", username);
+            return notFound("Vip user not found");
+        });
+    }
+
     private VipUserVO toVO(VipUser vipUser) {
         return new VipUserVO(
                 vipUser.getId(),
@@ -124,6 +291,18 @@ public class UserServiceImpl implements UserService {
                 vipUser.getVipLevel(),
                 vipUser.getStatus(),
                 vipUser.getCreatedAt(),
+                vipUser.getUpdatedAt()
+        );
+    }
+
+    private AccountSecurityVO toAccountSecurityVO(VipUser vipUser) {
+        return new AccountSecurityVO(
+                vipUser.getUsername(),
+                vipUser.getDisplayName(),
+                vipUser.getEmail(),
+                vipUser.getPhone(),
+                vipUser.getVipLevel(),
+                vipUser.getStatus(),
                 vipUser.getUpdatedAt()
         );
     }
@@ -139,13 +318,35 @@ public class UserServiceImpl implements UserService {
     }
 
     private void apply(VipUser vipUser, VipUserRequestVO request) {
-        vipUser.setUsername(request.username());
+        vipUser.setUsername(request.username().trim());
         vipUser.setPasswordHash(request.passwordHash());
-        vipUser.setDisplayName(request.displayName());
-        vipUser.setEmail(request.email());
-        vipUser.setPhone(request.phone());
+        vipUser.setDisplayName(request.displayName().trim());
+        vipUser.setEmail(blankToNull(request.email()));
+        vipUser.setPhone(blankToNull(request.phone()));
         vipUser.setVipLevel(defaultValue(request.vipLevel(), "NORMAL"));
         vipUser.setStatus(defaultValue(request.status(), "ENABLED"));
+    }
+
+    private void requireRequest(VipUserRequestVO request) {
+        if (request == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "request is required");
+        }
+    }
+
+    private void validateEmailUnique(String rawEmail, Long excludeId) {
+        String email = blankToNull(rawEmail);
+        if (email == null) {
+            return;
+        }
+        if (!isValidEmail(email)) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "email format is invalid");
+        }
+        long count = excludeId == null
+                ? vipUserDao.countByEmail(email)
+                : vipUserDao.countByEmailExcludingId(email, excludeId);
+        if (count > 0) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "email already exists");
+        }
     }
 
     private void requireText(String value, String message) {
@@ -173,6 +374,22 @@ public class UserServiceImpl implements UserService {
 
     private String defaultValue(String value, String defaultValue) {
         return value == null || value.isBlank() ? defaultValue : value;
+    }
+
+    private boolean defaultBoolean(Boolean value, boolean defaultValue) {
+        return value == null ? defaultValue : value;
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private boolean isStrongPassword(String value) {
+        return value != null && value.matches("^(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{6,20}$");
+    }
+
+    private boolean isValidEmail(String value) {
+        return value != null && value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
     }
 
     private String trimToNull(String value) {

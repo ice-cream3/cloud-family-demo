@@ -7,8 +7,10 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -25,7 +27,7 @@ public class PartnerExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex, HttpServletRequest request) {
         log.warn("Business exception: code={}, status={}, method={}, path={}, message={}",
                 ex.getCode(), ex.getHttpStatus(), request.getMethod(), request.getRequestURI(), ex.getMessage());
-        return ResponseEntity.status(ex.getHttpStatus()).body(ApiResponse.error(ex.getErrorCode(), ex.getMessage()));
+        return ResponseEntity.ok(ApiResponse.error(ex.getErrorCode(), ex.getMessage()));
     }
 
     @ExceptionHandler({
@@ -34,9 +36,37 @@ public class PartnerExceptionHandler {
             MethodArgumentTypeMismatchException.class
     })
     public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception ex, HttpServletRequest request) {
+        String message = badRequestMessage(ex);
         log.warn("Bad request: code={}, method={}, path={}, message={}",
-                ErrorCode.COMMON_BAD_REQUEST.getCode(), request.getMethod(), request.getRequestURI(), ex.getMessage());
-        return ResponseEntity.badRequest().body(ApiResponse.error(ErrorCode.COMMON_BAD_REQUEST, ex.getMessage()));
+                ErrorCode.COMMON_BAD_REQUEST.getCode(), request.getMethod(), request.getRequestURI(), message);
+        return ResponseEntity.ok(ApiResponse.error(ErrorCode.COMMON_BAD_REQUEST, message));
+    }
+
+    @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateKeyException(DuplicateKeyException ex, HttpServletRequest request) {
+        String message = duplicateKeyMessage(ex);
+        log.warn("Duplicate key: code={}, method={}, path={}, message={}",
+                ErrorCode.COMMON_BAD_REQUEST.getCode(), request.getMethod(), request.getRequestURI(), message);
+        return ResponseEntity.ok(ApiResponse.error(ErrorCode.COMMON_BAD_REQUEST, message));
+    }
+
+    private String duplicateKeyMessage(DuplicateKeyException ex) {
+        String message = ex.getMostSpecificCause().getMessage();
+        if (message != null && message.contains("uk_vip_user_email")) {
+            return "email already exists";
+        }
+        return "duplicate key";
+    }
+
+    private String badRequestMessage(Exception ex) {
+        if (ex instanceof MethodArgumentNotValidException validationException) {
+            return validationException.getBindingResult().getFieldErrors().stream()
+                    .map(error -> error.getDefaultMessage() == null ? error.getField() + " is invalid" : error.getDefaultMessage())
+                    .distinct()
+                    .findFirst()
+                    .orElse("请求参数不合法");
+        }
+        return ex.getMessage();
     }
 
     @ExceptionHandler(ResponseStatusException.class)
@@ -52,6 +82,14 @@ public class PartnerExceptionHandler {
                 errorCode.getCode(), ex.getStatusCode().value(), request.getMethod(), request.getRequestURI(), ex.getReason());
         return ResponseEntity.status(status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status)
                 .body(ApiResponse.error(errorCode, ex.getReason()));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(AccessDeniedException ex, HttpServletRequest request) {
+        log.warn("Access denied: code={}, method={}, path={}, message={}",
+                ErrorCode.COMMON_FORBIDDEN.getCode(), request.getMethod(), request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(ErrorCode.COMMON_FORBIDDEN, "Permission denied"));
     }
 
     @ExceptionHandler(Exception.class)

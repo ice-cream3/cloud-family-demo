@@ -25,6 +25,12 @@ public interface VipUserDao extends BaseMapper<VipUser> {
 
     VipUser findByUsername(@Param("username") String username);
 
+    long countByEmail(@Param("email") String email);
+
+    long countByEmailExcludingId(@Param("email") String email, @Param("id") Long id);
+
+    long countByEmailExcludingUsername(@Param("email") String email, @Param("username") String username);
+
     int insert(VipUser vipUser);
 
     int update(VipUser vipUser);

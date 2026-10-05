@@ -31,12 +31,18 @@ public class GatewayOnlyAccessFilter extends OncePerRequestFilter {
         }
 
         String requestToken = request.getHeader(GatewayHeaders.INTERNAL_TOKEN);
-        if (internalToken.equals(requestToken)) {
-            filterChain.doFilter(request, response);
+        if (!internalToken.equals(requestToken)) {
+            writeForbidden(response);
             return;
         }
 
-        writeForbidden(response);
+        String username = request.getHeader(GatewayHeaders.USER_NAME);
+        if (username == null || username.isBlank() || "anonymous".equalsIgnoreCase(username.trim())) {
+            writeUnauthorized(response);
+            return;
+        }
+
+        filterChain.doFilter(request, response);
     }
 
     private void writeForbidden(HttpServletResponse response) throws IOException {
@@ -47,6 +53,19 @@ public class GatewayOnlyAccessFilter extends OncePerRequestFilter {
                 + ",\"timestamp\":\"" + LocalDateTime.now()
                 + "\"}";
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.getWriter().write(body);
+    }
+
+    private void writeUnauthorized(HttpServletResponse response) throws IOException {
+        ErrorCode errorCode = ErrorCode.COMMON_UNAUTHORIZED;
+        String body = "{\"code\":" + errorCode.getCode()
+                + ",\"message\":\"Login required\""
+                + ",\"data\":null"
+                + ",\"timestamp\":\"" + LocalDateTime.now()
+                + "\"}";
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.getWriter().write(body);

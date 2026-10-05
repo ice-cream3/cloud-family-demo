@@ -6,6 +6,7 @@ import com.kfpd.cloud.common.config.security.JwtSecretKeys;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -24,7 +25,14 @@ public class SecurityConfig {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchange -> exchange
-                        .pathMatchers("/auth/api/login", "/auth/api/register", "/auth/manager/login", "/auth/refresh", "/actuator/health").permitAll()
+                        .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .pathMatchers(
+                                "/auth/api/login", "/auth/api/login/**",
+                                "/auth/api/register", "/auth/api/register/**",
+                                "/auth/manager/login", "/auth/manager/login/**",
+                                "/auth/refresh", "/auth/refresh/**",
+                                "/actuator/health"
+                        ).permitAll()
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(resourceServer -> resourceServer.jwt(jwt -> {

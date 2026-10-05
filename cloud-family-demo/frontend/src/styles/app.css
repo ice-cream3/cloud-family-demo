@@ -860,6 +860,15 @@ button:disabled {
     auto;
 }
 
+.query-bar.partner-info-query {
+  grid-template-columns:
+    minmax(170px, 1fr)
+    minmax(150px, 0.86fr)
+    minmax(140px, 0.72fr)
+    minmax(130px, 0.62fr)
+    auto;
+}
+
 .primary-button.small,
 .ghost-button.small {
   height: 38px;
@@ -1277,6 +1286,40 @@ button:disabled {
   padding: 0 10px;
 }
 
+.password-input-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  align-items: center;
+}
+
+.password-input-wrap input {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.password-input-wrap button {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #d7e0ea;
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+  color: #5f6f83;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.password-input-wrap button:hover {
+  color: #0f766e;
+  background: #eef8f5;
+}
+
+.password-input-wrap button:focus-visible {
+  outline: 2px solid rgba(15, 118, 110, 0.35);
+  outline-offset: 2px;
+}
+
 .record-form textarea {
   min-height: 78px;
   padding: 10px;
@@ -1296,6 +1339,13 @@ button:disabled {
   color: #667085;
   background: #f4f6f8;
   cursor: not-allowed;
+}
+
+.record-form .form-hint {
+  color: #728094;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 .record-form .checkbox-field {

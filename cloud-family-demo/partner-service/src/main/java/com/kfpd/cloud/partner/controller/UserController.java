@@ -4,7 +4,19 @@ import java.util.Map;
 
 import com.kfpd.cloud.common.web.ApiResponse;
 import com.kfpd.cloud.common.web.GatewayHeaders;
+import com.kfpd.cloud.partner.pojo.vo.AccountSecurityUpdateVO;
+import com.kfpd.cloud.partner.pojo.vo.AccountSecurityVO;
+import com.kfpd.cloud.partner.pojo.vo.AppDocumentVO;
+import com.kfpd.cloud.partner.pojo.vo.AppVersionVO;
+import com.kfpd.cloud.partner.pojo.vo.FavoriteItemVO;
+import com.kfpd.cloud.partner.pojo.vo.MembershipVO;
+import com.kfpd.cloud.partner.pojo.vo.NotificationSettingsUpdateVO;
+import com.kfpd.cloud.partner.pojo.vo.NotificationSettingsVO;
+import com.kfpd.cloud.partner.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.partner.pojo.vo.PageVO;
+import com.kfpd.cloud.partner.pojo.vo.PasswordChangeVO;
+import com.kfpd.cloud.partner.pojo.vo.ProfileDynamicVO;
+import com.kfpd.cloud.partner.pojo.vo.UserHistoryItemVO;
 import com.kfpd.cloud.partner.pojo.vo.UserProfileVO;
 import com.kfpd.cloud.partner.pojo.vo.VipUserPageQueryVO;
 import com.kfpd.cloud.partner.pojo.vo.VipUserRequestVO;
@@ -37,6 +49,85 @@ public class UserController {
             @RequestHeader(value = GatewayHeaders.USER_ROLES, required = false) String roles
     ) {
         return ApiResponse.success(userService.currentUser(username, roles));
+    }
+
+    @PostMapping("/security")
+    public ApiResponse<AccountSecurityVO> accountSecurity(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username
+    ) {
+        return ApiResponse.success(userService.accountSecurity(username));
+    }
+
+    @PostMapping("/security/update")
+    public ApiResponse<AccountSecurityVO> updateAccountSecurity(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+            @RequestBody AccountSecurityUpdateVO request
+    ) {
+        return ApiResponse.success(userService.updateAccountSecurity(username, request));
+    }
+
+    @PostMapping("/security/password")
+    public ApiResponse<Void> changePassword(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+            @RequestBody PasswordChangeVO request
+    ) {
+        userService.changePassword(username, request);
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/settings/notifications")
+    public ApiResponse<NotificationSettingsVO> notificationSettings(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username
+    ) {
+        return ApiResponse.success(userService.notificationSettings(username));
+    }
+
+    @PostMapping("/settings/notifications/update")
+    public ApiResponse<NotificationSettingsVO> updateNotificationSettings(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+            @RequestBody NotificationSettingsUpdateVO request
+    ) {
+        return ApiResponse.success(userService.updateNotificationSettings(username, request));
+    }
+
+    @PostMapping("/settings/document/{documentType}")
+    public ApiResponse<AppDocumentVO> document(@PathVariable String documentType) {
+        return ApiResponse.success(userService.document(documentType));
+    }
+
+    @PostMapping("/settings/version")
+    public ApiResponse<AppVersionVO> latestVersion() {
+        return ApiResponse.success(userService.latestVersion());
+    }
+
+    @PostMapping("/membership")
+    public ApiResponse<MembershipVO> membership(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username
+    ) {
+        return ApiResponse.success(userService.membership(username));
+    }
+
+    @PostMapping("/history/page")
+    public ApiResponse<PageVO<UserHistoryItemVO>> history(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+            @RequestBody(required = false) PageQueryVO query
+    ) {
+        return ApiResponse.success(userService.history(username, query));
+    }
+
+    @PostMapping("/favorites/page")
+    public ApiResponse<PageVO<FavoriteItemVO>> favorites(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+            @RequestBody(required = false) PageQueryVO query
+    ) {
+        return ApiResponse.success(userService.favorites(username, query));
+    }
+
+    @PostMapping("/dynamic/refresh")
+    public ApiResponse<ProfileDynamicVO> refreshDynamic(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username
+    ) {
+        return ApiResponse.success(userService.refreshDynamic(username));
     }
 
     @PostMapping("/vip-users/page")

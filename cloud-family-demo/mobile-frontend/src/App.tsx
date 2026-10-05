@@ -31,11 +31,11 @@ export default function App() {
     return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
   }, []);
 
-  async function handleLogin(username: string, password: string) {
+  async function handleLogin(username: string, password: string, remember: boolean) {
     setLoading(true);
     setError(null);
     try {
-      setSession(await loginPartner(username, password));
+      setSession(await loginPartner(username, password, remember));
     } catch (err) {
       setError(readError(err));
     } finally {

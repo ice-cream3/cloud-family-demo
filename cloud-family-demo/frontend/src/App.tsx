@@ -10,6 +10,7 @@ import {
   loadCurrentUser,
   loadManagerDashboard,
   loadMenus,
+  loadPartnerFeaturePage,
   loadPartnerInfo,
   loadSystemMenuPage,
   loadSystemOperationLogs,
@@ -19,6 +20,7 @@ import {
   loadSystemRoles,
   loadSystemUserRoles,
   loadSystemUsers,
+  resetPartnerInfoPassword,
   resetSystemUserPassword,
   replaceSystemMenuPermissions,
   replaceSystemRoleMenus,
@@ -166,7 +168,11 @@ export default function App() {
   }
 
   async function handleResetUserPassword(id: number, password: string) {
-    await resetSystemUserPassword(id, password);
+    if (activeMenu?.path === '/api/manager/partner/info') {
+      await resetPartnerInfoPassword(id, password);
+    } else {
+      await resetSystemUserPassword(id, password);
+    }
     await reloadCurrentSystemPage(systemPage?.pageNum || 1);
   }
 
@@ -311,6 +317,12 @@ function getSystemPageLoaders(): Record<string, (pageNum: number, pageSize: numb
     '/api/manager/system/operation-logs': loadSystemOperationLogs,
     '/api/manager/vip-users': loadManagerVipUsers,
     '/api/manager/partner/info': loadPartnerInfo,
+    '/api/manager/partner/settings/notifications': (pageNum, pageSize, query) => loadPartnerFeaturePage('notifications', pageNum, pageSize, query),
+    '/api/manager/partner/settings/documents': (pageNum, pageSize, query) => loadPartnerFeaturePage('documents', pageNum, pageSize, query),
+    '/api/manager/partner/settings/versions': (pageNum, pageSize, query) => loadPartnerFeaturePage('versions', pageNum, pageSize, query),
+    '/api/manager/partner/memberships': (pageNum, pageSize, query) => loadPartnerFeaturePage('memberships', pageNum, pageSize, query),
+    '/api/manager/partner/histories': (pageNum, pageSize, query) => loadPartnerFeaturePage('histories', pageNum, pageSize, query),
+    '/api/manager/partner/favorites': (pageNum, pageSize, query) => loadPartnerFeaturePage('favorites', pageNum, pageSize, query),
   };
 }
 

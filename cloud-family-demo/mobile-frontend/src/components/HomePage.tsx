@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
 import {
   Archive,
   Bell,
@@ -31,7 +32,21 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import type { PartnerHealth, UserProfile } from '../types/api';
+import type { AppDocument, FavoriteItem, Membership, PartnerHealth, ProfileDynamic, UserHistoryItem, UserProfile } from '../types/api';
+import type { AccountSecurity } from '../types/api';
+import {
+  changeAccountPassword,
+  loadAccountSecurity,
+  loadAppDocument,
+  loadAppVersion,
+  loadFavorites,
+  loadHistory,
+  loadMembership,
+  loadNotificationSettings,
+  refreshProfileDynamic,
+  updateAccountSecurity,
+  updateNotificationSettings,
+} from '../services/partnerService';
 import type { Session } from '../services/tokenStore';
 
 type HomePageProps = {
@@ -45,7 +60,8 @@ type HomePageProps = {
 };
 
 type TabKey = 'home' | 'tools' | 'activity' | 'message' | 'profile';
-type ScreenKey = TabKey | 'compress' | 'history' | 'settings';
+type ScreenKey = TabKey | 'compress' | 'history' | 'settings' | 'membership' | 'favorites';
+type SettingDetail = 'account' | 'notifications' | 'about' | 'privacy' | 'agreement' | 'version';
 
 const mainTools = [
   { icon: Image, label: '图片处理', tone: 'green' },
@@ -107,20 +123,32 @@ const messages = [
   { icon: MessageCircle, title: '客服消息', desc: '您好，有什么可以帮助您?', time: '2天前', tone: 'blue' },
 ];
 
-const historyItems = [
-  { icon: Image, title: '图片压缩', desc: '3张图片 · 2.4MB -> 856KB', time: '14:32', tone: 'green' },
-  { icon: FileImage, title: 'PDF转图片', desc: '文件名：document.pdf', time: '11:20', tone: 'red' },
-  { icon: ScanLine, title: '文字识别', desc: '提取 365 个文字', time: '10:15', tone: 'blue' },
-  { icon: FileText, title: '图片转PDF', desc: '5张图片', time: '昨天 16:20', tone: 'orange' },
-  { icon: Calculator, title: '单位换算', desc: '长度单位转换', time: '昨天 09:45', tone: 'green' },
-];
-
 export function HomePage({ session, profile, health, loading, error, onReload, onLogout }: HomePageProps) {
   const [screen, setScreen] = useState<ScreenKey>('home');
   const [showMoreTools, setShowMoreTools] = useState(false);
+  const [dynamic, setDynamic] = useState<ProfileDynamic | null>(null);
+  const [dynamicLoading, setDynamicLoading] = useState(false);
   const displayName = profile?.displayName || session.username || '用户名';
-  const serviceStatus = health?.status || (profile ? 'UP' : 'UNKNOWN');
-  const activeTab = ['compress', 'history', 'settings'].includes(screen) ? 'tools' : screen as TabKey;
+  const serviceStatus = dynamic?.serviceStatus || health?.status || (profile ? 'UP' : 'UNKNOWN');
+  const activeTab = ['history', 'settings', 'membership', 'favorites'].includes(screen) ? 'profile' : screen === 'compress' ? 'tools' : screen as TabKey;
+
+  useEffect(() => {
+    void loadDynamic();
+  }, []);
+
+  async function loadDynamic() {
+    setDynamicLoading(true);
+    try {
+      setDynamic(await refreshProfileDynamic());
+    } finally {
+      setDynamicLoading(false);
+    }
+  }
+
+  async function refreshDynamic() {
+    onReload();
+    await loadDynamic();
+  }
 
   function setTab(tab: TabKey) {
     setScreen(tab);
@@ -148,15 +176,20 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
           <ProfileScreen
             displayName={displayName}
             serviceStatus={serviceStatus}
-            loading={loading}
-            onReload={onReload}
+            loading={loading || dynamicLoading}
+            dynamic={dynamic}
+            onReload={refreshDynamic}
             onLogout={onLogout}
+            onOpenMembership={() => setScreen('membership')}
             onOpenHistory={() => setScreen('history')}
+            onOpenFavorites={() => setScreen('favorites')}
             onOpenSettings={() => setScreen('settings')}
           />
         ) : null}
         {screen === 'history' ? <HistoryScreen onBack={() => setScreen('profile')} /> : null}
-        {screen === 'settings' ? <SettingsScreen onBack={() => setScreen('profile')} onLogout={onLogout} /> : null}
+        {screen === 'membership' ? <MembershipScreen onBack={() => setScreen('profile')} /> : null}
+        {screen === 'favorites' ? <FavoritesScreen onBack={() => setScreen('profile')} /> : null}
+        {screen === 'settings' ? <SettingsScreen displayName={displayName} onBack={() => setScreen('profile')} onLogout={onLogout} /> : null}
 
         <BottomTabs active={activeTab} onChange={setTab} hasMessageDot />
         {showMoreTools ? <MoreToolsSheet onClose={() => setShowMoreTools(false)} /> : null}
@@ -395,17 +428,23 @@ function ProfileScreen({
   displayName,
   serviceStatus,
   loading,
+  dynamic,
   onReload,
   onLogout,
+  onOpenMembership,
   onOpenHistory,
+  onOpenFavorites,
   onOpenSettings,
 }: {
   displayName: string;
   serviceStatus: string;
   loading: boolean;
+  dynamic: ProfileDynamic | null;
   onReload: () => void;
   onLogout: () => void;
+  onOpenMembership: () => void;
   onOpenHistory: () => void;
+  onOpenFavorites: () => void;
   onOpenSettings: () => void;
 }) {
   return (
@@ -429,19 +468,19 @@ function ProfileScreen({
           <strong>开通会员</strong>
           <span>解锁更多高级功能</span>
         </div>
-        <button type="button">立即开通</button>
+        <button type="button" onClick={onOpenMembership}>立即开通</button>
       </section>
       <div className="profile-stats">
-        <div><strong>12</strong><span>我的收藏</span></div>
-        <div><strong>28</strong><span>历史记录</span></div>
-        <div><strong>3</strong><span>我的文件</span></div>
-        <div><strong>0</strong><span>优惠券</span></div>
+        <div><strong>{dynamic?.favoriteCount ?? '-'}</strong><span>我的收藏</span></div>
+        <div><strong>{dynamic?.historyCount ?? '-'}</strong><span>历史记录</span></div>
+        <div><strong>{dynamic?.fileCount ?? '-'}</strong><span>我的文件</span></div>
+        <div><strong>{dynamic?.couponCount ?? '-'}</strong><span>优惠券</span></div>
       </div>
       <div className="profile-menu">
-        <MenuRow icon={Crown} title="会员中心" />
+        <MenuRow icon={Crown} title="会员中心" onClick={onOpenMembership} />
         <MenuRow icon={FileText} title="历史记录" onClick={onOpenHistory} />
-        <MenuRow icon={Star} title="我的收藏" />
-        <MenuRow icon={RefreshCw} title={loading ? '刷新中' : '刷新状态'} onClick={onReload} />
+        <MenuRow icon={Star} title="我的收藏" onClick={onOpenFavorites} />
+        <MenuRow icon={RefreshCw} title={loading ? '刷新中' : '刷新动态'} onClick={onReload} />
         <MenuRow icon={Settings} title="设置" onClick={onOpenSettings} />
         <MenuRow icon={LogOut} title="退出登录" onClick={onLogout} />
       </div>
@@ -450,24 +489,50 @@ function ProfileScreen({
 }
 
 function HistoryScreen({ onBack }: { onBack: () => void }) {
+  const [items, setItems] = useState<UserHistoryItem[]>([]);
+  const [category, setCategory] = useState('全部');
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState<string | null>(null);
+  const categories = ['全部', '图片处理', '文件转换', '扫描识别', '生活工具'];
+
+  useEffect(() => {
+    void reload(category);
+  }, [category]);
+
+  async function reload(nextCategory: string) {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const page = await loadHistory(nextCategory);
+      setItems(page.records || []);
+    } catch (err) {
+      setMessage(readSettingError(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="tool-screen">
       <HeaderWithBack title="历史记录" onBack={onBack} />
-      <SegmentedTabs items={['全部', '图片处理', '文件转换', '扫描识别', '生活工具']} />
+      <SegmentedTabs items={categories} active={category} onChange={setCategory} />
       <h2 className="history-date">今天</h2>
+      {message ? <div className="settings-message error">{message}</div> : null}
       <div className="message-list history-list">
-        {historyItems.map((item) => {
-          const Icon = item.icon;
+        {loading ? <article className="settings-info-card">加载中</article> : null}
+        {!loading && items.length === 0 ? <article className="settings-info-card">暂无历史记录</article> : null}
+        {items.map((item) => {
+          const Icon = iconForTone(item.iconTone);
           return (
-            <article key={`${item.title}-${item.time}`} className="message-item">
-              <span className={`tool-icon ${item.tone}`}>
+            <article key={item.id} className="message-item">
+              <span className={`tool-icon ${item.iconTone || 'blue'}`}>
                 <Icon size={20} />
               </span>
               <div>
                 <strong>{item.title}</strong>
-                <p>{item.desc}</p>
+                <p>{item.description}</p>
               </div>
-              <time>{item.time}</time>
+              <time>{formatShortTime(item.occurredAt)}</time>
             </article>
           );
         })}
@@ -476,21 +541,443 @@ function HistoryScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-function SettingsScreen({ onBack, onLogout }: { onBack: () => void; onLogout: () => void }) {
+function MembershipScreen({ onBack }: { onBack: () => void }) {
+  const [membership, setMembership] = useState<Membership | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadMembership()
+      .then(setMembership)
+      .catch((err) => setMessage(readSettingError(err)));
+  }, []);
+
+  return (
+    <div className="tool-screen">
+      <HeaderWithBack title="会员中心" onBack={onBack} />
+      {message ? <div className="settings-message error">{message}</div> : null}
+      <section className="vip-banner">
+        <div>
+          <h2>{membership?.planName || '普通会员'}</h2>
+          <p>{membership?.benefits || '基础工具可用'}</p>
+          <button type="button">立即开通</button>
+        </div>
+        <Crown size={78} />
+      </section>
+      <div className="settings-card-list">
+        <article className="settings-info-card">
+          <strong>会员状态</strong>
+          <span>{membership?.status || '-'}</span>
+        </article>
+        <article className="settings-info-card">
+          <strong>到期时间</strong>
+          <span>{membership?.expireAt ? formatShortTime(membership.expireAt) : '长期有效'}</span>
+        </article>
+      </div>
+    </div>
+  );
+}
+
+function FavoritesScreen({ onBack }: { onBack: () => void }) {
+  const [items, setItems] = useState<FavoriteItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadFavorites()
+      .then((page) => setItems(page.records || []))
+      .catch((err) => setMessage(readSettingError(err)))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="tool-screen">
+      <HeaderWithBack title="我的收藏" onBack={onBack} />
+      {message ? <div className="settings-message error">{message}</div> : null}
+      <div className="message-list">
+        {loading ? <article className="settings-info-card">加载中</article> : null}
+        {!loading && items.length === 0 ? <article className="settings-info-card">暂无收藏</article> : null}
+        {items.map((item) => {
+          const Icon = iconForTone(item.iconTone);
+          return (
+            <article key={item.id} className="message-item">
+              <span className={`tool-icon ${item.iconTone || 'blue'}`}>
+                <Icon size={20} />
+              </span>
+              <div>
+                <strong>{item.title}</strong>
+                <p>{item.description}</p>
+              </div>
+              <time>{formatShortTime(item.createdAt)}</time>
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SettingsScreen({ displayName, onBack, onLogout }: { displayName: string; onBack: () => void; onLogout: () => void }) {
+  const [detail, setDetail] = useState<SettingDetail | null>(null);
+  const [cacheSize, setCacheSize] = useState('12.4MB');
+  const [toast, setToast] = useState<string | null>(null);
+
+  function showToast(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 1800);
+  }
+
+  function clearCache() {
+    if (cacheSize === '0KB') {
+      showToast('缓存已清理');
+      return;
+    }
+    setCacheSize('0KB');
+    showToast('缓存清理完成');
+  }
+
+  function checkVersion() {
+    setDetail('version');
+  }
+
+  function logout() {
+    if (window.confirm('确认退出登录？')) {
+      onLogout();
+    }
+  }
+
+  if (detail) {
+    return (
+      <div className="tool-screen settings-detail-screen">
+        <HeaderWithBack title={settingTitle(detail)} onBack={() => setDetail(null)} />
+        {detail === 'account' ? (
+          <AccountSecurityDetail fallbackDisplayName={displayName} />
+        ) : (
+          <SettingDetailContent
+            detail={detail}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="tool-screen">
       <HeaderWithBack title="设置" onBack={onBack} />
       <div className="profile-menu settings-menu">
-        <MenuRow icon={ShieldCheck} title="账号与安全" />
-        <MenuRow icon={Bell} title="消息通知" />
-        <MenuRow icon={Archive} title="清理缓存" meta="12.4MB" />
-        <MenuRow icon={FileText} title="关于我们" />
-        <MenuRow icon={ShieldCheck} title="隐私政策" />
-        <MenuRow icon={FileText} title="用户协议" />
-        <MenuRow icon={RefreshCw} title="版本更新" meta="v1.2.0" />
+        <MenuRow icon={ShieldCheck} title="账号与安全" onClick={() => setDetail('account')} />
+        <MenuRow icon={Bell} title="消息通知" onClick={() => setDetail('notifications')} />
+        <MenuRow icon={Archive} title="清理缓存" meta={cacheSize} onClick={clearCache} />
+        <MenuRow icon={FileText} title="关于我们" onClick={() => setDetail('about')} />
+        <MenuRow icon={ShieldCheck} title="隐私政策" onClick={() => setDetail('privacy')} />
+        <MenuRow icon={FileText} title="用户协议" onClick={() => setDetail('agreement')} />
+        <MenuRow icon={RefreshCw} title="版本更新" meta="v1.2.0" onClick={checkVersion} />
       </div>
-      <button className="logout-button" type="button" onClick={onLogout}>退出登录</button>
+      <button className="logout-button" type="button" onClick={logout}>退出登录</button>
+      {toast ? <div className="settings-toast">{toast}</div> : null}
     </div>
+  );
+}
+
+function AccountSecurityDetail({ fallbackDisplayName }: { fallbackDisplayName: string }) {
+  const [account, setAccount] = useState<AccountSecurity | null>(null);
+  const [displayName, setDisplayName] = useState(fallbackDisplayName);
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    void reload();
+  }, []);
+
+  async function reload() {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const nextAccount = await loadAccountSecurity();
+      setAccount(nextAccount);
+      setDisplayName(nextAccount.displayName || '');
+      setEmail(nextAccount.email || '');
+      setPhone(nextAccount.phone || '');
+    } catch (err) {
+      setMessage({ type: 'error', text: readSettingError(err) });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!displayName.trim()) {
+      setMessage({ type: 'error', text: '请输入显示名称' });
+      return;
+    }
+    if (email.trim() && !isValidEmail(email.trim())) {
+      setMessage({ type: 'error', text: '请输入有效的邮箱地址' });
+      return;
+    }
+    setSaving(true);
+    setMessage(null);
+    try {
+      const nextAccount = await updateAccountSecurity({
+        displayName: displayName.trim(),
+        email: email.trim() || null,
+        phone: phone.trim() || null,
+      });
+      setAccount(nextAccount);
+      setDisplayName(nextAccount.displayName || '');
+      setEmail(nextAccount.email || '');
+      setPhone(nextAccount.phone || '');
+      setMessage({ type: 'success', text: '账号资料已更新' });
+    } catch (err) {
+      setMessage({ type: 'error', text: readSettingError(err) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function savePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!currentPassword || !newPassword) {
+      setMessage({ type: 'error', text: '请输入当前密码和新密码' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setMessage({ type: 'error', text: '两次输入的新密码不一致' });
+      return;
+    }
+    if (!isStrongPassword(newPassword)) {
+      setMessage({ type: 'error', text: '新密码需为 6-20 位，并包含数字、大小写字母和特殊字符' });
+      return;
+    }
+    setSaving(true);
+    setMessage(null);
+    try {
+      await changeAccountPassword({ currentPassword, newPassword });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setMessage({ type: 'success', text: '密码已修改' });
+    } catch (err) {
+      setMessage({ type: 'error', text: readSettingError(err) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="settings-card-list">
+      <article className="settings-info-card">
+        <strong>{account?.username || '-'}</strong>
+        <span>{loading ? '账号信息加载中' : `会员等级：${account?.vipLevel || '-'} · 状态：${account?.status || '-'}`}</span>
+      </article>
+
+      {message ? <div className={`settings-message ${message.type}`}>{message.text}</div> : null}
+
+      <form className="settings-form-card" onSubmit={saveProfile}>
+        <h2>基础信息</h2>
+        <label>
+          显示名称
+          <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} disabled={loading || saving} />
+        </label>
+        <label>
+          邮箱
+          <input value={email} onChange={(event) => setEmail(event.target.value)} disabled={loading || saving} inputMode="email" />
+        </label>
+        <label>
+          手机号
+          <input value={phone} onChange={(event) => setPhone(event.target.value)} disabled={loading || saving} inputMode="tel" />
+        </label>
+        <button className="app-primary" type="submit" disabled={loading || saving}>
+          {saving ? '保存中' : '保存资料'}
+        </button>
+      </form>
+
+      <form className="settings-form-card" onSubmit={savePassword}>
+        <h2>修改密码</h2>
+        <label>
+          当前密码
+          <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} disabled={saving} autoComplete="current-password" />
+        </label>
+        <label>
+          新密码
+          <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} disabled={saving} autoComplete="new-password" />
+        </label>
+        <label>
+          确认新密码
+          <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} disabled={saving} autoComplete="new-password" />
+        </label>
+        <button className="app-primary" type="submit" disabled={saving}>
+          {saving ? '提交中' : '修改密码'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function settingTitle(detail: SettingDetail) {
+  return {
+    account: '账号与安全',
+    notifications: '消息通知',
+    about: '关于我们',
+    privacy: '隐私政策',
+    agreement: '用户协议',
+    version: '版本更新',
+  }[detail];
+}
+
+function SettingDetailContent({
+  detail,
+}: {
+  detail: SettingDetail;
+}) {
+  const [noticeSettings, setNoticeSettings] = useState({
+    systemEnabled: true,
+    activityEnabled: true,
+    taskEnabled: false,
+  });
+  const [document, setDocument] = useState<AppDocument | null>(null);
+  const [version, setVersion] = useState('检查中');
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMessage(null);
+    if (detail === 'notifications') {
+      loadNotificationSettings()
+        .then(setNoticeSettings)
+        .catch((err) => setMessage(readSettingError(err)));
+      return;
+    }
+    if (detail === 'version') {
+      loadAppVersion()
+        .then((nextVersion) => setVersion(nextVersion.latest ? '已是最新' : nextVersion.versionName))
+        .catch((err) => setMessage(readSettingError(err)));
+      return;
+    }
+    if (detail === 'about' || detail === 'privacy' || detail === 'agreement') {
+      loadAppDocument(detail)
+        .then(setDocument)
+        .catch((err) => setMessage(readSettingError(err)));
+    }
+  }, [detail]);
+
+  async function saveNotice(key: keyof typeof noticeSettings, value: boolean) {
+    const next = { ...noticeSettings, [key]: value };
+    setNoticeSettings(next);
+    try {
+      setNoticeSettings(await updateNotificationSettings(next));
+    } catch (err) {
+      setMessage(readSettingError(err));
+    }
+  }
+
+  if (detail === 'notifications') {
+    return (
+      <div className="settings-card-list">
+        {message ? <div className="settings-message error">{message}</div> : null}
+        <SwitchRow title="系统通知" desc="登录状态、账号安全和服务状态提醒" checked={noticeSettings.systemEnabled} onChange={(value) => saveNotice('systemEnabled', value)} />
+        <SwitchRow title="活动消息" desc="会员活动、福利和优惠通知" checked={noticeSettings.activityEnabled} onChange={(value) => saveNotice('activityEnabled', value)} />
+        <SwitchRow title="任务完成提醒" desc="文件处理、图片压缩完成后提醒" checked={noticeSettings.taskEnabled} onChange={(value) => saveNotice('taskEnabled', value)} />
+      </div>
+    );
+  }
+
+  if (detail === 'version') {
+    return (
+      <div className="settings-card-list">
+        {message ? <div className="settings-message error">{message}</div> : null}
+        <article className="settings-info-card centered">
+          <RefreshCw size={34} />
+          <strong>{version}</strong>
+          <span>{version === '已是最新' ? '当前已是最新版本' : '当前版本'}</span>
+        </article>
+      </div>
+    );
+  }
+
+  if (detail === 'account') {
+    return null;
+  }
+
+  return (
+    <article className="settings-document">
+      {message ? <div className="settings-message error">{message}</div> : null}
+      <h2>{document?.title || '加载中'}</h2>
+      {(document?.content ? document.content.split('。').filter(Boolean).map((item) => `${item}。`) : ['内容加载中']).map((paragraph) => (
+        <p key={paragraph}>{paragraph}</p>
+      ))}
+    </article>
+  );
+}
+
+function readSettingError(error: unknown) {
+  if (error instanceof Error) {
+    if (error.message === 'email already exists') {
+      return '该邮箱已经被占用';
+    }
+    if (error.message === 'email format is invalid') {
+      return '请输入有效的邮箱地址';
+    }
+    if (error.message === 'Current password is incorrect') {
+      return '当前密码不正确';
+    }
+    if (error.message === 'newPassword is not strong enough') {
+      return '新密码需为 6-20 位，并包含数字、大小写字母和特殊字符';
+    }
+    return error.message;
+  }
+  return '操作失败';
+}
+
+function isStrongPassword(value: string) {
+  return /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{6,20}$/.test(value);
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
+}
+
+function iconForTone(tone?: string | null) {
+  if (tone === 'green') {
+    return Image;
+  }
+  if (tone === 'orange') {
+    return FileText;
+  }
+  if (tone === 'red') {
+    return FileImage;
+  }
+  if (tone === 'purple') {
+    return Sparkles;
+  }
+  return FileText;
+}
+
+function formatShortTime(value?: string | null) {
+  if (!value) {
+    return '-';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function SwitchRow({ title, desc, checked, onChange }: { title: string; desc: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label className="settings-switch-row">
+      <span>
+        <strong>{title}</strong>
+        <small>{desc}</small>
+      </span>
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <i />
+    </label>
   );
 }
 
@@ -570,11 +1057,11 @@ function SectionTitle({ title, action }: { title: string; action?: string }) {
   );
 }
 
-function SegmentedTabs({ items }: { items: string[] }) {
+function SegmentedTabs({ items, active, onChange }: { items: string[]; active?: string; onChange?: (item: string) => void }) {
   return (
     <div className="tool-segments">
       {items.map((item, index) => (
-        <button key={item} className={index === 0 ? 'active' : ''} type="button">{item}</button>
+        <button key={item} className={(active ? active === item : index === 0) ? 'active' : ''} type="button" onClick={() => onChange?.(item)}>{item}</button>
       ))}
     </div>
   );

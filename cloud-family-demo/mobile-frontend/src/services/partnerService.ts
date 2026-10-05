@@ -1,13 +1,29 @@
-import type { LoginResponse, PartnerHealth, RegisterRequest, UserProfile } from '../types/api';
+import type {
+  AccountSecurity,
+  AccountSecurityUpdateRequest,
+  AppDocument,
+  AppVersion,
+  FavoriteItem,
+  LoginResponse,
+  Membership,
+  NotificationSettings,
+  PageResult,
+  PartnerHealth,
+  PasswordChangeRequest,
+  ProfileDynamic,
+  RegisterRequest,
+  UserHistoryItem,
+  UserProfile,
+} from '../types/api';
 import { post } from './apiClient';
 import { clearSession, saveSession } from './tokenStore';
 
-export async function loginPartner(username: string, password: string) {
+export async function loginPartner(username: string, password: string, remember = true) {
   const response = await post<LoginResponse>('/auth/api/login', {
     auth: false,
     body: { username, password },
   });
-  return saveSession(response);
+  return saveSession(response, remember);
 }
 
 export async function registerPartner(request: RegisterRequest) {
@@ -28,6 +44,60 @@ export async function logoutPartner() {
 
 export function loadCurrentUser() {
   return post<UserProfile>('/api/users/me');
+}
+
+export function loadAccountSecurity() {
+  return post<AccountSecurity>('/api/users/security');
+}
+
+export function updateAccountSecurity(request: AccountSecurityUpdateRequest) {
+  return post<AccountSecurity>('/api/users/security/update', {
+    body: request,
+  });
+}
+
+export function changeAccountPassword(request: PasswordChangeRequest) {
+  return post<void>('/api/users/security/password', {
+    body: request,
+  });
+}
+
+export function loadNotificationSettings() {
+  return post<NotificationSettings>('/api/users/settings/notifications');
+}
+
+export function updateNotificationSettings(request: NotificationSettings) {
+  return post<NotificationSettings>('/api/users/settings/notifications/update', {
+    body: request,
+  });
+}
+
+export function loadAppDocument(documentType: 'about' | 'privacy' | 'agreement') {
+  return post<AppDocument>(`/api/users/settings/document/${documentType}`);
+}
+
+export function loadAppVersion() {
+  return post<AppVersion>('/api/users/settings/version');
+}
+
+export function loadMembership() {
+  return post<Membership>('/api/users/membership');
+}
+
+export function loadHistory(category = '全部', pageNum = 1, pageSize = 20) {
+  return post<PageResult<UserHistoryItem>>('/api/users/history/page', {
+    body: { category, pageNum, pageSize },
+  });
+}
+
+export function loadFavorites(pageNum = 1, pageSize = 20) {
+  return post<PageResult<FavoriteItem>>('/api/users/favorites/page', {
+    body: { pageNum, pageSize },
+  });
+}
+
+export function refreshProfileDynamic() {
+  return post<ProfileDynamic>('/api/users/dynamic/refresh');
 }
 
 export function loadPartnerHealth() {
