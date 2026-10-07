@@ -62,6 +62,12 @@ type HomePageProps = {
 type TabKey = 'home' | 'tools' | 'activity' | 'message' | 'profile';
 type ScreenKey = TabKey | 'compress' | 'history' | 'settings' | 'membership' | 'favorites';
 type SettingDetail = 'account' | 'notifications' | 'about' | 'privacy' | 'agreement' | 'version';
+type SearchableTool = {
+  icon: typeof Image;
+  label: string;
+  tone: string;
+  screen?: 'compress';
+};
 
 const mainTools = [
   { icon: Image, label: '图片处理', tone: 'green' },
@@ -209,6 +215,37 @@ function StatusBar() {
 }
 
 function HomeScreen({ displayName, onOpenTools, onOpenCompress }: { displayName: string; onOpenTools: () => void; onOpenCompress: () => void }) {
+  const [searchText, setSearchText] = useState('');
+  const [searchActive, setSearchActive] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const searchResults = searchTools(searchText);
+
+  function openTool(item: SearchableTool) {
+    if (item.screen === 'compress') {
+      onOpenCompress();
+      return;
+    }
+    showToast(`${item.label}功能建设中`);
+  }
+
+  function submitSearch() {
+    const firstResult = searchResults[0];
+    if (!searchText.trim()) {
+      setSearchActive(true);
+      return;
+    }
+    if (firstResult) {
+      openTool(firstResult);
+      return;
+    }
+    showToast('暂无匹配工具');
+  }
+
+  function showToast(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 1600);
+  }
+
   return (
     <div className="tool-screen">
       <header className="tool-home-head">
@@ -219,14 +256,48 @@ function HomeScreen({ displayName, onOpenTools, onOpenCompress }: { displayName:
           <strong>Hi，早上好!</strong>
           <span>{displayName} 的效率工具箱 ✨</span>
         </div>
-        <button type="button" aria-label="刷新">
+        <button type="button" aria-label="快速打开图片压缩" onClick={onOpenCompress}>
           <Zap size={16} />
         </button>
       </header>
 
-      <div className="tool-search">
-        <input placeholder="搜索工具，试试“图片压缩”" />
-        <Search size={18} />
+      <div className={`tool-search-wrap ${searchActive ? 'active' : ''}`}>
+        <form className="tool-search" onSubmit={(event) => {
+          event.preventDefault();
+          submitSearch();
+        }}>
+          <input
+            value={searchText}
+            placeholder="搜索工具，试试“图片压缩”"
+            onChange={(event) => {
+              setSearchText(event.target.value);
+              setSearchActive(true);
+            }}
+            onFocus={() => setSearchActive(true)}
+          />
+          <button type="submit" aria-label="搜索工具">
+            <Search size={18} />
+          </button>
+        </form>
+        {searchActive ? (
+          <div className="tool-search-results">
+            {searchResults.length > 0 ? searchResults.slice(0, 5).map((item) => {
+              const Icon = item.icon;
+              return (
+                <button key={item.label} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => openTool(item)}>
+                  <span className={`tool-icon ${item.tone}`}>
+                    <Icon size={18} />
+                  </span>
+                  <span>
+                    <strong>{item.label}</strong>
+                    <small>{toolCategoryLabel(item)}</small>
+                  </span>
+                  <ChevronRight size={16} />
+                </button>
+              );
+            }) : <div className="tool-search-empty">暂无匹配工具</div>}
+          </div>
+        ) : null}
       </div>
 
       <section className="tool-home-banner">
@@ -279,8 +350,32 @@ function HomeScreen({ displayName, onOpenTools, onOpenCompress }: { displayName:
         </span>
         <ChevronRight size={18} />
       </button>
+      {toast ? <div className="home-toast">{toast}</div> : null}
     </div>
   );
+}
+
+function allSearchableTools(): SearchableTool[] {
+  return [...imageTools, ...fileTools, ...moreTools];
+}
+
+function searchTools(keyword: string) {
+  const normalizedKeyword = keyword.trim().toLowerCase();
+  const tools = allSearchableTools();
+  if (!normalizedKeyword) {
+    return tools.slice(0, 5);
+  }
+  return tools.filter((item) => item.label.toLowerCase().includes(normalizedKeyword));
+}
+
+function toolCategoryLabel(item: SearchableTool) {
+  if (imageTools.some((tool) => tool.label === item.label)) {
+    return '图片处理';
+  }
+  if (fileTools.some((tool) => tool.label === item.label)) {
+    return '文件转换';
+  }
+  return '生活工具';
 }
 
 function ToolsScreen({ onOpenCompress, onOpenMore }: { onOpenCompress: () => void; onOpenMore: () => void }) {
@@ -447,6 +542,13 @@ function ProfileScreen({
   onOpenFavorites: () => void;
   onOpenSettings: () => void;
 }) {
+  const [statsMessage, setStatsMessage] = useState<string | null>(null);
+
+  function showStatsMessage(message: string) {
+    setStatsMessage(message);
+    window.setTimeout(() => setStatsMessage(null), 1600);
+  }
+
   return (
     <div className="tool-screen profile-screen">
       <header className="profile-head">
@@ -471,11 +573,24 @@ function ProfileScreen({
         <button type="button" onClick={onOpenMembership}>立即开通</button>
       </section>
       <div className="profile-stats">
-        <div><strong>{dynamic?.favoriteCount ?? '-'}</strong><span>我的收藏</span></div>
-        <div><strong>{dynamic?.historyCount ?? '-'}</strong><span>历史记录</span></div>
-        <div><strong>{dynamic?.fileCount ?? '-'}</strong><span>我的文件</span></div>
-        <div><strong>{dynamic?.couponCount ?? '-'}</strong><span>优惠券</span></div>
+        <button type="button" onClick={onOpenFavorites} aria-label="打开我的收藏">
+          <strong>{dynamic?.favoriteCount ?? '-'}</strong>
+          <span>我的收藏</span>
+        </button>
+        <button type="button" onClick={onOpenHistory} aria-label="打开历史记录">
+          <strong>{dynamic?.historyCount ?? '-'}</strong>
+          <span>历史记录</span>
+        </button>
+        <button type="button" onClick={() => showStatsMessage('我的文件功能建设中')} aria-label="打开我的文件">
+          <strong>{dynamic?.fileCount ?? '-'}</strong>
+          <span>我的文件</span>
+        </button>
+        <button type="button" onClick={() => showStatsMessage('优惠券功能建设中')} aria-label="打开优惠券">
+          <strong>{dynamic?.couponCount ?? '-'}</strong>
+          <span>优惠券</span>
+        </button>
       </div>
+      {statsMessage ? <div className="profile-stats-toast">{statsMessage}</div> : null}
       <div className="profile-menu">
         <MenuRow icon={Crown} title="会员中心" onClick={onOpenMembership} />
         <MenuRow icon={FileText} title="历史记录" onClick={onOpenHistory} />

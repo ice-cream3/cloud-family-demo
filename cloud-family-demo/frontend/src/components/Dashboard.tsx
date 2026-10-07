@@ -561,6 +561,21 @@ function SystemPagePanel({
     setSelectedTreeMenu(null);
     setTreeNodes([]);
     setTreeError(null);
+    setEditorOpen(false);
+    setEditorRecord(null);
+    setEditorError(null);
+    setPasswordRecord(null);
+    setPasswordError(null);
+    setPermissionRecord(null);
+    setPermissionError(null);
+    setRoleRecord(null);
+    setRoleError(null);
+    setRolePermissionRecord(null);
+    setRolePermissionError(null);
+    setRoleMenuRecord(null);
+    setRoleMenuError(null);
+    setLogDetailRecord(null);
+    setOperationMessage(null);
   }, [menu?.path]);
 
   useEffect(() => {
