@@ -49,6 +49,7 @@ import {
   loadNotificationSettings,
   loadBookableTripSlots,
   loadMyTrips,
+  loadMyTripReservations,
   loadTripOwners,
   publishTrip,
   refreshProfileDynamic,
@@ -57,6 +58,7 @@ import {
   updateAccountSecurity,
   updateNotificationSettings,
 } from '../services/partnerService';
+import { ApiError } from '../services/apiClient';
 import type { Session } from '../services/tokenStore';
 
 type HomePageProps = {
@@ -78,6 +80,8 @@ type SearchableTool = {
   tone: string;
   screen?: 'compress';
 };
+
+const TRIP_CONFLICT_CODE = 200002;
 
 const mainTools = [
   { icon: Image, label: '图片处理', tone: 'green' },
@@ -784,6 +788,7 @@ function TripScheduleScreen({
   const [owners, setOwners] = useState<TripOwner[]>([]);
   const [selectedOwnerSlots, setSelectedOwnerSlots] = useState<TripSlot[]>([]);
   const [mySlots, setMySlots] = useState<TripSlot[]>([]);
+  const [reservedSlots, setReservedSlots] = useState<TripSlot[]>([]);
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState('下午可约');
   const [place, setPlace] = useState('线上会议');
@@ -802,12 +807,19 @@ function TripScheduleScreen({
     try {
       if (mode === 'booking') {
         const nextOwners = await loadTripOwners();
+        const nextReservations = await loadMyTripReservations();
         setOwners(nextOwners);
+        setReservedSlots(nextReservations);
         if (ownerUsername) {
           setSelectedOwnerSlots(await loadBookableTripSlots(ownerUsername));
         }
       } else {
-        setMySlots(await loadMyTrips());
+        const [nextMySlots, nextReservations] = await Promise.all([
+          loadMyTrips(),
+          loadMyTripReservations(),
+        ]);
+        setMySlots(nextMySlots);
+        setReservedSlots(nextReservations);
       }
     } catch (err) {
       showTripToast(readSettingError(err));
@@ -857,15 +869,34 @@ function TripScheduleScreen({
     }
   }
 
-  function requestSlot(slot: TripSlot) {
+  async function requestSlot(slot: TripSlot) {
     if (isOwnTripSlot(slot, username)) {
       showTripToast('不能预约自己发布的行程');
       return;
     }
-    applyTrip(slot.id)
-      .then(() => reloadTrips())
-      .then(() => showTripToast('预约申请已发送'))
-      .catch((err) => showTripToast(readSettingError(err)));
+    try {
+      await applyTrip(slot.id);
+      await reloadTrips();
+      setTab('我的预约');
+      showTripToast('预约申请已发送');
+    } catch (err) {
+      if (err instanceof ApiError && err.code === TRIP_CONFLICT_CODE) {
+        const confirmed = window.confirm('预约时间与您发布的行程冲突。继续预约将删除自己发布的冲突行程，是否继续？');
+        if (!confirmed) {
+          return;
+        }
+        try {
+          await applyTrip(slot.id, '希望预约这个时段', true);
+          await reloadTrips();
+          setTab('我的预约');
+          showTripToast('已删除冲突行程并提交预约');
+        } catch (confirmErr) {
+          showTripToast(readSettingError(confirmErr));
+        }
+        return;
+      }
+      showTripToast(readSettingError(err));
+    }
   }
 
   function reviewSlot(slotId: number, approved: boolean) {
@@ -895,12 +926,12 @@ function TripScheduleScreen({
       <section className="trip-hero">
         <div>
           <span>最近一周</span>
-          <h2>{mode === 'mine' ? '管理我的发布行程和预约审核' : '先选择可预约人，再预约具体时段'}</h2>
+          <h2>{mode === 'mine' ? '查看我的行程、预约和审核' : '先选择可预约人，再查看我的预约'}</h2>
         </div>
         <CalendarDays size={58} />
       </section>
 
-      <SegmentedTabs items={mode === 'mine' ? ['我的行程', '我的发布', '申请审核'] : ['可预约', '我的发布', '申请审核']} active={tab} onChange={changeTripTab} />
+      <SegmentedTabs items={mode === 'mine' ? ['我的行程', '我的预约', '我的发布', '待审核'] : ['可预约', '我的预约']} active={tab} onChange={changeTripTab} />
 
       {tab === '我的行程' ? (
         <TripSlotList emptyText={loading ? '加载中' : '暂无我的行程'} slots={mySlots} currentUser={username} />
@@ -937,6 +968,10 @@ function TripScheduleScreen({
         </>
       ) : null}
 
+      {tab === '我的预约' ? (
+        <TripSlotList emptyText={loading ? '加载中' : '暂无我的预约'} slots={reservedSlots} currentUser={username} statusContext="reservation" />
+      ) : null}
+
       {mode === 'booking' && tab === '可预约' ? (
         selectedTripOwner ? (
           <>
@@ -957,7 +992,7 @@ function TripScheduleScreen({
         )
       ) : null}
 
-      {tab === '申请审核' ? (
+      {tab === '待审核' ? (
         <div className="trip-list">
           {pendingRequests.length === 0 ? <article className="settings-info-card">暂无待审核申请</article> : null}
           {pendingRequests.map((slot) => (
@@ -1010,19 +1045,21 @@ function TripSlotList({
   emptyText,
   actionLabel,
   onAction,
+  statusContext,
 }: {
   slots: TripSlot[];
   currentUser: string;
   emptyText: string;
   actionLabel?: string;
   onAction?: (slot: TripSlot) => void;
+  statusContext?: 'reservation';
 }) {
   return (
     <div className="trip-list">
       {slots.length === 0 ? <article className="settings-info-card">{emptyText}</article> : null}
       {slots.map((slot) => (
         <article key={slot.id} className="trip-card">
-          <TripCardMain slot={slot} currentUser={currentUser} />
+          <TripCardMain slot={slot} currentUser={currentUser} statusContext={statusContext} />
           {actionLabel && onAction ? (
             <button className="trip-card-action" type="button" onClick={() => onAction(slot)}>{actionLabel}</button>
           ) : null}
@@ -1032,17 +1069,21 @@ function TripSlotList({
   );
 }
 
-function TripCardMain({ slot, currentUser }: { slot: TripSlot; currentUser: string }) {
+function TripCardMain({ slot, currentUser, statusContext }: { slot: TripSlot; currentUser: string; statusContext?: 'reservation' }) {
   const ownSlot = isOwnTripSlot(slot, currentUser);
 
   return (
     <div className="trip-card-main">
-      <span className={`trip-status ${slot.status}`}>
-        {tripStatusLabel(slot.status)}
+      <span
+        className={`trip-status ${slot.status}`}
+        title={tripStatusHint(slot.status, statusContext)}
+        tabIndex={statusContext === 'reservation' && slot.status === 'PENDING' ? 0 : undefined}
+      >
+        {tripStatusLabel(slot.status, statusContext)}
       </span>
       <div>
         <strong>{slot.title}</strong>
-        <p>{ownSlot ? '我发布的行程' : `${slot.ownerDisplayName || slot.ownerUsername} 发布的行程`}</p>
+        <p>{tripSubtitle(slot, ownSlot, statusContext)}</p>
       </div>
       <div className="trip-meta">
         <span><CalendarDays size={15} />{formatTripDate(slot.tripDate)}</span>
@@ -1051,6 +1092,18 @@ function TripCardMain({ slot, currentUser }: { slot: TripSlot; currentUser: stri
       </div>
     </div>
   );
+}
+
+function tripSubtitle(slot: TripSlot, ownSlot: boolean, context?: 'reservation') {
+  if (context === 'reservation') {
+    const owner = slot.ownerDisplayName || slot.ownerUsername;
+    return owner ? `预约对象：${owner}` : '预约对象：-';
+  }
+  if (!ownSlot) {
+    return `${slot.ownerDisplayName || slot.ownerUsername} 发布的行程`;
+  }
+  const applicant = slot.applicantDisplayName || slot.applicantUsername;
+  return applicant ? `我发布的行程 · 预约人：${applicant}` : '我发布的行程';
 }
 
 function SettingsScreen({ displayName, onBack, onLogout }: { displayName: string; onBack: () => void; onLogout: () => void }) {
@@ -1424,13 +1477,20 @@ function formatTripDate(value: string) {
   return `${date.getMonth() + 1}/${date.getDate()} ${weekdays[date.getDay()]}`;
 }
 
-function tripStatusLabel(status: TripSlot['status']) {
+function tripStatusLabel(status: TripSlot['status'], context?: 'reservation') {
   const labels: Record<TripSlot['status'], string> = {
     OPEN: '可预约',
-    PENDING: '待审核',
+    PENDING: context === 'reservation' ? '预约中' : '待审核',
     BOOKED: '已预约',
   };
   return labels[status];
+}
+
+function tripStatusHint(status: TripSlot['status'], context?: 'reservation') {
+  if (context === 'reservation' && status === 'PENDING') {
+    return '等待对方确认';
+  }
+  return undefined;
 }
 
 function isOwnTripSlot(slot: TripSlot, displayName: string) {

@@ -115,15 +115,19 @@ export function loadMyTrips() {
   return post<TripSlot[]>('/api/users/trips/my');
 }
 
+export function loadMyTripReservations() {
+  return post<TripSlot[]>('/api/users/trips/my-reservations');
+}
+
 export function publishTrip(request: TripPublishRequest) {
   return post<TripSlot>('/api/users/trips/publish', {
     body: request,
   });
 }
 
-export function applyTrip(slotId: number, applyNote = '希望预约这个时段') {
+export function applyTrip(slotId: number, applyNote = '希望预约这个时段', confirmConflict = false) {
   return post<TripSlot>('/api/users/trips/apply', {
-    body: { slotId, applyNote },
+    body: { slotId, applyNote, confirmConflict },
   });
 }
 

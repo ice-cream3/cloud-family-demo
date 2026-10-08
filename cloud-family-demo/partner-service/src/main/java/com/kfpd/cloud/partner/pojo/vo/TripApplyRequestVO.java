@@ -2,6 +2,7 @@ package com.kfpd.cloud.partner.pojo.vo;
 
 public record TripApplyRequestVO(
         Long slotId,
-        String applyNote
+        String applyNote,
+        Boolean confirmConflict
 ) {
 }

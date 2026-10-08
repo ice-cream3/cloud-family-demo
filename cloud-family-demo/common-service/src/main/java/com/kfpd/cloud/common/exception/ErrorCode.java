@@ -21,6 +21,7 @@ public enum ErrorCode {
     AUTH_REDIS_SESSION_STORE_UNAVAILABLE(100011, 500, "Redis session store is unavailable"),
 
     PARTNER_VIP_USER_NOT_FOUND(200001, 404, "Vip user not found"),
+    PARTNER_TRIP_CONFLICT(200002, 400, "Trip booking conflicts with your published trip"),
 
     MANAGER_RESOURCE_NOT_FOUND(300001, 404, "Manager resource not found"),
 

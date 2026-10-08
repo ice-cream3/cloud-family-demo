@@ -253,6 +253,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public List<TripSlotVO> myReservedTrips(String username) {
+        findCurrentVipUser(username);
+        return userProfileFeatureDao.findMyReservedTripSlots(username);
+    }
+
+    @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public TripSlotVO publishTrip(String username, TripPublishRequestVO request) {
         VipUser vipUser = findCurrentVipUser(username);
@@ -299,6 +305,13 @@ public class UserServiceImpl implements UserService {
         }
         if (!"OPEN".equals(slot.status())) {
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "trip slot is not open");
+        }
+        List<TripSlotVO> conflicts = userProfileFeatureDao.findConflictingOwnedTripSlots(username, request.slotId());
+        if (!conflicts.isEmpty() && !Boolean.TRUE.equals(request.confirmConflict())) {
+            throw new BusinessException(ErrorCode.PARTNER_TRIP_CONFLICT, "预约时间与您发布的行程冲突，继续预约将删除冲突行程");
+        }
+        if (!conflicts.isEmpty()) {
+            userProfileFeatureDao.deleteConflictingOwnedTripSlots(username, request.slotId());
         }
         int affected = userProfileFeatureDao.applyTripSlot(
                 request.slotId(),

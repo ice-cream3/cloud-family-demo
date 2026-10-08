@@ -59,6 +59,8 @@ public interface UserService {
 
     java.util.List<TripSlotVO> myTrips(String username);
 
+    java.util.List<TripSlotVO> myReservedTrips(String username);
+
     TripSlotVO publishTrip(String username, TripPublishRequestVO request);
 
     TripSlotVO applyTrip(String username, TripApplyRequestVO request);

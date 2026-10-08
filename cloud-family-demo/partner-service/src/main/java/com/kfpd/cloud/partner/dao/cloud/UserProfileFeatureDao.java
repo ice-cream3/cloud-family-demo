@@ -52,6 +52,10 @@ public interface UserProfileFeatureDao {
 
     List<TripSlotVO> findMyTripSlots(@Param("username") String username);
 
+    List<TripSlotVO> findMyReservedTripSlots(@Param("username") String username);
+
+    List<TripSlotVO> findConflictingOwnedTripSlots(@Param("username") String username, @Param("slotId") Long slotId);
+
     TripSlotVO findTripSlotById(@Param("id") Long id);
 
     int insertTripSlot(@Param("ownerUsername") String ownerUsername,
@@ -66,6 +70,8 @@ public interface UserProfileFeatureDao {
                       @Param("applicantUsername") String applicantUsername,
                       @Param("applicantDisplayName") String applicantDisplayName,
                       @Param("applyNote") String applyNote);
+
+    int deleteConflictingOwnedTripSlots(@Param("username") String username, @Param("slotId") Long slotId);
 
     int approveTripSlot(@Param("id") Long id, @Param("ownerUsername") String ownerUsername);
 

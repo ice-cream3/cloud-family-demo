@@ -204,6 +204,31 @@
         ORDER BY trip_date ASC, start_time ASC, id DESC
     </select>
 
+    <select id="findMyReservedTripSlots" resultMap="TripSlotResultMap">
+        SELECT id, owner_username, owner_display_name, title, place, trip_date, start_time, end_time, status,
+               applicant_username, applicant_display_name, apply_note, applied_at, reviewed_at, created_at, updated_at
+        FROM user_trip_slot
+        WHERE applicant_username = #{username}
+          AND status IN ('PENDING', 'BOOKED')
+        ORDER BY trip_date ASC, start_time ASC, id DESC
+    </select>
+
+    <select id="findConflictingOwnedTripSlots" resultMap="TripSlotResultMap">
+        SELECT owned.id, owned.owner_username, owned.owner_display_name, owned.title, owned.place,
+               owned.trip_date, owned.start_time, owned.end_time, owned.status,
+               owned.applicant_username, owned.applicant_display_name, owned.apply_note,
+               owned.applied_at, owned.reviewed_at, owned.created_at, owned.updated_at
+        FROM user_trip_slot target
+        INNER JOIN user_trip_slot owned
+            ON owned.owner_username = #{username}
+           AND owned.id != target.id
+           AND owned.trip_date = target.trip_date
+           AND owned.start_time &lt; target.end_time
+           AND owned.end_time &gt; target.start_time
+        WHERE target.id = #{slotId}
+        ORDER BY owned.trip_date ASC, owned.start_time ASC, owned.id ASC
+    </select>
+
     <select id="findTripSlotById" resultMap="TripSlotResultMap">
         SELECT id, owner_username, owner_display_name, title, place, trip_date, start_time, end_time, status,
                applicant_username, applicant_display_name, apply_note, applied_at, reviewed_at, created_at, updated_at
@@ -228,6 +253,18 @@
           AND status = 'OPEN'
           AND owner_username != #{applicantUsername}
     </update>
+
+    <delete id="deleteConflictingOwnedTripSlots">
+        DELETE owned
+        FROM user_trip_slot target
+        INNER JOIN user_trip_slot owned
+            ON owned.owner_username = #{username}
+           AND owned.id != target.id
+           AND owned.trip_date = target.trip_date
+           AND owned.start_time &lt; target.end_time
+           AND owned.end_time &gt; target.start_time
+        WHERE target.id = #{slotId}
+    </delete>
 
     <update id="approveTripSlot">
         UPDATE user_trip_slot

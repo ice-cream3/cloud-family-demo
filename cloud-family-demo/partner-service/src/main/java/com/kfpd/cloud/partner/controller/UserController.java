@@ -158,6 +158,13 @@ public class UserController {
         return ApiResponse.success(userService.myTrips(username));
     }
 
+    @PostMapping("/trips/my-reservations")
+    public ApiResponse<List<TripSlotVO>> myReservedTrips(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username
+    ) {
+        return ApiResponse.success(userService.myReservedTrips(username));
+    }
+
     @PostMapping("/trips/publish")
     public ApiResponse<TripSlotVO> publishTrip(
             @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
