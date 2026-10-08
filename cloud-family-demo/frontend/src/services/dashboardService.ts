@@ -203,6 +203,9 @@ function getSystemEndpoint(path: string) {
     '/api/manager/partner/memberships': '/api/manager/partner/features/memberships',
     '/api/manager/partner/histories': '/api/manager/partner/features/histories',
     '/api/manager/partner/favorites': '/api/manager/partner/features/favorites',
+    '/api/manager/function/trips/users': '/api/manager/partner/features/trip-users',
+    '/api/manager/function/trips/publishes': '/api/manager/partner/features/trip-publishes',
+    '/api/manager/function/trips/reviews': '/api/manager/partner/features/trip-reviews',
   };
   const endpoint = endpoints[path];
   if (!endpoint) {

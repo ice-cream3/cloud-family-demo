@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfpd.cloud.manager.dao.cloud.UserFeatureAdminDao">
+
+    <select id="countNotifications" resultType="long">
+        SELECT COUNT(*)
+        FROM user_notification_setting
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND username LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+        </where>
+    </select>
+
+    <select id="findNotificationPage" resultType="map">
+        SELECT id, username, system_enabled systemEnabled, activity_enabled activityEnabled, task_enabled taskEnabled, updated_at updatedAt
+        FROM user_notification_setting
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND username LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+        </where>
+        ORDER BY id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <insert id="insertNotification" parameterType="map" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_notification_setting (username, system_enabled, activity_enabled, task_enabled)
+        VALUES (#{username}, #{systemEnabled}, #{activityEnabled}, #{taskEnabled})
+    </insert>
+
+    <update id="updateNotification">
+        UPDATE user_notification_setting
+        SET username = #{record.username},
+            system_enabled = #{record.systemEnabled},
+            activity_enabled = #{record.activityEnabled},
+            task_enabled = #{record.taskEnabled}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteNotification">
+        DELETE FROM user_notification_setting WHERE id = #{id}
+    </delete>
+
+    <select id="countDocuments" resultType="long">
+        SELECT COUNT(*)
+        FROM app_document
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (document_type LIKE CONCAT('%', #{keyword}, '%') OR title LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </select>
+
+    <select id="findDocumentPage" resultType="map">
+        SELECT id, document_type documentType, title, content, updated_at updatedAt
+        FROM app_document
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (document_type LIKE CONCAT('%', #{keyword}, '%') OR title LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <insert id="insertDocument" parameterType="map" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO app_document (document_type, title, content)
+        VALUES (#{documentType}, #{title}, #{content})
+    </insert>
+
+    <update id="updateDocument">
+        UPDATE app_document
+        SET document_type = #{record.documentType},
+            title = #{record.title},
+            content = #{record.content}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteDocument">
+        DELETE FROM app_document WHERE id = #{id}
+    </delete>
+
+    <select id="countVersions" resultType="long">
+        SELECT COUNT(*)
+        FROM app_version
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND version_name LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+        </where>
+    </select>
+
+    <select id="findVersionPage" resultType="map">
+        SELECT id, version_name versionName, latest, release_note releaseNote, created_at createdAt
+        FROM app_version
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND version_name LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+        </where>
+        ORDER BY latest DESC, id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <insert id="insertVersion" parameterType="map" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO app_version (version_name, latest, release_note)
+        VALUES (#{versionName}, #{latest}, #{releaseNote})
+    </insert>
+
+    <update id="updateVersion">
+        UPDATE app_version
+        SET version_name = #{record.versionName},
+            latest = #{record.latest},
+            release_note = #{record.releaseNote}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteVersion">
+        DELETE FROM app_version WHERE id = #{id}
+    </delete>
+
+    <select id="countMemberships" resultType="long">
+        SELECT COUNT(*)
+        FROM user_membership
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (username LIKE CONCAT('%', #{keyword}, '%') OR plan_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+    </select>
+
+    <select id="findMembershipPage" resultType="map">
+        SELECT id, username, plan_name planName, status, expire_at expireAt, benefits, updated_at updatedAt
+        FROM user_membership
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (username LIKE CONCAT('%', #{keyword}, '%') OR plan_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+        ORDER BY id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <insert id="insertMembership" parameterType="map" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_membership (username, plan_name, status, expire_at, benefits)
+        VALUES (#{username}, #{planName}, #{status}, #{expireAt}, #{benefits})
+    </insert>
+
+    <update id="updateMembership">
+        UPDATE user_membership
+        SET username = #{record.username},
+            plan_name = #{record.planName},
+            status = #{record.status},
+            expire_at = #{record.expireAt},
+            benefits = #{record.benefits}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteMembership">
+        DELETE FROM user_membership WHERE id = #{id}
+    </delete>
+
+    <select id="countHistories" resultType="long">
+        SELECT COUNT(*)
+        FROM user_history
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (username LIKE CONCAT('%', #{keyword}, '%') OR title LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="category != null and category != ''">
+                AND category = #{category}
+            </if>
+        </where>
+    </select>
+
+    <select id="findHistoryPage" resultType="map">
+        SELECT id, username, category, title, description, icon_tone iconTone, occurred_at occurredAt
+        FROM user_history
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (username LIKE CONCAT('%', #{keyword}, '%') OR title LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="category != null and category != ''">
+                AND category = #{category}
+            </if>
+        </where>
+        ORDER BY occurred_at DESC, id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <insert id="insertHistory" parameterType="map" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_history (username, category, title, description, icon_tone, occurred_at)
+        VALUES (#{username}, #{category}, #{title}, #{description}, #{iconTone}, COALESCE(#{occurredAt}, CURRENT_TIMESTAMP))
+    </insert>
+
+    <update id="updateHistory">
+        UPDATE user_history
+        SET username = #{record.username},
+            category = #{record.category},
+            title = #{record.title},
+            description = #{record.description},
+            icon_tone = #{record.iconTone},
+            occurred_at = #{record.occurredAt}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteHistory">
+        DELETE FROM user_history WHERE id = #{id}
+    </delete>
+
+    <select id="countFavorites" resultType="long">
+        SELECT COUNT(*)
+        FROM user_favorite
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (username LIKE CONCAT('%', #{keyword}, '%') OR title LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </select>
+
+    <select id="findFavoritePage" resultType="map">
+        SELECT id, username, item_type itemType, title, description, icon_tone iconTone, created_at createdAt
+        FROM user_favorite
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (username LIKE CONCAT('%', #{keyword}, '%') OR title LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <insert id="insertFavorite" parameterType="map" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_favorite (username, item_type, title, description, icon_tone)
+        VALUES (#{username}, #{itemType}, #{title}, #{description}, #{iconTone})
+    </insert>
+
+    <update id="updateFavorite">
+        UPDATE user_favorite
+        SET username = #{record.username},
+            item_type = #{record.itemType},
+            title = #{record.title},
+            description = #{record.description},
+            icon_tone = #{record.iconTone}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteFavorite">
+        DELETE FROM user_favorite WHERE id = #{id}
+    </delete>
+
+    <select id="countTripOwners" resultType="long">
+        SELECT COUNT(*)
+        FROM (
+            SELECT owner_username
+            FROM user_trip_slot
+            <where>
+                <if test="keyword != null and keyword != ''">
+                    AND (owner_username LIKE CONCAT('%', #{keyword}, '%') OR owner_display_name LIKE CONCAT('%', #{keyword}, '%'))
+                </if>
+            </where>
+            GROUP BY owner_username
+        ) owner_rows
+    </select>
+
+    <select id="findTripOwnerPage" resultType="map">
+        SELECT MIN(id) id,
+               owner_username ownerUsername,
+               owner_display_name ownerDisplayName,
+               COUNT(*) publishCount,
+               SUM(CASE WHEN status = 'OPEN' THEN 1 ELSE 0 END) openCount,
+               SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) pendingCount,
+               SUM(CASE WHEN status = 'BOOKED' THEN 1 ELSE 0 END) bookedCount,
+               MAX(created_at) latestPublishedAt
+        FROM user_trip_slot
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (owner_username LIKE CONCAT('%', #{keyword}, '%') OR owner_display_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        GROUP BY owner_username, owner_display_name
+        ORDER BY latestPublishedAt DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <select id="countTrips" resultType="long">
+        SELECT COUNT(*)
+        FROM user_trip_slot
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    owner_username LIKE CONCAT('%', #{keyword}, '%')
+                    OR owner_display_name LIKE CONCAT('%', #{keyword}, '%')
+                    OR applicant_username LIKE CONCAT('%', #{keyword}, '%')
+                    OR applicant_display_name LIKE CONCAT('%', #{keyword}, '%')
+                    OR title LIKE CONCAT('%', #{keyword}, '%')
+                    OR place LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="reviewOnly">
+                AND status IN ('PENDING', 'BOOKED')
+            </if>
+        </where>
+    </select>
+
+    <select id="findTripPage" resultType="map">
+        SELECT id,
+               owner_username ownerUsername,
+               owner_display_name ownerDisplayName,
+               title,
+               place,
+               trip_date tripDate,
+               start_time startTime,
+               end_time endTime,
+               status,
+               applicant_username applicantUsername,
+               applicant_display_name applicantDisplayName,
+               apply_note applyNote,
+               applied_at appliedAt,
+               reviewed_at reviewedAt,
+               created_at createdAt,
+               updated_at updatedAt
+        FROM user_trip_slot
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    owner_username LIKE CONCAT('%', #{keyword}, '%')
+                    OR owner_display_name LIKE CONCAT('%', #{keyword}, '%')
+                    OR applicant_username LIKE CONCAT('%', #{keyword}, '%')
+                    OR applicant_display_name LIKE CONCAT('%', #{keyword}, '%')
+                    OR title LIKE CONCAT('%', #{keyword}, '%')
+                    OR place LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="reviewOnly">
+                AND status IN ('PENDING', 'BOOKED')
+            </if>
+        </where>
+        ORDER BY trip_date DESC, start_time DESC, id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <insert id="insertTrip" parameterType="map" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_trip_slot (
+            owner_username, owner_display_name, title, place, trip_date, start_time, end_time, status,
+            applicant_username, applicant_display_name, apply_note
+        )
+        VALUES (
+            #{ownerUsername}, #{ownerDisplayName}, #{title}, #{place}, #{tripDate}, #{startTime}, #{endTime}, #{status},
+            #{applicantUsername}, #{applicantDisplayName}, #{applyNote}
+        )
+    </insert>
+
+    <update id="updateTrip">
+        UPDATE user_trip_slot
+        SET owner_username = #{record.ownerUsername},
+            owner_display_name = #{record.ownerDisplayName},
+            title = #{record.title},
+            place = #{record.place},
+            trip_date = #{record.tripDate},
+            start_time = #{record.startTime},
+            end_time = #{record.endTime},
+            status = #{record.status},
+            applicant_username = #{record.applicantUsername},
+            applicant_display_name = #{record.applicantDisplayName},
+            apply_note = #{record.applyNote}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteTrip">
+        DELETE FROM user_trip_slot WHERE id = #{id}
+    </delete>
+</mapper>

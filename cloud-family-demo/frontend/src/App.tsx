@@ -323,6 +323,9 @@ function getSystemPageLoaders(): Record<string, (pageNum: number, pageSize: numb
     '/api/manager/partner/memberships': (pageNum, pageSize, query) => loadPartnerFeaturePage('memberships', pageNum, pageSize, query),
     '/api/manager/partner/histories': (pageNum, pageSize, query) => loadPartnerFeaturePage('histories', pageNum, pageSize, query),
     '/api/manager/partner/favorites': (pageNum, pageSize, query) => loadPartnerFeaturePage('favorites', pageNum, pageSize, query),
+    '/api/manager/function/trips/users': (pageNum, pageSize, query) => loadPartnerFeaturePage('trip-users', pageNum, pageSize, query),
+    '/api/manager/function/trips/publishes': (pageNum, pageSize, query) => loadPartnerFeaturePage('trip-publishes', pageNum, pageSize, query),
+    '/api/manager/function/trips/reviews': (pageNum, pageSize, query) => loadPartnerFeaturePage('trip-reviews', pageNum, pageSize, query),
   };
 }
 

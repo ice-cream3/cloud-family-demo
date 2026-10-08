@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfpd.cloud.partner.dao.cloud.UserProfileFeatureDao">
+
+    <resultMap id="NotificationSettingsResultMap" type="com.kfpd.cloud.partner.pojo.vo.NotificationSettingsVO">
+        <constructor>
+            <arg column="system_enabled" javaType="java.lang.Boolean"/>
+            <arg column="activity_enabled" javaType="java.lang.Boolean"/>
+            <arg column="task_enabled" javaType="java.lang.Boolean"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="AppDocumentResultMap" type="com.kfpd.cloud.partner.pojo.vo.AppDocumentVO">
+        <constructor>
+            <arg column="document_type" javaType="java.lang.String"/>
+            <arg column="title" javaType="java.lang.String"/>
+            <arg column="content" javaType="java.lang.String"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="AppVersionResultMap" type="com.kfpd.cloud.partner.pojo.vo.AppVersionVO">
+        <constructor>
+            <arg column="version_name" javaType="java.lang.String"/>
+            <arg column="latest" javaType="java.lang.Boolean"/>
+            <arg column="release_note" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="MembershipResultMap" type="com.kfpd.cloud.partner.pojo.vo.MembershipVO">
+        <constructor>
+            <arg column="username" javaType="java.lang.String"/>
+            <arg column="plan_name" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="expire_at" javaType="java.time.LocalDateTime"/>
+            <arg column="benefits" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="UserHistoryItemResultMap" type="com.kfpd.cloud.partner.pojo.vo.UserHistoryItemVO">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="category" javaType="java.lang.String"/>
+            <arg column="title" javaType="java.lang.String"/>
+            <arg column="description" javaType="java.lang.String"/>
+            <arg column="icon_tone" javaType="java.lang.String"/>
+            <arg column="occurred_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="FavoriteItemResultMap" type="com.kfpd.cloud.partner.pojo.vo.FavoriteItemVO">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="item_type" javaType="java.lang.String"/>
+            <arg column="title" javaType="java.lang.String"/>
+            <arg column="description" javaType="java.lang.String"/>
+            <arg column="icon_tone" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="TripOwnerResultMap" type="com.kfpd.cloud.partner.pojo.vo.TripOwnerVO">
+        <constructor>
+            <arg column="owner_username" javaType="java.lang.String"/>
+            <arg column="owner_display_name" javaType="java.lang.String"/>
+            <arg column="slot_count" javaType="java.lang.Long"/>
+            <arg column="next_date" javaType="java.lang.String"/>
+            <arg column="next_time" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="TripSlotResultMap" type="com.kfpd.cloud.partner.pojo.vo.TripSlotVO">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="owner_username" javaType="java.lang.String"/>
+            <arg column="owner_display_name" javaType="java.lang.String"/>
+            <arg column="title" javaType="java.lang.String"/>
+            <arg column="place" javaType="java.lang.String"/>
+            <arg column="trip_date" javaType="java.time.LocalDate"/>
+            <arg column="start_time" javaType="java.time.LocalTime"/>
+            <arg column="end_time" javaType="java.time.LocalTime"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="applicant_username" javaType="java.lang.String"/>
+            <arg column="applicant_display_name" javaType="java.lang.String"/>
+            <arg column="apply_note" javaType="java.lang.String"/>
+            <arg column="applied_at" javaType="java.time.LocalDateTime"/>
+            <arg column="reviewed_at" javaType="java.time.LocalDateTime"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findNotificationSettings" resultMap="NotificationSettingsResultMap">
+        SELECT system_enabled, activity_enabled, task_enabled
+        FROM user_notification_setting
+        WHERE username = #{username}
+    </select>
+
+    <insert id="insertDefaultNotificationSettings">
+        INSERT IGNORE INTO user_notification_setting (username, system_enabled, activity_enabled, task_enabled)
+        VALUES (#{username}, 1, 1, 0)
+    </insert>
+
+    <insert id="updateNotificationSettings">
+        INSERT INTO user_notification_setting (username, system_enabled, activity_enabled, task_enabled)
+        VALUES (#{username}, #{systemEnabled}, #{activityEnabled}, #{taskEnabled})
+        ON DUPLICATE KEY UPDATE
+            system_enabled = VALUES(system_enabled),
+            activity_enabled = VALUES(activity_enabled),
+            task_enabled = VALUES(task_enabled)
+    </insert>
+
+    <select id="findDocument" resultMap="AppDocumentResultMap">
+        SELECT document_type, title, content, updated_at
+        FROM app_document
+        WHERE document_type = #{documentType}
+    </select>
+
+    <select id="findLatestVersion" resultMap="AppVersionResultMap">
+        SELECT version_name, latest, release_note
+        FROM app_version
+        ORDER BY latest DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findMembership" resultMap="MembershipResultMap">
+        SELECT username, plan_name, status, expire_at, benefits
+        FROM user_membership
+        WHERE username = #{username}
+    </select>
+
+    <insert id="insertDefaultMembership">
+        INSERT IGNORE INTO user_membership (username, plan_name, status, benefits)
+        VALUES (#{username}, '普通会员', 'ACTIVE', '基础工具可用')
+    </insert>
+
+    <sql id="HistoryFilters">
+        WHERE username = #{username}
+        <if test="category != null and category != '' and category != '全部'">
+            AND category = #{category}
+        </if>
+    </sql>
+
+    <select id="countHistory" resultType="long">
+        SELECT COUNT(*)
+        FROM user_history
+        <include refid="HistoryFilters"/>
+    </select>
+
+    <select id="findHistoryPage" resultMap="UserHistoryItemResultMap">
+        SELECT id, category, title, description, icon_tone, occurred_at
+        FROM user_history
+        <include refid="HistoryFilters"/>
+        ORDER BY occurred_at DESC, id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <select id="countFavorites" resultType="long">
+        SELECT COUNT(*)
+        FROM user_favorite
+        WHERE username = #{username}
+    </select>
+
+    <select id="findFavoritePage" resultMap="FavoriteItemResultMap">
+        SELECT id, item_type, title, description, icon_tone, created_at
+        FROM user_favorite
+        WHERE username = #{username}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <select id="findBookableTripOwners" resultMap="TripOwnerResultMap">
+        SELECT owner_username,
+               owner_display_name,
+               COUNT(*) slot_count,
+               DATE_FORMAT(MIN(trip_date), '%Y-%m-%d') next_date,
+               DATE_FORMAT(MIN(start_time), '%H:%i:%s') next_time
+        FROM user_trip_slot
+        WHERE status = 'OPEN'
+          AND owner_username != #{username}
+          AND trip_date BETWEEN CURRENT_DATE AND DATE_ADD(CURRENT_DATE, INTERVAL 6 DAY)
+        GROUP BY owner_username, owner_display_name
+        ORDER BY next_date ASC, next_time ASC, owner_username ASC
+    </select>
+
+    <select id="findBookableTripSlots" resultMap="TripSlotResultMap">
+        SELECT id, owner_username, owner_display_name, title, place, trip_date, start_time, end_time, status,
+               applicant_username, applicant_display_name, apply_note, applied_at, reviewed_at, created_at, updated_at
+        FROM user_trip_slot
+        WHERE status = 'OPEN'
+          AND owner_username = #{ownerUsername}
+          AND owner_username != #{username}
+          AND trip_date BETWEEN CURRENT_DATE AND DATE_ADD(CURRENT_DATE, INTERVAL 6 DAY)
+        ORDER BY trip_date ASC, start_time ASC, id ASC
+    </select>
+
+    <select id="findMyTripSlots" resultMap="TripSlotResultMap">
+        SELECT id, owner_username, owner_display_name, title, place, trip_date, start_time, end_time, status,
+               applicant_username, applicant_display_name, apply_note, applied_at, reviewed_at, created_at, updated_at
+        FROM user_trip_slot
+        WHERE owner_username = #{username}
+        ORDER BY trip_date ASC, start_time ASC, id DESC
+    </select>
+
+    <select id="findTripSlotById" resultMap="TripSlotResultMap">
+        SELECT id, owner_username, owner_display_name, title, place, trip_date, start_time, end_time, status,
+               applicant_username, applicant_display_name, apply_note, applied_at, reviewed_at, created_at, updated_at
+        FROM user_trip_slot
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insertTripSlot">
+        INSERT INTO user_trip_slot (owner_username, owner_display_name, title, place, trip_date, start_time, end_time, status)
+        VALUES (#{ownerUsername}, #{ownerDisplayName}, #{title}, #{place}, #{tripDate}, #{startTime}, #{endTime}, 'OPEN')
+    </insert>
+
+    <update id="applyTripSlot">
+        UPDATE user_trip_slot
+        SET status = 'PENDING',
+            applicant_username = #{applicantUsername},
+            applicant_display_name = #{applicantDisplayName},
+            apply_note = #{applyNote},
+            applied_at = CURRENT_TIMESTAMP,
+            reviewed_at = NULL
+        WHERE id = #{id}
+          AND status = 'OPEN'
+          AND owner_username != #{applicantUsername}
+    </update>
+
+    <update id="approveTripSlot">
+        UPDATE user_trip_slot
+        SET status = 'BOOKED',
+            reviewed_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+          AND owner_username = #{ownerUsername}
+          AND status = 'PENDING'
+    </update>
+
+    <update id="rejectTripSlot">
+        UPDATE user_trip_slot
+        SET status = 'OPEN',
+            applicant_username = NULL,
+            applicant_display_name = NULL,
+            apply_note = NULL,
+            applied_at = NULL,
+            reviewed_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+          AND owner_username = #{ownerUsername}
+          AND status = 'PENDING'
+    </update>
+</mapper>

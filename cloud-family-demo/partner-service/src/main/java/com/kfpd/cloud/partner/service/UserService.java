@@ -12,6 +12,11 @@ import com.kfpd.cloud.partner.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.partner.pojo.vo.PageVO;
 import com.kfpd.cloud.partner.pojo.vo.PasswordChangeVO;
 import com.kfpd.cloud.partner.pojo.vo.ProfileDynamicVO;
+import com.kfpd.cloud.partner.pojo.vo.TripApplyRequestVO;
+import com.kfpd.cloud.partner.pojo.vo.TripOwnerVO;
+import com.kfpd.cloud.partner.pojo.vo.TripPublishRequestVO;
+import com.kfpd.cloud.partner.pojo.vo.TripReviewRequestVO;
+import com.kfpd.cloud.partner.pojo.vo.TripSlotVO;
 import com.kfpd.cloud.partner.pojo.vo.UserHistoryItemVO;
 import com.kfpd.cloud.partner.pojo.vo.UserProfileVO;
 import com.kfpd.cloud.partner.pojo.vo.VipUserPageQueryVO;
@@ -47,6 +52,18 @@ public interface UserService {
     PageVO<FavoriteItemVO> favorites(String username, PageQueryVO query);
 
     ProfileDynamicVO refreshDynamic(String username);
+
+    java.util.List<TripOwnerVO> tripOwners(String username);
+
+    java.util.List<TripSlotVO> bookableTripSlots(String username, String ownerUsername);
+
+    java.util.List<TripSlotVO> myTrips(String username);
+
+    TripSlotVO publishTrip(String username, TripPublishRequestVO request);
+
+    TripSlotVO applyTrip(String username, TripApplyRequestVO request);
+
+    TripSlotVO reviewTrip(String username, TripReviewRequestVO request);
 
     VipUserVO createVipUser(VipUserRequestVO request);
 

@@ -1,6 +1,7 @@
 package com.kfpd.cloud.partner.controller;
 
 import java.util.Map;
+import java.util.List;
 
 import com.kfpd.cloud.common.web.ApiResponse;
 import com.kfpd.cloud.common.web.GatewayHeaders;
@@ -16,6 +17,11 @@ import com.kfpd.cloud.partner.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.partner.pojo.vo.PageVO;
 import com.kfpd.cloud.partner.pojo.vo.PasswordChangeVO;
 import com.kfpd.cloud.partner.pojo.vo.ProfileDynamicVO;
+import com.kfpd.cloud.partner.pojo.vo.TripApplyRequestVO;
+import com.kfpd.cloud.partner.pojo.vo.TripOwnerVO;
+import com.kfpd.cloud.partner.pojo.vo.TripPublishRequestVO;
+import com.kfpd.cloud.partner.pojo.vo.TripReviewRequestVO;
+import com.kfpd.cloud.partner.pojo.vo.TripSlotVO;
 import com.kfpd.cloud.partner.pojo.vo.UserHistoryItemVO;
 import com.kfpd.cloud.partner.pojo.vo.UserProfileVO;
 import com.kfpd.cloud.partner.pojo.vo.VipUserPageQueryVO;
@@ -128,6 +134,52 @@ public class UserController {
             @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username
     ) {
         return ApiResponse.success(userService.refreshDynamic(username));
+    }
+
+    @PostMapping("/trips/bookable/owners")
+    public ApiResponse<List<TripOwnerVO>> tripOwners(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username
+    ) {
+        return ApiResponse.success(userService.tripOwners(username));
+    }
+
+    @PostMapping("/trips/bookable/slots/{ownerUsername}")
+    public ApiResponse<List<TripSlotVO>> bookableTripSlots(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+            @PathVariable String ownerUsername
+    ) {
+        return ApiResponse.success(userService.bookableTripSlots(username, ownerUsername));
+    }
+
+    @PostMapping("/trips/my")
+    public ApiResponse<List<TripSlotVO>> myTrips(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username
+    ) {
+        return ApiResponse.success(userService.myTrips(username));
+    }
+
+    @PostMapping("/trips/publish")
+    public ApiResponse<TripSlotVO> publishTrip(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+            @RequestBody TripPublishRequestVO request
+    ) {
+        return ApiResponse.success(userService.publishTrip(username, request));
+    }
+
+    @PostMapping("/trips/apply")
+    public ApiResponse<TripSlotVO> applyTrip(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+            @RequestBody TripApplyRequestVO request
+    ) {
+        return ApiResponse.success(userService.applyTrip(username, request));
+    }
+
+    @PostMapping("/trips/review")
+    public ApiResponse<TripSlotVO> reviewTrip(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+            @RequestBody TripReviewRequestVO request
+    ) {
+        return ApiResponse.success(userService.reviewTrip(username, request));
     }
 
     @PostMapping("/vip-users/page")

@@ -2909,7 +2909,7 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
             { label: '已暂停', value: 'SUSPENDED' },
           ],
         },
-        { key: 'expireAt', label: '到期时间', placeholder: 'YYYY-MM-DD HH:mm:ss' },
+        { key: 'expireAt', label: '到期时间', placeholder: 'yyyy-MM-dd HH:mm:ss' },
         { key: 'benefits', label: '权益', type: 'textarea' },
       ],
     };
@@ -2934,7 +2934,7 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
         { key: 'title', label: '标题', required: true },
         { key: 'description', label: '描述', type: 'textarea' },
         { key: 'iconTone', label: '色调', placeholder: 'green / orange / blue' },
-        { key: 'occurredAt', label: '发生时间', placeholder: 'YYYY-MM-DD HH:mm:ss' },
+        { key: 'occurredAt', label: '发生时间', placeholder: 'yyyy-MM-dd HH:mm:ss' },
       ],
     };
   }
@@ -2958,6 +2958,69 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
         { key: 'title', label: '标题', required: true },
         { key: 'description', label: '描述', type: 'textarea' },
         { key: 'iconTone', label: '色调', placeholder: 'green / orange / blue' },
+      ],
+    };
+  }
+
+  if (path === '/api/manager/function/trips/users') {
+    return {
+      title: '预约人管理',
+      apiPath: '/api/manager/partner/features/trip-users/page',
+      columns: [
+        commonColumns[0],
+        { key: 'ownerUsername', title: '发布账号', render: (record) => textValue(readField(record, 'ownerUsername')) },
+        { key: 'ownerDisplayName', title: '发布人', render: (record) => textValue(readField(record, 'ownerDisplayName')) },
+        { key: 'publishCount', title: '发布数', render: (record) => textValue(readField(record, 'publishCount')) },
+        { key: 'openCount', title: '可预约', render: (record) => textValue(readField(record, 'openCount')) },
+        { key: 'pendingCount', title: '待审核', render: (record) => textValue(readField(record, 'pendingCount')) },
+        { key: 'bookedCount', title: '已预约', render: (record) => textValue(readField(record, 'bookedCount')) },
+        { key: 'latestPublishedAt', title: '最近发布', render: (record) => formatDate(readField(record, 'latestPublishedAt')) },
+      ],
+      fields: [],
+    };
+  }
+
+  if (path === '/api/manager/function/trips/publishes' || path === '/api/manager/function/trips/reviews') {
+    const reviewPage = path === '/api/manager/function/trips/reviews';
+    return {
+      title: reviewPage ? '审核管理' : '发布管理',
+      apiPath: reviewPage ? '/api/manager/partner/features/trip-reviews/page' : '/api/manager/partner/features/trip-publishes/page',
+      columns: [
+        commonColumns[0],
+        { key: 'ownerUsername', title: '发布账号', render: (record) => textValue(readField(record, 'ownerUsername')) },
+        { key: 'ownerDisplayName', title: '发布人', render: (record) => textValue(readField(record, 'ownerDisplayName')) },
+        { key: 'title', title: '标题', render: (record) => textValue(readField(record, 'title')) },
+        { key: 'place', title: '地点', render: (record) => textValue(readField(record, 'place')) },
+        { key: 'tripDate', title: '日期', render: (record) => textValue(readField(record, 'tripDate')) },
+        { key: 'startTime', title: '开始', render: (record) => textValue(readField(record, 'startTime')) },
+        { key: 'endTime', title: '结束', render: (record) => textValue(readField(record, 'endTime')) },
+        { key: 'status', title: '状态', render: (record) => <StatusValue value={readField(record, 'status')} /> },
+        { key: 'applicantUsername', title: '预约账号', render: (record) => textValue(readField(record, 'applicantUsername')) },
+        { key: 'applicantDisplayName', title: '预约人', render: (record) => textValue(readField(record, 'applicantDisplayName')) },
+        { key: 'applyNote', title: '申请备注', render: (record) => truncateText(readField(record, 'applyNote'), 32) },
+      ],
+      fields: [
+        { key: 'ownerUsername', label: '发布账号', required: true },
+        { key: 'ownerDisplayName', label: '发布人', required: true },
+        { key: 'title', label: '标题', required: true },
+        { key: 'place', label: '地点', required: true },
+        { key: 'tripDate', label: '日期', required: true, placeholder: 'YYYY-MM-DD' },
+        { key: 'startTime', label: '开始时间', required: true, placeholder: 'HH:mm:ss' },
+        { key: 'endTime', label: '结束时间', required: true, placeholder: 'HH:mm:ss' },
+        {
+          key: 'status',
+          label: '状态',
+          type: 'select',
+          required: true,
+          options: [
+            { label: '可预约', value: 'OPEN' },
+            { label: '待审核', value: 'PENDING' },
+            { label: '已预约', value: 'BOOKED' },
+          ],
+        },
+        { key: 'applicantUsername', label: '预约账号' },
+        { key: 'applicantDisplayName', label: '预约人' },
+        { key: 'applyNote', label: '申请备注', type: 'textarea' },
       ],
     };
   }
@@ -2996,7 +3059,10 @@ function isSystemPageMenu(path?: string) {
     || path === '/api/manager/partner/settings/versions'
     || path === '/api/manager/partner/memberships'
     || path === '/api/manager/partner/histories'
-    || path === '/api/manager/partner/favorites';
+    || path === '/api/manager/partner/favorites'
+    || path === '/api/manager/function/trips/users'
+    || path === '/api/manager/function/trips/publishes'
+    || path === '/api/manager/function/trips/reviews';
 }
 
 function isPartnerFeaturePage(path?: string) {
@@ -3005,7 +3071,10 @@ function isPartnerFeaturePage(path?: string) {
     || path === '/api/manager/partner/settings/versions'
     || path === '/api/manager/partner/memberships'
     || path === '/api/manager/partner/histories'
-    || path === '/api/manager/partner/favorites';
+    || path === '/api/manager/partner/favorites'
+    || path === '/api/manager/function/trips/users'
+    || path === '/api/manager/function/trips/publishes'
+    || path === '/api/manager/function/trips/reviews';
 }
 
 function systemActionPermissions(menu: MenuTreeNode | null, action: 'add' | 'edit' | 'delete') {
@@ -3047,6 +3116,8 @@ function systemActionPermissions(menu: MenuTreeNode | null, action: 'add' | 'edi
     '/api/manager/partner/memberships': partnerFeaturePermissions(),
     '/api/manager/partner/histories': partnerFeaturePermissions(),
     '/api/manager/partner/favorites': partnerFeaturePermissions(),
+    '/api/manager/function/trips/publishes': tripFeaturePermissions(),
+    '/api/manager/function/trips/reviews': tripFeaturePermissions(),
   };
   return Array.from(new Set([
     ...(path ? permissionsByPath[path]?.[action] || [] : []),
@@ -3059,6 +3130,14 @@ function partnerFeaturePermissions() {
     add: ['partner:feature:add'],
     edit: ['partner:feature:edit'],
     delete: ['partner:feature:delete'],
+  };
+}
+
+function tripFeaturePermissions() {
+  return {
+    add: ['partner:trip:add'],
+    edit: ['partner:trip:edit'],
+    delete: ['partner:trip:delete'],
   };
 }
 
@@ -3124,6 +3203,8 @@ function operationLogBusinessTypeOptions(businessModule?: string) {
     { label: '会员中心配置', value: 'USER_MEMBERSHIPS' },
     { label: '历史记录', value: 'USER_HISTORIES' },
     { label: '我的收藏', value: 'USER_FAVORITES' },
+    { label: '行程预约发布', value: 'USER_TRIP-PUBLISHES' },
+    { label: '行程预约审核', value: 'USER_TRIP-REVIEWS' },
   ];
   if (businessModule === 'SYSTEM') {
     return systemOptions;
@@ -3746,7 +3827,26 @@ function formatDate(value?: string) {
   if (!value) {
     return '-';
   }
-  return value.replace('T', ' ').slice(0, 19);
+  const normalized = value.trim().replace('T', ' ');
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (match) {
+    const [, year, month, day, hour = '00', minute = '00', second = '00'] = match;
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return [
+    date.getFullYear(),
+    padDatePart(date.getMonth() + 1),
+    padDatePart(date.getDate()),
+  ].join('-') + ` ${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}:${padDatePart(date.getSeconds())}`;
+}
+
+function padDatePart(value: number) {
+  return String(value).padStart(2, '0');
 }
 
 function textValue(value?: string) {

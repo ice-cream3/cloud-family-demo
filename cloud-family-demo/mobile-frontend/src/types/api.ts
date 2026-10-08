@@ -120,3 +120,38 @@ export type ProfileDynamic = {
   serviceStatus: string;
   refreshedAt: string;
 };
+
+export type TripOwner = {
+  ownerUsername: string;
+  ownerDisplayName: string;
+  slotCount: number;
+  nextDate: string;
+  nextTime: string;
+};
+
+export type TripSlot = {
+  id: number;
+  ownerUsername: string;
+  ownerDisplayName: string;
+  title: string;
+  place: string;
+  tripDate: string;
+  startTime: string;
+  endTime: string;
+  status: 'OPEN' | 'PENDING' | 'BOOKED';
+  applicantUsername?: string | null;
+  applicantDisplayName?: string | null;
+  applyNote?: string | null;
+  appliedAt?: string | null;
+  reviewedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type TripPublishRequest = {
+  title: string;
+  place: string;
+  tripDate: string;
+  startTime: string;
+  endTime: string;
+};

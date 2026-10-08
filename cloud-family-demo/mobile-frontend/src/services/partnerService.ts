@@ -12,6 +12,9 @@ import type {
   PasswordChangeRequest,
   ProfileDynamic,
   RegisterRequest,
+  TripOwner,
+  TripPublishRequest,
+  TripSlot,
   UserHistoryItem,
   UserProfile,
 } from '../types/api';
@@ -98,6 +101,36 @@ export function loadFavorites(pageNum = 1, pageSize = 20) {
 
 export function refreshProfileDynamic() {
   return post<ProfileDynamic>('/api/users/dynamic/refresh');
+}
+
+export function loadTripOwners() {
+  return post<TripOwner[]>('/api/users/trips/bookable/owners');
+}
+
+export function loadBookableTripSlots(ownerUsername: string) {
+  return post<TripSlot[]>(`/api/users/trips/bookable/slots/${encodeURIComponent(ownerUsername)}`);
+}
+
+export function loadMyTrips() {
+  return post<TripSlot[]>('/api/users/trips/my');
+}
+
+export function publishTrip(request: TripPublishRequest) {
+  return post<TripSlot>('/api/users/trips/publish', {
+    body: request,
+  });
+}
+
+export function applyTrip(slotId: number, applyNote = '希望预约这个时段') {
+  return post<TripSlot>('/api/users/trips/apply', {
+    body: { slotId, applyNote },
+  });
+}
+
+export function reviewTrip(slotId: number, approved: boolean) {
+  return post<TripSlot>('/api/users/trips/review', {
+    body: { slotId, approved },
+  });
 }
 
 export function loadPartnerHealth() {

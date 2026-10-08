@@ -4,9 +4,12 @@ import {
   Archive,
   Bell,
   Calculator,
+  CalendarDays,
+  CheckCircle2,
   Camera,
   ChevronLeft,
   ChevronRight,
+  Clock3,
   Crown,
   FileImage,
   FileText,
@@ -26,13 +29,14 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  UserCheck,
   UserRound,
   Wand2,
   Wrench,
   X,
   Zap,
 } from 'lucide-react';
-import type { AppDocument, FavoriteItem, Membership, PartnerHealth, ProfileDynamic, UserHistoryItem, UserProfile } from '../types/api';
+import type { AppDocument, FavoriteItem, Membership, PartnerHealth, ProfileDynamic, TripOwner, TripPublishRequest, TripSlot, UserHistoryItem, UserProfile } from '../types/api';
 import type { AccountSecurity } from '../types/api';
 import {
   changeAccountPassword,
@@ -43,7 +47,13 @@ import {
   loadHistory,
   loadMembership,
   loadNotificationSettings,
+  loadBookableTripSlots,
+  loadMyTrips,
+  loadTripOwners,
+  publishTrip,
   refreshProfileDynamic,
+  applyTrip,
+  reviewTrip,
   updateAccountSecurity,
   updateNotificationSettings,
 } from '../services/partnerService';
@@ -60,7 +70,7 @@ type HomePageProps = {
 };
 
 type TabKey = 'home' | 'tools' | 'activity' | 'message' | 'profile';
-type ScreenKey = TabKey | 'compress' | 'history' | 'settings' | 'membership' | 'favorites';
+type ScreenKey = TabKey | 'compress' | 'history' | 'settings' | 'membership' | 'favorites' | 'trips' | 'myTrips';
 type SettingDetail = 'account' | 'notifications' | 'about' | 'privacy' | 'agreement' | 'version';
 type SearchableTool = {
   icon: typeof Image;
@@ -136,7 +146,7 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
   const [dynamicLoading, setDynamicLoading] = useState(false);
   const displayName = profile?.displayName || session.username || '用户名';
   const serviceStatus = dynamic?.serviceStatus || health?.status || (profile ? 'UP' : 'UNKNOWN');
-  const activeTab = ['history', 'settings', 'membership', 'favorites'].includes(screen) ? 'profile' : screen === 'compress' ? 'tools' : screen as TabKey;
+  const activeTab = ['history', 'settings', 'membership', 'favorites', 'trips', 'myTrips'].includes(screen) ? 'profile' : screen === 'compress' ? 'tools' : screen as TabKey;
 
   useEffect(() => {
     void loadDynamic();
@@ -168,7 +178,12 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
         {error ? <div className="tool-error">{error}</div> : null}
 
         {screen === 'home' ? (
-          <HomeScreen displayName={displayName} onOpenTools={() => setTab('tools')} onOpenCompress={() => setScreen('compress')} />
+          <HomeScreen
+            displayName={displayName}
+            onOpenTools={() => setTab('tools')}
+            onOpenCompress={() => setScreen('compress')}
+            onOpenTrips={() => setScreen('trips')}
+          />
         ) : null}
         {screen === 'tools' ? (
           <ToolsScreen onOpenCompress={() => setScreen('compress')} onOpenMore={() => setShowMoreTools(true)} />
@@ -189,12 +204,15 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
             onOpenMembership={() => setScreen('membership')}
             onOpenHistory={() => setScreen('history')}
             onOpenFavorites={() => setScreen('favorites')}
+            onOpenTrips={() => setScreen('myTrips')}
             onOpenSettings={() => setScreen('settings')}
           />
         ) : null}
         {screen === 'history' ? <HistoryScreen onBack={() => setScreen('profile')} /> : null}
         {screen === 'membership' ? <MembershipScreen onBack={() => setScreen('profile')} /> : null}
         {screen === 'favorites' ? <FavoritesScreen onBack={() => setScreen('profile')} /> : null}
+        {screen === 'trips' ? <TripScheduleScreen mode="booking" displayName={displayName} username={session.username || ''} onBack={() => setScreen('home')} /> : null}
+        {screen === 'myTrips' ? <TripScheduleScreen mode="mine" displayName={displayName} username={session.username || ''} onBack={() => setScreen('profile')} /> : null}
         {screen === 'settings' ? <SettingsScreen displayName={displayName} onBack={() => setScreen('profile')} onLogout={onLogout} /> : null}
 
         <BottomTabs active={activeTab} onChange={setTab} hasMessageDot />
@@ -214,7 +232,17 @@ function StatusBar() {
   );
 }
 
-function HomeScreen({ displayName, onOpenTools, onOpenCompress }: { displayName: string; onOpenTools: () => void; onOpenCompress: () => void }) {
+function HomeScreen({
+  displayName,
+  onOpenTools,
+  onOpenCompress,
+  onOpenTrips,
+}: {
+  displayName: string;
+  onOpenTools: () => void;
+  onOpenCompress: () => void;
+  onOpenTrips: () => void;
+}) {
   const [searchText, setSearchText] = useState('');
   const [searchActive, setSearchActive] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -311,6 +339,12 @@ function HomeScreen({ displayName, onOpenTools, onOpenCompress }: { displayName:
       </section>
 
       <div className="tool-shortcut-grid">
+        <button type="button" onClick={onOpenTrips}>
+          <span className="tool-icon blue">
+            <CalendarDays size={24} />
+          </span>
+          <em>行程预约</em>
+        </button>
         {mainTools.map((item) => {
           const Icon = item.icon;
           return (
@@ -529,6 +563,7 @@ function ProfileScreen({
   onOpenMembership,
   onOpenHistory,
   onOpenFavorites,
+  onOpenTrips,
   onOpenSettings,
 }: {
   displayName: string;
@@ -540,6 +575,7 @@ function ProfileScreen({
   onOpenMembership: () => void;
   onOpenHistory: () => void;
   onOpenFavorites: () => void;
+  onOpenTrips: () => void;
   onOpenSettings: () => void;
 }) {
   const [statsMessage, setStatsMessage] = useState<string | null>(null);
@@ -593,6 +629,7 @@ function ProfileScreen({
       {statsMessage ? <div className="profile-stats-toast">{statsMessage}</div> : null}
       <div className="profile-menu">
         <MenuRow icon={Crown} title="会员中心" onClick={onOpenMembership} />
+        <MenuRow icon={CalendarDays} title="我的行程" onClick={onOpenTrips} />
         <MenuRow icon={FileText} title="历史记录" onClick={onOpenHistory} />
         <MenuRow icon={Star} title="我的收藏" onClick={onOpenFavorites} />
         <MenuRow icon={RefreshCw} title={loading ? '刷新中' : '刷新动态'} onClick={onReload} />
@@ -726,6 +763,291 @@ function FavoritesScreen({ onBack }: { onBack: () => void }) {
             </article>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function TripScheduleScreen({
+  mode,
+  displayName,
+  username,
+  onBack,
+}: {
+  mode: 'booking' | 'mine';
+  displayName: string;
+  username: string;
+  onBack: () => void;
+}) {
+  const [tab, setTab] = useState(mode === 'mine' ? '我的行程' : '可预约');
+  const [selectedTripOwner, setSelectedTripOwner] = useState<string | null>(null);
+  const [owners, setOwners] = useState<TripOwner[]>([]);
+  const [selectedOwnerSlots, setSelectedOwnerSlots] = useState<TripSlot[]>([]);
+  const [mySlots, setMySlots] = useState<TripSlot[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [title, setTitle] = useState('下午可约');
+  const [place, setPlace] = useState('线上会议');
+  const [date, setDate] = useState(nextTripDate(1));
+  const [startTime, setStartTime] = useState('14:00');
+  const [endTime, setEndTime] = useState('15:00');
+  const [toast, setToast] = useState<string | null>(null);
+  const pendingRequests = mySlots.filter((slot) => slot.status === 'PENDING');
+
+  useEffect(() => {
+    void reloadTrips();
+  }, [mode]);
+
+  async function reloadTrips(ownerUsername = selectedTripOwner) {
+    setLoading(true);
+    try {
+      if (mode === 'booking') {
+        const nextOwners = await loadTripOwners();
+        setOwners(nextOwners);
+        if (ownerUsername) {
+          setSelectedOwnerSlots(await loadBookableTripSlots(ownerUsername));
+        }
+      } else {
+        setMySlots(await loadMyTrips());
+      }
+    } catch (err) {
+      showTripToast(readSettingError(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function selectTripOwner(ownerUsername: string) {
+    setSelectedTripOwner(ownerUsername);
+    setLoading(true);
+    try {
+      setSelectedOwnerSlots(await loadBookableTripSlots(ownerUsername));
+    } catch (err) {
+      showTripToast(readSettingError(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function publishSlot(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!title.trim() || !place.trim() || !date || !startTime || !endTime) {
+      showTripToast('请完整填写行程信息');
+      return;
+    }
+    if (startTime >= endTime) {
+      showTripToast('结束时间需晚于开始时间');
+      return;
+    }
+    const request: TripPublishRequest = {
+      title: title.trim(),
+      place: place.trim(),
+      tripDate: date,
+      startTime,
+      endTime,
+    };
+    try {
+      await publishTrip(request);
+      await reloadTrips();
+      setTab('我的发布');
+      setTitle('下午可约');
+      setPlace('线上会议');
+      showTripToast('行程已发布');
+    } catch (err) {
+      showTripToast(readSettingError(err));
+    }
+  }
+
+  function requestSlot(slot: TripSlot) {
+    if (isOwnTripSlot(slot, username)) {
+      showTripToast('不能预约自己发布的行程');
+      return;
+    }
+    applyTrip(slot.id)
+      .then(() => reloadTrips())
+      .then(() => showTripToast('预约申请已发送'))
+      .catch((err) => showTripToast(readSettingError(err)));
+  }
+
+  function reviewSlot(slotId: number, approved: boolean) {
+    reviewTrip(slotId, approved)
+      .then(() => reloadTrips())
+      .then(() => showTripToast(approved ? '已通过预约申请' : '已拒绝预约申请'))
+      .catch((err) => showTripToast(readSettingError(err)));
+  }
+
+  function changeTripTab(nextTab: string) {
+    setTab(nextTab);
+    if (mode !== 'booking' || nextTab !== '可预约') {
+      setSelectedTripOwner(null);
+      setSelectedOwnerSlots([]);
+    }
+    void reloadTrips();
+  }
+
+  function showTripToast(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 1600);
+  }
+
+  return (
+    <div className="tool-screen trip-screen">
+      <HeaderWithBack title={mode === 'mine' ? '我的行程' : '行程预约'} onBack={onBack} right={mode === 'mine' ? '管理' : '预约'} />
+      <section className="trip-hero">
+        <div>
+          <span>最近一周</span>
+          <h2>{mode === 'mine' ? '管理我的发布行程和预约审核' : '先选择可预约人，再预约具体时段'}</h2>
+        </div>
+        <CalendarDays size={58} />
+      </section>
+
+      <SegmentedTabs items={mode === 'mine' ? ['我的行程', '我的发布', '申请审核'] : ['可预约', '我的发布', '申请审核']} active={tab} onChange={changeTripTab} />
+
+      {tab === '我的行程' ? (
+        <TripSlotList emptyText={loading ? '加载中' : '暂无我的行程'} slots={mySlots} currentUser={username} />
+      ) : null}
+
+      {tab === '我的发布' ? (
+        <>
+          <form className="trip-form" onSubmit={publishSlot}>
+            <label>
+              <span>行程标题</span>
+              <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="例如 咖啡沟通 / 线上咨询" />
+            </label>
+            <label>
+              <span>地点</span>
+              <input value={place} onChange={(event) => setPlace(event.target.value)} placeholder="例如 公司会议室 / 线上会议" />
+            </label>
+            <div className="trip-time-grid">
+              <label>
+                <span>日期</span>
+                <input type="date" min={nextTripDate(0)} max={nextTripDate(6)} value={date} onChange={(event) => setDate(event.target.value)} />
+              </label>
+              <label>
+                <span>开始</span>
+                <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+              </label>
+              <label>
+                <span>结束</span>
+                <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
+              </label>
+            </div>
+            <button className="app-primary" type="submit">发布行程</button>
+          </form>
+          <TripSlotList emptyText={loading ? '加载中' : '暂无已发布行程'} slots={mySlots} currentUser={username} />
+        </>
+      ) : null}
+
+      {mode === 'booking' && tab === '可预约' ? (
+        selectedTripOwner ? (
+          <>
+            <button className="trip-owner-back" type="button" onClick={() => setSelectedTripOwner(null)}>
+              <ChevronLeft size={17} />
+              返回可预约人列表
+            </button>
+            <TripSlotList
+              emptyText="该用户暂无可预约时段"
+              slots={selectedOwnerSlots}
+              currentUser={username}
+              actionLabel="预约"
+              onAction={requestSlot}
+            />
+          </>
+        ) : (
+          <TripOwnerList owners={owners} loading={loading} onSelect={selectTripOwner} />
+        )
+      ) : null}
+
+      {tab === '申请审核' ? (
+        <div className="trip-list">
+          {pendingRequests.length === 0 ? <article className="settings-info-card">暂无待审核申请</article> : null}
+          {pendingRequests.map((slot) => (
+            <article key={slot.id} className="trip-card">
+              <TripCardMain slot={slot} currentUser={username} />
+              <div className="trip-request-note">
+                <UserCheck size={16} />
+                <span>{slot.applicantDisplayName || slot.applicantUsername} 申请预约：{slot.applyNote}</span>
+              </div>
+              <div className="trip-review-actions">
+                <button type="button" onClick={() => reviewSlot(slot.id, false)}>拒绝</button>
+                <button type="button" onClick={() => reviewSlot(slot.id, true)}>
+                  <CheckCircle2 size={16} />
+                  通过
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      {toast ? <div className="home-toast">{toast}</div> : null}
+    </div>
+  );
+}
+
+function TripOwnerList({ owners, loading, onSelect }: { owners: TripOwner[]; loading: boolean; onSelect: (ownerName: string) => void }) {
+  return (
+    <div className="trip-owner-list">
+      {owners.length === 0 ? <article className="settings-info-card">{loading ? '加载中' : '暂无可预约用户'}</article> : null}
+      {owners.map((owner) => (
+        <button key={owner.ownerUsername} className="trip-owner-card" type="button" onClick={() => onSelect(owner.ownerUsername)}>
+          <span className="trip-owner-avatar">
+            <UserRound size={20} />
+          </span>
+          <span>
+            <strong>{owner.ownerDisplayName || owner.ownerUsername}</strong>
+            <small>{owner.slotCount} 个可预约时段 · 最近 {formatTripDate(owner.nextDate)} {owner.nextTime}</small>
+          </span>
+          <ChevronRight size={17} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TripSlotList({
+  slots,
+  currentUser,
+  emptyText,
+  actionLabel,
+  onAction,
+}: {
+  slots: TripSlot[];
+  currentUser: string;
+  emptyText: string;
+  actionLabel?: string;
+  onAction?: (slot: TripSlot) => void;
+}) {
+  return (
+    <div className="trip-list">
+      {slots.length === 0 ? <article className="settings-info-card">{emptyText}</article> : null}
+      {slots.map((slot) => (
+        <article key={slot.id} className="trip-card">
+          <TripCardMain slot={slot} currentUser={currentUser} />
+          {actionLabel && onAction ? (
+            <button className="trip-card-action" type="button" onClick={() => onAction(slot)}>{actionLabel}</button>
+          ) : null}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function TripCardMain({ slot, currentUser }: { slot: TripSlot; currentUser: string }) {
+  const ownSlot = isOwnTripSlot(slot, currentUser);
+
+  return (
+    <div className="trip-card-main">
+      <span className={`trip-status ${slot.status}`}>
+        {tripStatusLabel(slot.status)}
+      </span>
+      <div>
+        <strong>{slot.title}</strong>
+        <p>{ownSlot ? '我发布的行程' : `${slot.ownerDisplayName || slot.ownerUsername} 发布的行程`}</p>
+      </div>
+      <div className="trip-meta">
+        <span><CalendarDays size={15} />{formatTripDate(slot.tripDate)}</span>
+        <span><Clock3 size={15} />{slot.startTime}-{slot.endTime}</span>
+        <span>{slot.place}</span>
       </div>
     </div>
   );
@@ -1081,6 +1403,42 @@ function formatShortTime(value?: string | null) {
     return value;
   }
   return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function nextTripDate(offsetDays: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+function formatTripDate(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  return `${date.getMonth() + 1}/${date.getDate()} ${weekdays[date.getDay()]}`;
+}
+
+function tripStatusLabel(status: TripSlot['status']) {
+  const labels: Record<TripSlot['status'], string> = {
+    OPEN: '可预约',
+    PENDING: '待审核',
+    BOOKED: '已预约',
+  };
+  return labels[status];
+}
+
+function isOwnTripSlot(slot: TripSlot, displayName: string) {
+  return normalizeTripOwner(slot.ownerUsername) === normalizeTripOwner(displayName);
+}
+
+function normalizeTripOwner(value: string) {
+  return value.trim().toLowerCase();
 }
 
 function SwitchRow({ title, desc, checked, onChange }: { title: string; desc: string; checked: boolean; onChange: (checked: boolean) => void }) {

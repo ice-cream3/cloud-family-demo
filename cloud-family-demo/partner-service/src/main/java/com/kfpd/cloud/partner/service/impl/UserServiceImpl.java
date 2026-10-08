@@ -1,7 +1,9 @@
 package com.kfpd.cloud.partner.service.impl;
 
-import java.time.format.DateTimeFormatter;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +26,11 @@ import com.kfpd.cloud.partner.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.partner.pojo.vo.PageVO;
 import com.kfpd.cloud.partner.pojo.vo.PasswordChangeVO;
 import com.kfpd.cloud.partner.pojo.vo.ProfileDynamicVO;
+import com.kfpd.cloud.partner.pojo.vo.TripApplyRequestVO;
+import com.kfpd.cloud.partner.pojo.vo.TripOwnerVO;
+import com.kfpd.cloud.partner.pojo.vo.TripPublishRequestVO;
+import com.kfpd.cloud.partner.pojo.vo.TripReviewRequestVO;
+import com.kfpd.cloud.partner.pojo.vo.TripSlotVO;
 import com.kfpd.cloud.partner.pojo.vo.UserHistoryItemVO;
 import com.kfpd.cloud.partner.pojo.vo.UserProfileVO;
 import com.kfpd.cloud.partner.pojo.vo.VipUserPageQueryVO;
@@ -221,6 +228,107 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public List<TripOwnerVO> tripOwners(String username) {
+        findCurrentVipUser(username);
+        return userProfileFeatureDao.findBookableTripOwners(username);
+    }
+
+    @Override
+    public List<TripSlotVO> bookableTripSlots(String username, String ownerUsername) {
+        findCurrentVipUser(username);
+        String owner = trimToNull(ownerUsername);
+        if (owner == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "ownerUsername is required");
+        }
+        if (owner.equalsIgnoreCase(username)) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "cannot book your own trip");
+        }
+        return userProfileFeatureDao.findBookableTripSlots(username, owner);
+    }
+
+    @Override
+    public List<TripSlotVO> myTrips(String username) {
+        findCurrentVipUser(username);
+        return userProfileFeatureDao.findMyTripSlots(username);
+    }
+
+    @Override
+    @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public TripSlotVO publishTrip(String username, TripPublishRequestVO request) {
+        VipUser vipUser = findCurrentVipUser(username);
+        if (request == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "request is required");
+        }
+        requireText(request.title(), "title is required");
+        requireText(request.place(), "place is required");
+        LocalDate tripDate = parseTripDate(request.tripDate());
+        LocalTime startTime = parseTripTime(request.startTime(), "startTime is required");
+        LocalTime endTime = parseTripTime(request.endTime(), "endTime is required");
+        if (!endTime.isAfter(startTime)) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "endTime must be after startTime");
+        }
+        LocalDate today = LocalDate.now();
+        if (tripDate.isBefore(today) || tripDate.isAfter(today.plusDays(6))) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "tripDate must be within the next 7 days");
+        }
+        userProfileFeatureDao.insertTripSlot(
+                username,
+                Optional.ofNullable(vipUser.getDisplayName()).orElse(username),
+                request.title().trim(),
+                request.place().trim(),
+                tripDate.toString(),
+                startTime.toString(),
+                endTime.toString()
+        );
+        return userProfileFeatureDao.findMyTripSlots(username).stream()
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "publish failed"));
+    }
+
+    @Override
+    @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public TripSlotVO applyTrip(String username, TripApplyRequestVO request) {
+        VipUser vipUser = findCurrentVipUser(username);
+        if (request == null || request.slotId() == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "slotId is required");
+        }
+        TripSlotVO slot = Optional.ofNullable(userProfileFeatureDao.findTripSlotById(request.slotId()))
+                .orElseThrow(() -> notFound("Trip slot not found"));
+        if (username.equalsIgnoreCase(slot.ownerUsername())) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "cannot book your own trip");
+        }
+        if (!"OPEN".equals(slot.status())) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "trip slot is not open");
+        }
+        int affected = userProfileFeatureDao.applyTripSlot(
+                request.slotId(),
+                username,
+                Optional.ofNullable(vipUser.getDisplayName()).orElse(username),
+                Optional.ofNullable(trimToNull(request.applyNote())).orElse("希望预约这个时段")
+        );
+        if (affected == 0) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "trip slot is not available");
+        }
+        return userProfileFeatureDao.findTripSlotById(request.slotId());
+    }
+
+    @Override
+    @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public TripSlotVO reviewTrip(String username, TripReviewRequestVO request) {
+        findCurrentVipUser(username);
+        if (request == null || request.slotId() == null || request.approved() == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "slotId and approved are required");
+        }
+        int affected = request.approved()
+                ? userProfileFeatureDao.approveTripSlot(request.slotId(), username)
+                : userProfileFeatureDao.rejectTripSlot(request.slotId(), username);
+        if (affected == 0) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "trip review is not available");
+        }
+        return userProfileFeatureDao.findTripSlotById(request.slotId());
+    }
+
+    @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public VipUserVO createVipUser(VipUserRequestVO request) {
         requireRequest(request);
@@ -390,6 +498,30 @@ public class UserServiceImpl implements UserService {
 
     private boolean isValidEmail(String value) {
         return value != null && value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
+    }
+
+    private LocalDate parseTripDate(String value) {
+        String normalized = trimToNull(value);
+        if (normalized == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "tripDate is required");
+        }
+        try {
+            return LocalDate.parse(normalized);
+        } catch (RuntimeException ex) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "tripDate format is invalid");
+        }
+    }
+
+    private LocalTime parseTripTime(String value, String emptyMessage) {
+        String normalized = trimToNull(value);
+        if (normalized == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, emptyMessage);
+        }
+        try {
+            return LocalTime.parse(normalized);
+        } catch (RuntimeException ex) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "trip time format is invalid");
+        }
     }
 
     private String trimToNull(String value) {
