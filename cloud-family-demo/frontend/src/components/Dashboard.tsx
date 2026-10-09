@@ -2909,7 +2909,7 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
             { label: '已暂停', value: 'SUSPENDED' },
           ],
         },
-        { key: 'expireAt', label: '到期时间', placeholder: 'yyyy-MM-dd HH:mm:ss' },
+        { key: 'expireAt', label: '到期时间', placeholder: 'yyyy-MM-dd HH:mm:SS' },
         { key: 'benefits', label: '权益', type: 'textarea' },
       ],
     };
@@ -2934,7 +2934,7 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
         { key: 'title', label: '标题', required: true },
         { key: 'description', label: '描述', type: 'textarea' },
         { key: 'iconTone', label: '色调', placeholder: 'green / orange / blue' },
-        { key: 'occurredAt', label: '发生时间', placeholder: 'yyyy-MM-dd HH:mm:ss' },
+        { key: 'occurredAt', label: '发生时间', placeholder: 'yyyy-MM-dd HH:mm:SS' },
       ],
     };
   }

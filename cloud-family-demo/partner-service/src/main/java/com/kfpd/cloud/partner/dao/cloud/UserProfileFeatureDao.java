@@ -56,6 +56,11 @@ public interface UserProfileFeatureDao {
 
     List<TripSlotVO> findConflictingOwnedTripSlots(@Param("username") String username, @Param("slotId") Long slotId);
 
+    long countOwnedTripSlotConflicts(@Param("username") String username,
+                                     @Param("tripDate") String tripDate,
+                                     @Param("startTime") String startTime,
+                                     @Param("endTime") String endTime);
+
     TripSlotVO findTripSlotById(@Param("id") Long id);
 
     int insertTripSlot(@Param("ownerUsername") String ownerUsername,

@@ -55,6 +55,9 @@ public class PartnerExceptionHandler {
         if (message != null && message.contains("uk_vip_user_email")) {
             return "email already exists";
         }
+        if (message != null && message.contains("uk_user_trip_owner_slot")) {
+            return "duplicate trip slot";
+        }
         return "duplicate key";
     }
 

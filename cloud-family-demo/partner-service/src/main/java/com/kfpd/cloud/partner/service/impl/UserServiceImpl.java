@@ -277,6 +277,9 @@ public class UserServiceImpl implements UserService {
         if (tripDate.isBefore(today) || tripDate.isAfter(today.plusDays(6))) {
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "tripDate must be within the next 7 days");
         }
+        if (userProfileFeatureDao.countOwnedTripSlotConflicts(username, tripDate.toString(), startTime.toString(), endTime.toString()) > 0) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "trip slot time conflicts");
+        }
         userProfileFeatureDao.insertTripSlot(
                 username,
                 Optional.ofNullable(vipUser.getDisplayName()).orElse(username),

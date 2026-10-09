@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FocusEvent, FormEvent } from 'react';
 import {
   Archive,
   Bell,
@@ -143,6 +143,10 @@ const messages = [
   { icon: MessageCircle, title: '客服消息', desc: '您好，有什么可以帮助您?', time: '2天前', tone: 'blue' },
 ];
 
+const tripStartMinute = 0;
+const tripEndMinute = 23 * 60 + 50;
+const tripDurationLimitMinutes = 4 * 60;
+
 export function HomePage({ session, profile, health, loading, error, onReload, onLogout }: HomePageProps) {
   const [screen, setScreen] = useState<ScreenKey>('home');
   const [showMoreTools, setShowMoreTools] = useState(false);
@@ -215,8 +219,24 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
         {screen === 'history' ? <HistoryScreen onBack={() => setScreen('profile')} /> : null}
         {screen === 'membership' ? <MembershipScreen onBack={() => setScreen('profile')} /> : null}
         {screen === 'favorites' ? <FavoritesScreen onBack={() => setScreen('profile')} /> : null}
-        {screen === 'trips' ? <TripScheduleScreen mode="booking" displayName={displayName} username={session.username || ''} onBack={() => setScreen('home')} /> : null}
-        {screen === 'myTrips' ? <TripScheduleScreen mode="mine" displayName={displayName} username={session.username || ''} onBack={() => setScreen('profile')} /> : null}
+        {screen === 'trips' ? (
+          <TripScheduleScreen
+            mode="booking"
+            displayName={displayName}
+            username={session.username || ''}
+            onBack={() => setScreen('home')}
+            onOpenMyTrips={() => setScreen('myTrips')}
+          />
+        ) : null}
+        {screen === 'myTrips' ? (
+          <TripScheduleScreen
+            mode="mine"
+            displayName={displayName}
+            username={session.username || ''}
+            onBack={() => setScreen('profile')}
+            onOpenBooking={() => setScreen('trips')}
+          />
+        ) : null}
         {screen === 'settings' ? <SettingsScreen displayName={displayName} onBack={() => setScreen('profile')} onLogout={onLogout} /> : null}
 
         <BottomTabs active={activeTab} onChange={setTab} hasMessageDot />
@@ -777,11 +797,15 @@ function TripScheduleScreen({
   displayName,
   username,
   onBack,
+  onOpenMyTrips,
+  onOpenBooking,
 }: {
   mode: 'booking' | 'mine';
   displayName: string;
   username: string;
   onBack: () => void;
+  onOpenMyTrips?: () => void;
+  onOpenBooking?: () => void;
 }) {
   const [tab, setTab] = useState(mode === 'mine' ? '我的行程' : '可预约');
   const [selectedTripOwner, setSelectedTripOwner] = useState<string | null>(null);
@@ -797,6 +821,8 @@ function TripScheduleScreen({
   const [endTime, setEndTime] = useState('15:00');
   const [toast, setToast] = useState<string | null>(null);
   const pendingRequests = mySlots.filter((slot) => slot.status === 'PENDING');
+  const startTimeOptions = buildTripStartTimeOptions(date);
+  const endTimeOptions = buildTripEndTimeOptions(startTime);
 
   useEffect(() => {
     void reloadTrips();
@@ -808,8 +834,10 @@ function TripScheduleScreen({
       if (mode === 'booking') {
         const nextOwners = await loadTripOwners();
         const nextReservations = await loadMyTripReservations();
+        const nextMySlots = await loadMyTrips();
         setOwners(nextOwners);
         setReservedSlots(nextReservations);
+        setMySlots(nextMySlots);
         if (ownerUsername) {
           setSelectedOwnerSlots(await loadBookableTripSlots(ownerUsername));
         }
@@ -866,6 +894,25 @@ function TripScheduleScreen({
       showTripToast('行程已发布');
     } catch (err) {
       showTripToast(readSettingError(err));
+    }
+  }
+
+  function changeTripDate(nextDate: string) {
+    const nextStartOptions = buildTripStartTimeOptions(nextDate);
+    const nextStartTime = nextStartOptions.includes(startTime) ? startTime : nextStartOptions[0] || startTime;
+    const nextEndOptions = buildTripEndTimeOptions(nextStartTime);
+    setDate(nextDate);
+    setStartTime(nextStartTime);
+    if (!nextEndOptions.includes(endTime)) {
+      setEndTime(nextEndOptions[0] || endTime);
+    }
+  }
+
+  function changeStartTime(nextStartTime: string) {
+    const nextEndOptions = buildTripEndTimeOptions(nextStartTime);
+    setStartTime(nextStartTime);
+    if (!nextEndOptions.includes(endTime)) {
+      setEndTime(nextEndOptions[0] || endTime);
     }
   }
 
@@ -931,7 +978,19 @@ function TripScheduleScreen({
         <CalendarDays size={58} />
       </section>
 
-      <SegmentedTabs items={mode === 'mine' ? ['我的行程', '我的预约', '我的发布', '待审核'] : ['可预约', '我的预约']} active={tab} onChange={changeTripTab} />
+      <div className="trip-segment-row">
+        {mode === 'mine' ? (
+          <button className="trip-flow-jump backward" type="button" onClick={onOpenBooking} aria-label="返回行程预约">
+            <ChevronLeft size={17} />
+          </button>
+        ) : null}
+        <SegmentedTabs items={mode === 'mine' ? ['我的行程', '我的预约', '我的发布', '待审核'] : ['可预约', '我的预约', '行程预览']} active={tab} onChange={changeTripTab} />
+        {mode === 'booking' ? (
+          <button className="trip-flow-jump forward" type="button" onClick={onOpenMyTrips} aria-label="打开我的行程">
+            <ChevronRight size={17} />
+          </button>
+        ) : null}
+      </div>
 
       {tab === '我的行程' ? (
         <TripSlotList emptyText={loading ? '加载中' : '暂无我的行程'} slots={mySlots} currentUser={username} />
@@ -951,15 +1010,15 @@ function TripScheduleScreen({
             <div className="trip-time-grid">
               <label>
                 <span>日期</span>
-                <input type="date" min={nextTripDate(0)} max={nextTripDate(6)} value={date} onChange={(event) => setDate(event.target.value)} />
+                <input type="date" min={nextTripDate(0)} max={nextTripDate(6)} value={date} onChange={(event) => changeTripDate(event.target.value)} />
               </label>
               <label>
                 <span>开始</span>
-                <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+                <TripTimePicker value={startTime} options={startTimeOptions} onChange={changeStartTime} hourMode={date === nextTripDate(0) ? 'options' : 'all'} />
               </label>
               <label>
                 <span>结束</span>
-                <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
+                <TripTimePicker value={endTime} options={endTimeOptions} onChange={setEndTime} hourMode="options" />
               </label>
             </div>
             <button className="app-primary" type="submit">发布行程</button>
@@ -970,6 +1029,10 @@ function TripScheduleScreen({
 
       {tab === '我的预约' ? (
         <TripSlotList emptyText={loading ? '加载中' : '暂无我的预约'} slots={reservedSlots} currentUser={username} statusContext="reservation" />
+      ) : null}
+
+      {tab === '行程预览' ? (
+        <TripTimelinePreview slots={mergeTripTimelineSlots(mySlots, reservedSlots)} currentUser={username} />
       ) : null}
 
       {mode === 'booking' && tab === '可预约' ? (
@@ -1039,6 +1102,170 @@ function TripOwnerList({ owners, loading, onSelect }: { owners: TripOwner[]; loa
   );
 }
 
+function TripTimePicker({
+  value,
+  options,
+  onChange,
+  hourMode = 'all',
+}: {
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  hourMode?: 'all' | 'options';
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const selectedHour = value.slice(0, 2);
+  const hours = hourMode === 'all' ? buildTripHourOptions() : Array.from(new Set(options.map((time) => time.slice(0, 2))));
+  const activeHour = hours.includes(selectedHour) ? selectedHour : hours[0] || selectedHour;
+  const minutes = options
+    .filter((time) => time.startsWith(`${activeHour}:`))
+    .map((time) => time.slice(3, 5));
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  function closeWhenLeaving(event: FocusEvent<HTMLDivElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setOpen(false);
+      if (!isAllowedTripTime(draft, options)) {
+        setDraft(value);
+      }
+    }
+  }
+
+  function applyManualInput(nextDraft: string) {
+    setDraft(nextDraft);
+    const normalized = normalizeTripTimeInput(nextDraft);
+    if (normalized && options.includes(normalized)) {
+      onChange(normalized);
+    }
+  }
+
+  function chooseHour(hour: string) {
+    const nextTime = options.find((time) => time.startsWith(`${hour}:`));
+    if (nextTime) {
+      onChange(nextTime);
+    }
+  }
+
+  function chooseMinute(minute: string) {
+    const nextTime = `${activeHour}:${minute}`;
+    if (options.includes(nextTime)) {
+      onChange(nextTime);
+    }
+  }
+
+  return (
+    <div className="trip-time-picker" onBlur={closeWhenLeaving}>
+      <div className="trip-time-input-wrap">
+        <input
+          value={draft}
+          inputMode="numeric"
+          placeholder="HH:mm"
+          onFocus={() => setOpen(true)}
+          onChange={(event) => applyManualInput(event.target.value)}
+        />
+        <button type="button" aria-label="选择时间" onClick={() => setOpen((next) => !next)}>
+          <ChevronRight size={15} />
+        </button>
+      </div>
+      {open ? (
+        <div className="trip-time-panel">
+          <div className="trip-time-column" aria-label="小时">
+            {hours.map((hour) => (
+              <button key={hour} className={hour === activeHour ? 'active' : ''} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => chooseHour(hour)}>
+                {hour}
+              </button>
+            ))}
+          </div>
+          <div className="trip-time-column" aria-label="分钟">
+            {minutes.map((minute) => (
+              <button key={minute} className={`${activeHour}:${minute}` === value ? 'active' : ''} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => chooseMinute(minute)}>
+                {minute}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TripTimelinePreview({ slots, currentUser }: { slots: TripSlot[]; currentUser: string }) {
+  const now = new Date();
+  const sortedSlots = [...slots].sort(compareTripSlots);
+  const upcomingSlots = sortedSlots.filter((slot) => !isTripSlotExpired(slot, now));
+  const expiredSlots = sortedSlots.filter((slot) => isTripSlotExpired(slot, now)).reverse();
+
+  return (
+    <section className="trip-timeline-preview">
+      <header>
+        <span>行程预览</span>
+        <strong>{upcomingSlots.length} 个未出行 · {expiredSlots.length} 个已过期</strong>
+      </header>
+      <TripTimelineGroup
+        title="未出行"
+        description="今天未结束和未来行程"
+        emptyText="暂无未出行行程"
+        slots={upcomingSlots}
+        currentUser={currentUser}
+      />
+      <TripTimelineGroup
+        title="已过期"
+        description="已超过结束时间的行程"
+        emptyText="暂无已过期行程"
+        slots={expiredSlots}
+        currentUser={currentUser}
+        expired
+      />
+    </section>
+  );
+}
+
+function TripTimelineGroup({
+  title,
+  description,
+  emptyText,
+  slots,
+  currentUser,
+  expired = false,
+}: {
+  title: string;
+  description: string;
+  emptyText: string;
+  slots: TripSlot[];
+  currentUser: string;
+  expired?: boolean;
+}) {
+  return (
+    <div className="trip-timeline-group">
+      <div className="trip-timeline-group-title">
+        <strong>{title}</strong>
+        <span>{description}</span>
+      </div>
+      {slots.length === 0 ? <article className="settings-info-card">{emptyText}</article> : null}
+      {slots.map((slot) => {
+        const ownSlot = isOwnTripSlot(slot, currentUser);
+        return (
+          <article key={`${slot.id}-${ownSlot ? 'owned' : 'reserved'}-${expired ? 'expired' : 'upcoming'}`} className={`trip-timeline-item ${ownSlot ? 'owned' : 'reserved'} ${expired ? 'expired' : 'upcoming'}`}>
+            <time>
+              <span>{formatTripDate(slot.tripDate)}</span>
+              {formatTripTimeRange(slot.startTime, slot.endTime)}
+            </time>
+            <div>
+              <strong>{slot.title}</strong>
+              <span>{ownSlot ? tripSubtitle(slot, true) : tripSubtitle(slot, false, 'reservation')}</span>
+              <small>{slot.place} · {tripStatusLabel(slot.status, ownSlot ? undefined : 'reservation')} · {expired ? '已过期' : '未出行'}</small>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 function TripSlotList({
   slots,
   currentUser,
@@ -1067,6 +1294,23 @@ function TripSlotList({
       ))}
     </div>
   );
+}
+
+function mergeTripTimelineSlots(mySlots: TripSlot[], reservedSlots: TripSlot[]) {
+  const byKey = new Map<string, TripSlot>();
+  [...mySlots, ...reservedSlots].forEach((slot) => {
+    byKey.set(`${slot.id}-${slot.ownerUsername}-${slot.applicantUsername || ''}`, slot);
+  });
+  return Array.from(byKey.values());
+}
+
+function compareTripSlots(left: TripSlot, right: TripSlot) {
+  return `${left.tripDate} ${left.startTime}`.localeCompare(`${right.tripDate} ${right.startTime}`);
+}
+
+function isTripSlotExpired(slot: TripSlot, now = new Date()) {
+  const endAt = new Date(`${slot.tripDate}T${formatTripClock(slot.endTime)}:00`);
+  return !Number.isNaN(endAt.getTime()) && endAt.getTime() < now.getTime();
 }
 
 function TripCardMain({ slot, currentUser, statusContext }: { slot: TripSlot; currentUser: string; statusContext?: 'reservation' }) {
@@ -1418,6 +1662,12 @@ function readSettingError(error: unknown) {
     if (error.message === 'newPassword is not strong enough') {
       return '新密码需为 6-20 位，并包含数字、大小写字母和特殊字符';
     }
+    if (error.message === 'trip slot time conflicts') {
+      return '该时间段已有发布行程，请更换时间';
+    }
+    if (error.message === 'duplicate trip slot') {
+      return '该时间段已有发布行程，请更换时间';
+    }
     return error.message;
   }
   return '操作失败';
@@ -1466,6 +1716,74 @@ function nextTripDate(offsetDays: number) {
     String(date.getMonth() + 1).padStart(2, '0'),
     String(date.getDate()).padStart(2, '0'),
   ].join('-');
+}
+
+function buildTripTimeOptions(startMinute: number, endMinute: number) {
+  const options: string[] = [];
+  for (let minute = startMinute; minute <= endMinute; minute += 10) {
+    options.push(formatTripTimeMinute(minute));
+  }
+  return options;
+}
+
+function buildTripHourOptions() {
+  return Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, '0'));
+}
+
+function buildTripStartTimeOptions(date: string) {
+  const today = nextTripDate(0);
+  const minMinute = date === today ? Math.max(tripStartMinute, nextTenMinuteAfter(new Date())) : tripStartMinute;
+  return buildTripTimeOptions(minMinute, tripEndMinute - 10);
+}
+
+function buildTripEndTimeOptions(startTime: string) {
+  const startMinute = parseTripTimeMinute(startTime);
+  const minMinute = startMinute + 10;
+  const maxMinute = Math.min(tripEndMinute, startMinute + tripDurationLimitMinutes);
+  return buildTripTimeOptions(minMinute, maxMinute);
+}
+
+function formatTripTimeMinute(totalMinutes: number) {
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function formatTripTimeRange(startTime: string, endTime: string) {
+  return `${formatTripClock(startTime)}-${formatTripClock(endTime)}`;
+}
+
+function formatTripClock(value: string) {
+  return value.slice(0, 5);
+}
+
+function parseTripTimeMinute(value: string) {
+  const [hour = '0', minute = '0'] = value.split(':');
+  return Number(hour) * 60 + Number(minute);
+}
+
+function normalizeTripTimeInput(value: string) {
+  const normalized = value.trim();
+  const match = normalized.match(/^(\d{1,2}):?(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null;
+  }
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function isAllowedTripTime(value: string, options: string[]) {
+  const normalized = normalizeTripTimeInput(value);
+  return Boolean(normalized && options.includes(normalized));
+}
+
+function nextTenMinuteAfter(date: Date) {
+  const minutes = date.getHours() * 60 + date.getMinutes();
+  return Math.floor(minutes / 10) * 10 + 10;
 }
 
 function formatTripDate(value: string) {
