@@ -24,7 +24,7 @@ export default function App() {
       setSession(null);
       setProfile(null);
       setHealth(null);
-      setError('登录状态已失效，请重新登录。');
+      setError('登录状态已失效，可能已在其他设备登录，请重新登录。');
     }
 
     window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);

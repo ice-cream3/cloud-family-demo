@@ -227,6 +227,7 @@ public class AuthServiceImpl implements AuthService {
                 .attribute("roles", String.join(",", account.roles()))
                 .attribute("permissions", String.join(",", account.permissions()))
                 .build();
+        revokeExistingJdbcSessions(account.username(), registeredClient.getId());
         authorizationService.save(authorization);
         recordLoginLog(account, registeredClient.getClientId(), grantType, context, issuedAt);
         log.info("Token issued: username={}, userType={}, clientId={}, grantType={}, scopes={}, expiresAt={}, refreshTokenExpiresAt={}",
@@ -424,6 +425,7 @@ public class AuthServiceImpl implements AuthService {
                 issuedAt,
                 refreshTokenExpiresAtInstant
         );
+        revokeExistingRedisSessions(account.username(), registeredClient.getClientId());
         saveRedisSession(session);
         recordLoginLog(account, registeredClient.getClientId(), grantType, context, issuedAt);
         log.info("Redis token issued: username={}, userType={}, clientId={}, grantType={}, expiresAt={}, refreshTokenExpiresAt={}",
@@ -527,6 +529,45 @@ public class AuthServiceImpl implements AuthService {
             revokedCount++;
         }
         refreshTokens.delete();
+        return revokedCount;
+    }
+
+    private int revokeExistingJdbcSessions(String username, String registeredClientId) {
+        List<String> authorizationIds = findAuthorizationIdsByPrincipalNameAndRegisteredClientId(username, registeredClientId);
+        int revokedCount = 0;
+        for (String authorizationId : authorizationIds) {
+            OAuth2Authorization authorization = authorizationService.findById(authorizationId);
+            if (authorization != null) {
+                authorizationService.remove(authorization);
+                revokedCount++;
+            }
+        }
+        if (revokedCount > 0) {
+            log.info("Existing JDBC sessions revoked before login: username={}, registeredClientId={}, revokedCount={}",
+                    username, registeredClientId, revokedCount);
+        }
+        return revokedCount;
+    }
+
+    private int revokeExistingRedisSessions(String username, String clientId) {
+        RSet<String> refreshTokens = redissonClient().getSet(redisUserSessionsKey(username));
+        Set<String> tokenSnapshot = new LinkedHashSet<>(refreshTokens.readAll());
+        int revokedCount = 0;
+        for (String refreshToken : tokenSnapshot) {
+            RedisLoginSession session = readRedisSession(redisRefreshTokenKey(refreshToken));
+            if (session == null) {
+                refreshTokens.remove(refreshToken);
+                continue;
+            }
+            if (clientId.equals(session.clientId())) {
+                revokeRedisSession(session);
+                revokedCount++;
+            }
+        }
+        if (revokedCount > 0) {
+            log.info("Existing Redis sessions revoked before login: username={}, clientId={}, revokedCount={}",
+                    username, clientId, revokedCount);
+        }
         return revokedCount;
     }
 
@@ -838,6 +879,10 @@ public class AuthServiceImpl implements AuthService {
 
     private List<String> findAuthorizationIdsByPrincipalName(String username) {
         return oAuth2AuthorizationDao.findIdsByPrincipalName(username);
+    }
+
+    private List<String> findAuthorizationIdsByPrincipalNameAndRegisteredClientId(String username, String registeredClientId) {
+        return oAuth2AuthorizationDao.findIdsByPrincipalNameAndRegisteredClientId(username, registeredClientId);
     }
 
     private record LoginAttempt(int failedCount, LocalDateTime lockedUntil) {

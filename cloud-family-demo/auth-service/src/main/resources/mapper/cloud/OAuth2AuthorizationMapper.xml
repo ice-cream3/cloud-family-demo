@@ -9,4 +9,11 @@
         FROM oauth2_authorization
         WHERE principal_name = #{username}
     </select>
+
+    <select id="findIdsByPrincipalNameAndRegisteredClientId" resultType="java.lang.String">
+        SELECT id
+        FROM oauth2_authorization
+        WHERE principal_name = #{username}
+          AND registered_client_id = #{registeredClientId}
+    </select>
 </mapper>
