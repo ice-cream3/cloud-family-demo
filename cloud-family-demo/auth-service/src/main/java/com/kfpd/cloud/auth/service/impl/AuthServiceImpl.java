@@ -610,7 +610,10 @@ public class AuthServiceImpl implements AuthService {
         try {
             redissonClient().getBucket(key).set(objectMapper.writeValueAsString(session), ttl);
         } catch (JsonProcessingException ex) {
-            throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, "Failed to serialize Redis login session");
+            log.error("Failed to serialize Redis login session: username={}, key={}, message={}",
+                    session.username(), key, ex.getOriginalMessage(), ex);
+            throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR,
+                    "Failed to serialize Redis login session: " + ex.getOriginalMessage());
         }
     }
 

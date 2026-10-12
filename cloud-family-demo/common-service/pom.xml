@@ -53,6 +53,11 @@
             <groupId>org.redisson</groupId>
             <artifactId>redisson</artifactId>
         </dependency>
+        <!-- Jackson support for Java time types such as Instant in Redis session payloads. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
         <!-- RocketMQ client used by shared RocketMQ producer auto-configuration. -->
         <dependency>
             <groupId>org.apache.rocketmq</groupId>

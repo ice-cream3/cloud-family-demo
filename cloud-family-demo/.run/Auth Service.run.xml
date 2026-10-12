@@ -1,5 +1,8 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Auth Service" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <envs>
+      <env name="AUTH_SESSION_STORE" value="redis" />
+    </envs>
     <module name="auth-service" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="com.kfpd.cloud.auth.AuthServiceApplication" />
     <method v="2">
