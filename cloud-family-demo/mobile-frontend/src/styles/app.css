@@ -1128,6 +1128,101 @@ img {
   transform: scale(0.94);
 }
 
+.tool-credit-pill {
+  display: inline-grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  min-width: 72px;
+  min-height: 38px;
+  padding: 5px 8px;
+  border: 1px solid rgba(23, 114, 69, 0.14);
+  border-radius: 8px;
+  color: #177245;
+  background: #f1f8f4;
+  text-align: left;
+}
+
+.tool-home-head .tool-credit-pill {
+  width: auto;
+  height: auto;
+  flex: 0 0 auto;
+  border-radius: 8px;
+}
+
+.tool-home-head .tool-credit-pill:hover,
+.tool-home-head .tool-credit-pill:focus-visible {
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
+}
+
+.tool-credit-pill svg {
+  justify-self: center;
+}
+
+.tool-credit-pill span {
+  display: block;
+  min-width: 0;
+}
+
+.tool-credit-pill strong,
+.tool-credit-pill em {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-credit-pill strong {
+  font-size: 15px;
+}
+
+.tool-credit-pill em {
+  margin: 3px 0 0;
+  color: currentColor;
+  font-size: 11px;
+  font-style: normal;
+  opacity: 0.86;
+}
+
+.tool-credit-pill.credit-s,
+.trip-credit-card.credit-s .trip-credit-score {
+  border-color: rgba(180, 83, 9, 0.18);
+  color: #b45309;
+  background: #fff7ed;
+}
+
+.tool-credit-pill.credit-a,
+.trip-credit-card.credit-a .trip-credit-score {
+  border-color: rgba(23, 114, 69, 0.16);
+  color: #177245;
+  background: #f1f8f4;
+}
+
+.tool-credit-pill.credit-b,
+.trip-credit-card.credit-b .trip-credit-score {
+  border-color: rgba(37, 99, 235, 0.16);
+  color: #2563eb;
+  background: #eef5ff;
+}
+
+.tool-credit-pill.credit-c,
+.trip-credit-card.credit-c .trip-credit-score {
+  border-color: rgba(124, 58, 237, 0.16);
+  color: #7c3aed;
+  background: #f5f0ff;
+}
+
+.tool-credit-pill.credit-d,
+.tool-credit-pill.blocked,
+.trip-credit-card.credit-d .trip-credit-score,
+.trip-credit-card.blocked .trip-credit-score {
+  border-color: rgba(190, 18, 60, 0.18);
+  color: #be123c;
+  background: #fff1f2;
+}
+
 .tool-search-wrap {
   position: relative;
   z-index: 5;
@@ -1903,6 +1998,263 @@ img {
   opacity: 0.9;
 }
 
+.trip-phone-alert {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 16px;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 8px;
+  color: #92400e;
+  background: #fffbeb;
+  font-size: 12px;
+  font-weight: 850;
+  text-align: left;
+}
+
+.trip-phone-alert svg {
+  color: #d97706;
+}
+
+.trip-credit-card {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  min-height: 110px;
+  margin: 0 0 16px;
+  padding: 14px 16px 14px 14px;
+  border: 1px solid rgba(234, 179, 8, 0.13);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.96)),
+    radial-gradient(circle at 10% 16%, rgba(245, 158, 11, 0.1), transparent 36%);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+}
+
+.trip-credit-card.blocked {
+  border-color: rgba(220, 38, 38, 0.22);
+}
+
+.trip-credit-score {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  width: 100%;
+  min-height: 78px;
+  padding: 8px 6px;
+  border: 1px solid rgba(180, 83, 9, 0.18);
+  border-radius: 8px;
+  color: #b45309;
+  background: #fff7ed;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.64);
+  text-align: center;
+}
+
+.trip-credit-card.blocked .trip-credit-score {
+  color: #be123c;
+  background: #fff1f2;
+}
+
+.trip-credit-score span,
+.trip-credit-main span {
+  color: #65758b;
+  font-size: 12px;
+}
+
+.trip-credit-score strong {
+  color: currentColor;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.trip-credit-score svg {
+  margin-bottom: 2px;
+  stroke-width: 2.4;
+}
+
+.trip-credit-main {
+  min-width: 0;
+}
+
+.trip-credit-main > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.trip-credit-main strong {
+  color: #122033;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.trip-credit-meter {
+  height: 7px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf1f6;
+}
+
+.trip-credit-meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #b45309, #f59e0b);
+}
+
+.trip-credit-card.credit-s .trip-credit-meter i {
+  background: linear-gradient(90deg, #b45309, #f59e0b);
+}
+
+.trip-credit-card.credit-a .trip-credit-meter i {
+  background: linear-gradient(90deg, #177245, #2f9e69);
+}
+
+.trip-credit-card.credit-b .trip-credit-meter i {
+  background: linear-gradient(90deg, #2563eb, #38bdf8);
+}
+
+.trip-credit-card.credit-c .trip-credit-meter i {
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+}
+
+.trip-credit-card.blocked .trip-credit-meter i {
+  background: linear-gradient(90deg, #be123c, #fb7185);
+}
+
+.trip-credit-card.credit-d .trip-credit-meter i {
+  background: linear-gradient(90deg, #be123c, #fb7185);
+}
+
+.credit-level-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: end center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.36);
+}
+
+.credit-level-sheet {
+  width: min(100%, 390px);
+  padding: 16px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 22px 54px rgba(15, 23, 42, 0.28);
+}
+
+.credit-level-sheet header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.credit-level-sheet header strong,
+.credit-level-sheet header span {
+  display: block;
+}
+
+.credit-level-sheet header strong {
+  color: #122033;
+  font-size: 17px;
+}
+
+.credit-level-sheet header span {
+  margin-top: 3px;
+  color: #65758b;
+  font-size: 12px;
+}
+
+.credit-level-sheet header button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  color: #526170;
+  background: #f4f7fb;
+}
+
+.credit-level-rules {
+  display: grid;
+  gap: 8px;
+}
+
+.credit-level-rules article {
+  display: grid;
+  grid-template-columns: 24px 26px minmax(70px, auto) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.credit-level-rules article.credit-s {
+  color: #b45309;
+  background: #fff7ed;
+}
+
+.credit-level-rules article.credit-a {
+  color: #177245;
+  background: #f1f8f4;
+}
+
+.credit-level-rules article.credit-b {
+  color: #2563eb;
+  background: #eef5ff;
+}
+
+.credit-level-rules article.credit-c {
+  color: #7c3aed;
+  background: #f5f0ff;
+}
+
+.credit-level-rules article.credit-d {
+  color: #be123c;
+  background: #fff1f2;
+}
+
+.credit-level-rules strong {
+  font-size: 15px;
+}
+
+.credit-level-rules span {
+  color: #122033;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.credit-level-rules small {
+  overflow: hidden;
+  color: #65758b;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.credit-level-sheet p {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #526170;
+  background: #f4f7fb;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .trip-form,
 .trip-list,
 .trip-owner-list {
@@ -2337,6 +2689,11 @@ img {
   background: #eaf0ff;
 }
 
+.trip-status.NO_SHOW {
+  color: #be123c;
+  background: #fff1f2;
+}
+
 .trip-meta {
   grid-column: 1 / -1;
   display: flex;
@@ -2370,6 +2727,11 @@ img {
   width: 100%;
   color: #ffffff;
   background: #2563eb;
+}
+
+.trip-card-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 
 .trip-request-note {
@@ -2412,6 +2774,7 @@ img {
 .activity-card,
 .message-item,
 .profile-vip-card,
+.profile-asset-card,
 .profile-menu {
   border-radius: 8px;
   background: #ffffff;
@@ -2583,6 +2946,124 @@ img {
   background: #ffe28a;
   font-size: 12px;
   font-weight: 900;
+}
+
+.profile-asset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.profile-asset-card {
+  display: grid;
+  grid-template-rows: 36px minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  min-height: 142px;
+  padding: 14px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  color: #122033;
+  text-align: left;
+}
+
+.profile-asset-card.membership {
+  border-color: rgba(180, 83, 9, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 251, 235, 0.96), rgba(255, 255, 255, 0.98)),
+    radial-gradient(circle at 88% 10%, rgba(245, 158, 11, 0.16), transparent 34%);
+}
+
+.profile-asset-card.credit {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(255, 255, 255, 0.98)),
+    radial-gradient(circle at 88% 10%, rgba(37, 99, 235, 0.1), transparent 34%);
+}
+
+.profile-asset-card.credit.credit-s {
+  border-color: rgba(180, 83, 9, 0.16);
+}
+
+.profile-asset-card.credit.credit-a {
+  border-color: rgba(23, 114, 69, 0.16);
+}
+
+.profile-asset-card.credit.credit-b {
+  border-color: rgba(37, 99, 235, 0.16);
+}
+
+.profile-asset-card.credit.credit-c {
+  border-color: rgba(124, 58, 237, 0.16);
+}
+
+.profile-asset-card.credit.credit-d,
+.profile-asset-card.credit.blocked {
+  border-color: rgba(190, 18, 60, 0.18);
+}
+
+.profile-asset-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: #b45309;
+  background: #fff7ed;
+}
+
+.profile-asset-card.credit-s .profile-asset-icon {
+  color: #b45309;
+  background: #fff7ed;
+}
+
+.profile-asset-card.credit-a .profile-asset-icon {
+  color: #177245;
+  background: #f1f8f4;
+}
+
+.profile-asset-card.credit-b .profile-asset-icon {
+  color: #2563eb;
+  background: #eef5ff;
+}
+
+.profile-asset-card.credit-c .profile-asset-icon {
+  color: #7c3aed;
+  background: #f5f0ff;
+}
+
+.profile-asset-card.credit-d .profile-asset-icon,
+.profile-asset-card.blocked .profile-asset-icon {
+  color: #be123c;
+  background: #fff1f2;
+}
+
+.profile-asset-card em,
+.profile-asset-card strong,
+.profile-asset-card small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-asset-card em {
+  color: #65758b;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.profile-asset-card strong {
+  margin-top: 6px;
+  color: #122033;
+  font-size: 17px;
+  line-height: 1.18;
+}
+
+.profile-asset-card small {
+  margin-top: 5px;
+  color: #7b8494;
+  font-size: 11px;
 }
 
 .profile-stats {
@@ -2797,6 +3278,123 @@ img {
 
 .settings-form-card input:disabled {
   color: #7b8495;
+  background: #f3f6fb;
+}
+
+.settings-country-code-field {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+}
+
+.settings-country-code-field > input {
+  padding-right: 4px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.settings-country-code-field > button {
+  height: 42px;
+  border: 1px solid #dbe3ee;
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
+  background: #ffffff;
+}
+
+.settings-country-code-field > button::before {
+  display: block;
+  width: 0;
+  height: 0;
+  margin: 0 auto;
+  border-top: 5px solid #111827;
+  border-right: 5px solid transparent;
+  border-left: 5px solid transparent;
+  content: "";
+}
+
+.settings-country-code-field > button:disabled {
+  background: #f3f6fb;
+}
+
+.settings-country-code-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 65;
+  display: grid;
+  gap: 8px;
+  max-height: 270px;
+  padding: 10px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+}
+
+.settings-country-code-panel input {
+  height: 38px;
+  background: #f8fafc;
+}
+
+.settings-country-code-list {
+  display: grid;
+  gap: 4px;
+  max-height: 198px;
+  overflow: auto;
+}
+
+.settings-country-code-list button {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  color: #475569;
+  background: transparent;
+  text-align: left;
+}
+
+.settings-country-code-list button:hover {
+  background: #f1f5f9;
+}
+
+.settings-country-code-list strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.settings-country-code-list span {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-code-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-code-button {
+  height: 42px;
+  border: 1px solid #bfd0ff;
+  border-radius: 8px;
+  color: #245bff;
+  background: #f5f8ff;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.settings-code-button:disabled {
+  color: #8b95a6;
+  border-color: #dbe3ee;
   background: #f3f6fb;
 }
 
@@ -3195,6 +3793,11 @@ img {
   color: #a3acba;
 }
 
+.phone-auth-input {
+  position: relative;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
 .mobile-password-toggle {
   display: inline-grid;
   place-items: center;
@@ -3231,6 +3834,106 @@ img {
   border-right: 4px solid transparent;
   border-left: 4px solid transparent;
   content: "";
+}
+
+.country-code-control {
+  display: inline-grid;
+  grid-template-columns: 54px 12px;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+}
+
+.mobile-auth-input .country-code-input {
+  width: 54px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: #111827;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.country-code-control > button {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.country-code-control > button::before {
+  display: block;
+  width: 0;
+  height: 0;
+  margin: 4px auto 0;
+  border-top: 4px solid #111827;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+  content: "";
+}
+
+.country-code-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 8px;
+  right: 8px;
+  z-index: 60;
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  padding: 10px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+}
+
+.mobile-auth-input .country-code-panel input {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.country-code-list {
+  display: grid;
+  gap: 4px;
+  max-height: 190px;
+  overflow: auto;
+}
+
+.country-code-list button {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  color: #475569;
+  background: transparent;
+  text-align: left;
+}
+
+.country-code-list button:hover {
+  background: #f1f5f9;
+}
+
+.country-code-list strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.country-code-list span {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .code-button {

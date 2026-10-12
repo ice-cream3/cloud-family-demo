@@ -152,12 +152,18 @@ public class AuthServiceImpl implements AuthService {
             log.warn("API register rejected: username={}, reason=duplicate_username", username);
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "username already exists");
         }
+        String email = blankToNull(request.email());
+        String phone = normalizePhone(request.phone());
+        String phoneCountryCode = phone == null ? null : normalizePhoneCountryCode(request.phoneCountryCode());
+        validateOptionalEmail(email);
+        validateOptionalPhone(phoneCountryCode, phone);
         loginAccountDao.insertApiUser(
                 username,
                 request.password(),
                 request.displayName().trim(),
-                blankToNull(request.email()),
-                blankToNull(request.phone())
+                email,
+                phoneCountryCode,
+                phone
         );
         log.info("API user registered: username={}, clientIp={}", username, context.clientIp());
         return apiLogin(new LoginVO(username, request.password()), context);
@@ -909,6 +915,39 @@ public class AuthServiceImpl implements AuthService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private void validateOptionalEmail(String email) {
+        if (email != null && !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$")) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "email format is invalid");
+        }
+    }
+
+    private void validateOptionalPhone(String phoneCountryCode, String phone) {
+        if (phone == null) {
+            return;
+        }
+        if (phoneCountryCode == null || !phoneCountryCode.matches("^\\+[1-9]\\d{0,3}$") || !phone.matches("^\\d{4,14}$")
+                || !(phoneCountryCode.substring(1) + phone).matches("^[1-9]\\d{7,14}$")) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "phone format is invalid");
+        }
+    }
+
+    private String normalizePhone(String phone) {
+        String normalized = phone == null ? null : phone.trim().replaceAll("[\\s\\-()]", "");
+        if (normalized != null && normalized.startsWith("+")) {
+            normalized = normalized.substring(1);
+        }
+        return normalized == null || normalized.isBlank() ? null : normalized;
+    }
+
+    private String normalizePhoneCountryCode(String phoneCountryCode) {
+        String normalized = blankToNull(phoneCountryCode);
+        if (normalized == null) {
+            return "+86";
+        }
+        normalized = normalized.replaceAll("[\\s\\-()]", "");
+        return normalized.startsWith("+") ? normalized : "+" + normalized;
     }
 
     private void insertLoginLog(String userType,

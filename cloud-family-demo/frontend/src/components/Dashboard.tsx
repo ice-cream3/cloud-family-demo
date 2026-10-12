@@ -4,6 +4,7 @@ import { ChevronRight, Eye, EyeOff, FolderTree, KeyRound, Layers3, ListTree, Log
 import type { LoginTrendPoint, ManagerDashboard, MenuTreeNode, OperationLog, PageQuery, PageResult, SysMenu, SysPermission, SysRole, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
 import type { Session } from '../services/tokenStore';
 import { loadSystemMenuTree } from '../services/dashboardService';
+import { COUNTRY_CALLING_CODE_OPTIONS } from '../constants/countryCallingCodes';
 
 type DashboardProps = {
   session: Session;
@@ -1848,8 +1849,9 @@ type TableColumn = {
 type EditorField = {
   key: string;
   label: string;
-  type?: 'text' | 'password' | 'number' | 'select' | 'checkbox' | 'textarea';
+  type?: 'text' | 'password' | 'number' | 'select' | 'checkbox' | 'textarea' | 'email' | 'tel';
   valueType?: 'string' | 'number';
+  validateAs?: 'email' | 'phone' | 'phoneCountryCode';
   required?: boolean;
   createOnly?: boolean;
   readonlyOnEdit?: boolean;
@@ -1889,9 +1891,16 @@ function RecordEditorDialog({
 }) {
   const fields = config.fields.filter((field) => !field.createOnly || !record);
   const [values, setValues] = useState<Record<string, string | boolean>>(() => initialEditorValues(fields, initialRecord || record));
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const nextValidationError = validateEditorValues(fields, values);
+    if (nextValidationError) {
+      setValidationError(nextValidationError);
+      return;
+    }
+    setValidationError(null);
     void onSave(buildPayload(fields, values));
   }
 
@@ -1919,7 +1928,7 @@ function RecordEditorDialog({
               )}
             </label>
           ))}
-          {error ? <div className="error-banner compact">{error}</div> : null}
+          {validationError || error ? <div className="error-banner compact">{validationError || error}</div> : null}
           <div className="dialog-actions">
             <button className="ghost-button" type="button" onClick={onClose} disabled={saving}>
               取消
@@ -2637,14 +2646,31 @@ function renderEditorControl(
   }
 
   return (
-    <input
-      type={field.type || 'text'}
-      value={String(value ?? '')}
-      onChange={(event) => onChange(event.target.value)}
-      placeholder={field.placeholder}
-      required={field.required}
-      disabled={disabled}
-    />
+    <>
+      <input
+        type={field.type || 'text'}
+        value={String(value ?? '')}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={field.placeholder}
+        required={field.required}
+        disabled={disabled}
+        inputMode={field.validateAs === 'phone' || field.validateAs === 'phoneCountryCode' ? 'tel' : field.validateAs === 'email' ? 'email' : undefined}
+        list={field.validateAs === 'phoneCountryCode' ? 'country-code-options' : undefined}
+      />
+      {field.validateAs === 'phoneCountryCode' ? <CountryCodeDatalist /> : null}
+    </>
+  );
+}
+
+function CountryCodeDatalist() {
+  return (
+    <datalist id="country-code-options">
+      {COUNTRY_CALLING_CODE_OPTIONS.map((option) => (
+        <option key={`${option.code}-${option.label}`} value={option.code}>
+          {option.label}
+        </option>
+      ))}
+    </datalist>
   );
 }
 
@@ -2683,6 +2709,40 @@ function buildPayload(fields: EditorField[], values: Record<string, string | boo
     payload[field.key] = text || undefined;
   });
   return payload;
+}
+
+function validateEditorValues(fields: EditorField[], values: Record<string, string | boolean>) {
+  for (const field of fields) {
+    const value = values[field.key];
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (!text) {
+      continue;
+    }
+    if (field.validateAs === 'email' && !isValidEmail(text)) {
+      return '请输入有效的邮箱地址';
+    }
+    if (field.validateAs === 'phone' && !isValidPhone(text)) {
+      return '请输入有效的手机号';
+    }
+    if (field.validateAs === 'phoneCountryCode' && !isValidPhoneCountryCode(text)) {
+      return '请输入有效的国际区号';
+    }
+  }
+  return null;
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
+}
+
+function isValidPhone(value: string) {
+  const normalized = value.replace(/[\s\-()]/g, '');
+  return /^\d{4,14}$/.test(normalized.replace(/^\+/, ''));
+}
+
+function isValidPhoneCountryCode(value: string) {
+  const normalized = value.trim().replace(/[\s\-()]/g, '');
+  return /^\+?[1-9]\d{0,3}$/.test(normalized);
 }
 
 function withMenuParentOptions(config: SystemPageConfig, options: MenuSelectOption[]) {
@@ -2826,8 +2886,10 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
         { key: 'username', title: '账号', render: (record) => textValue(readField(record, 'username')) },
         { key: 'displayName', title: '显示名称', render: (record) => textValue(readField(record, 'displayName')) },
         { key: 'email', title: '邮箱', render: (record) => textValue(readField(record, 'email')) },
+        { key: 'phoneCountryCode', title: '国际区号', render: (record) => textValue(readField(record, 'phoneCountryCode')) },
         { key: 'phone', title: '手机号', render: (record) => textValue(readField(record, 'phone')) },
         { key: 'vipLevel', title: '会员等级', render: (record) => textValue(readField(record, 'vipLevel')) },
+        { key: 'creditScore', title: '信用积分', render: (record) => textValue(readField(record, 'creditScore')) },
         ...(isPartnerInfo ? [
           { key: 'online', title: '登录状态', render: (record: SystemPageRecord) => <OnlineStatusValue record={record} /> },
         ] : []),
@@ -2838,9 +2900,11 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
         { key: 'username', label: '账号', required: true, readonlyOnEdit: true },
         { key: 'passwordHash', label: '密码', type: 'password', createOnly: true, required: true },
         { key: 'displayName', label: '显示名称', required: true },
-        { key: 'email', label: '邮箱' },
-        { key: 'phone', label: '手机号' },
+        { key: 'email', label: '邮箱', type: 'email', validateAs: 'email' },
+        { key: 'phoneCountryCode', label: '国际区号', type: 'tel', validateAs: 'phoneCountryCode', placeholder: '+86' },
+        { key: 'phone', label: '手机号', type: 'tel', validateAs: 'phone' },
         { key: 'vipLevel', label: '会员等级', placeholder: '例如 NORMAL / GOLD' },
+        { key: 'creditScore', label: '信用积分', type: 'number', placeholder: '0-100' },
         statusField,
       ],
     };
@@ -3049,6 +3113,7 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
             { label: '可预约', value: 'OPEN' },
             { label: '待审核', value: 'PENDING' },
             { label: '已预约', value: 'BOOKED' },
+            { label: '未履约', value: 'NO_SHOW' },
           ],
         },
         { key: 'applicantUsername', label: '预约账号' },
@@ -3627,8 +3692,10 @@ function operationLogFieldLabels(businessType: string | undefined) {
       password: '密码',
       displayName: '显示名称',
       email: '邮箱',
+      phoneCountryCode: '国际区号',
       phone: '手机号',
       vipLevel: '会员等级',
+      creditScore: '信用积分',
       status: '状态',
     },
   };
@@ -3746,6 +3813,15 @@ function recordLabel(record: SystemPageRecord) {
 
 function readErrorMessage(error: unknown) {
   if (error instanceof Error) {
+    if (error.message === 'email format is invalid') {
+      return '请输入有效的邮箱地址';
+    }
+    if (error.message === 'phone format is invalid') {
+      return '请输入有效的手机号';
+    }
+    if (error.message === 'phone already exists') {
+      return '该手机号已被占用，请联系客服处理';
+    }
     return error.message;
   }
   return '操作失败';

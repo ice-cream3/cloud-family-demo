@@ -1,5 +1,36 @@
 USE `fa-cloud`;
 
+DROP PROCEDURE IF EXISTS ensure_vip_user_credit_score;
+
+DELIMITER //
+
+CREATE PROCEDURE ensure_vip_user_credit_score()
+BEGIN
+    DECLARE credit_column_count int DEFAULT 0;
+
+    SELECT COUNT(*)
+    INTO credit_column_count
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = 'vip_user'
+      AND column_name = 'credit_score';
+
+    IF credit_column_count = 0 THEN
+        ALTER TABLE vip_user
+            ADD COLUMN credit_score int NOT NULL DEFAULT 100 COMMENT '行程预约信用积分' AFTER vip_level;
+    END IF;
+END//
+
+DELIMITER ;
+
+CALL ensure_vip_user_credit_score();
+
+DROP PROCEDURE IF EXISTS ensure_vip_user_credit_score;
+
+UPDATE vip_user
+SET credit_score = 100
+WHERE credit_score IS NULL;
+
 CREATE TABLE IF NOT EXISTS user_notification_setting (
     id bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     username varchar(64) NOT NULL COMMENT '用户账号',
@@ -78,7 +109,7 @@ CREATE TABLE IF NOT EXISTS user_trip_slot (
     trip_date date NOT NULL COMMENT '行程日期',
     start_time time NOT NULL COMMENT '开始时间',
     end_time time NOT NULL COMMENT '结束时间',
-    status varchar(32) NOT NULL DEFAULT 'OPEN' COMMENT '行程状态',
+    status varchar(32) NOT NULL DEFAULT 'OPEN' COMMENT '行程状态：OPEN/PENDING/BOOKED/NO_SHOW',
     applicant_username varchar(64) DEFAULT NULL COMMENT '预约人账号',
     applicant_display_name varchar(100) DEFAULT NULL COMMENT '预约人显示名称',
     apply_note varchar(255) DEFAULT NULL COMMENT '预约申请备注',

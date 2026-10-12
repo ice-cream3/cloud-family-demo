@@ -131,8 +131,10 @@ export type VipUser = {
   username: string;
   displayName?: string;
   email?: string;
+  phoneCountryCode?: string;
   phone?: string;
   vipLevel?: string;
+  creditScore?: number;
   status?: string;
   createdAt?: string;
   updatedAt?: string;

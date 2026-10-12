@@ -36,7 +36,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import type { AppDocument, FavoriteItem, Membership, PartnerHealth, ProfileDynamic, TripOwner, TripPublishRequest, TripSlot, UserHistoryItem, UserProfile } from '../types/api';
+import type { AppDocument, FavoriteItem, Membership, PartnerHealth, ProfileDynamic, TripCredit, TripOwner, TripPublishRequest, TripSlot, UserHistoryItem, UserProfile } from '../types/api';
 import type { AccountSecurity } from '../types/api';
 import {
   changeAccountPassword,
@@ -50,16 +50,20 @@ import {
   loadBookableTripSlots,
   loadMyTrips,
   loadMyTripReservations,
+  loadTripCredit,
   loadTripOwners,
+  markTripNoShow,
   publishTrip,
   refreshProfileDynamic,
   applyTrip,
   reviewTrip,
+  sendPhoneVerificationCode,
   updateAccountSecurity,
   updateNotificationSettings,
 } from '../services/partnerService';
 import { ApiError } from '../services/apiClient';
 import type { Session } from '../services/tokenStore';
+import { COUNTRY_CALLING_CODE_OPTIONS } from '../constants/countryCallingCodes';
 
 type HomePageProps = {
   session: Session;
@@ -72,7 +76,7 @@ type HomePageProps = {
 };
 
 type TabKey = 'home' | 'tools' | 'activity' | 'message' | 'profile';
-type ScreenKey = TabKey | 'compress' | 'history' | 'settings' | 'membership' | 'favorites' | 'trips' | 'myTrips';
+type ScreenKey = TabKey | 'compress' | 'history' | 'settings' | 'phoneVerification' | 'membership' | 'favorites' | 'trips' | 'myTrips';
 type SettingDetail = 'account' | 'notifications' | 'about' | 'privacy' | 'agreement' | 'version';
 type SearchableTool = {
   icon: typeof Image;
@@ -82,6 +86,13 @@ type SearchableTool = {
 };
 
 const TRIP_CONFLICT_CODE = 200002;
+const defaultTripCredit: TripCredit = {
+  creditScore: 100,
+  creditLevel: 'S',
+  minReservableScore: 60,
+  noShowPenalty: 20,
+  reservable: true,
+};
 
 const mainTools = [
   { icon: Image, label: '图片处理', tone: 'green' },
@@ -151,13 +162,19 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
   const [screen, setScreen] = useState<ScreenKey>('home');
   const [showMoreTools, setShowMoreTools] = useState(false);
   const [dynamic, setDynamic] = useState<ProfileDynamic | null>(null);
+  const [membership, setMembership] = useState<Membership | null>(null);
+  const [accountSecurity, setAccountSecurity] = useState<AccountSecurity | null>(null);
+  const [tripCredit, setTripCredit] = useState<TripCredit>(defaultTripCredit);
   const [dynamicLoading, setDynamicLoading] = useState(false);
   const displayName = profile?.displayName || session.username || '用户名';
   const serviceStatus = dynamic?.serviceStatus || health?.status || (profile ? 'UP' : 'UNKNOWN');
-  const activeTab = ['history', 'settings', 'membership', 'favorites', 'trips', 'myTrips'].includes(screen) ? 'profile' : screen === 'compress' ? 'tools' : screen as TabKey;
+  const activeTab = ['history', 'settings', 'phoneVerification', 'membership', 'favorites', 'trips', 'myTrips'].includes(screen) ? 'profile' : screen === 'compress' ? 'tools' : screen as TabKey;
 
   useEffect(() => {
     void loadDynamic();
+    void reloadAccountSecurity();
+    void reloadMembership();
+    void reloadTripCredit();
   }, []);
 
   async function loadDynamic() {
@@ -171,7 +188,34 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
 
   async function refreshDynamic() {
     onReload();
-    await loadDynamic();
+    await Promise.all([loadDynamic(), reloadAccountSecurity(), reloadMembership(), reloadTripCredit()]);
+  }
+
+  async function reloadAccountSecurity() {
+    try {
+      const nextAccount = await loadAccountSecurity();
+      setAccountSecurity(nextAccount);
+      return nextAccount;
+    } catch {
+      setAccountSecurity(null);
+      return null;
+    }
+  }
+
+  async function reloadMembership() {
+    try {
+      setMembership(await loadMembership());
+    } catch {
+      setMembership(null);
+    }
+  }
+
+  async function reloadTripCredit() {
+    try {
+      setTripCredit(await loadTripCredit());
+    } catch {
+      setTripCredit(defaultTripCredit);
+    }
   }
 
   function setTab(tab: TabKey) {
@@ -188,6 +232,7 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
         {screen === 'home' ? (
           <HomeScreen
             displayName={displayName}
+            tripCredit={tripCredit}
             onOpenTools={() => setTab('tools')}
             onOpenCompress={() => setScreen('compress')}
             onOpenTrips={() => setScreen('trips')}
@@ -207,6 +252,8 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
             serviceStatus={serviceStatus}
             loading={loading || dynamicLoading}
             dynamic={dynamic}
+            membership={membership}
+            tripCredit={tripCredit}
             onReload={refreshDynamic}
             onLogout={onLogout}
             onOpenMembership={() => setScreen('membership')}
@@ -224,6 +271,11 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
             mode="booking"
             displayName={displayName}
             username={session.username || ''}
+            accountSecurity={accountSecurity}
+            tripCredit={tripCredit}
+            onRefreshAccountSecurity={reloadAccountSecurity}
+            onRefreshTripCredit={reloadTripCredit}
+            onOpenPhoneVerification={() => setScreen('phoneVerification')}
             onBack={() => setScreen('home')}
             onOpenMyTrips={() => setScreen('myTrips')}
           />
@@ -233,11 +285,21 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
             mode="mine"
             displayName={displayName}
             username={session.username || ''}
+            accountSecurity={accountSecurity}
+            tripCredit={tripCredit}
+            onRefreshAccountSecurity={reloadAccountSecurity}
+            onRefreshTripCredit={reloadTripCredit}
+            onOpenPhoneVerification={() => setScreen('phoneVerification')}
             onBack={() => setScreen('profile')}
             onOpenBooking={() => setScreen('trips')}
           />
         ) : null}
-        {screen === 'settings' ? <SettingsScreen displayName={displayName} onBack={() => setScreen('profile')} onLogout={onLogout} /> : null}
+        {screen === 'settings' ? (
+          <SettingsScreen displayName={displayName} onAccountUpdated={setAccountSecurity} onBack={() => setScreen('profile')} onLogout={onLogout} />
+        ) : null}
+        {screen === 'phoneVerification' ? (
+          <SettingsScreen displayName={displayName} initialDetail="account" focusPhone onAccountUpdated={setAccountSecurity} onBack={() => setScreen('myTrips')} onLogout={onLogout} />
+        ) : null}
 
         <BottomTabs active={activeTab} onChange={setTab} hasMessageDot />
         {showMoreTools ? <MoreToolsSheet onClose={() => setShowMoreTools(false)} /> : null}
@@ -258,11 +320,13 @@ function StatusBar() {
 
 function HomeScreen({
   displayName,
+  tripCredit,
   onOpenTools,
   onOpenCompress,
   onOpenTrips,
 }: {
   displayName: string;
+  tripCredit: TripCredit;
   onOpenTools: () => void;
   onOpenCompress: () => void;
   onOpenTrips: () => void;
@@ -308,6 +372,7 @@ function HomeScreen({
           <strong>Hi，早上好!</strong>
           <span>{displayName} 的效率工具箱 ✨</span>
         </div>
+        <CreditLevelPill credit={tripCredit} />
         <button type="button" aria-label="快速打开图片压缩" onClick={onOpenCompress}>
           <Zap size={16} />
         </button>
@@ -410,6 +475,29 @@ function HomeScreen({
       </button>
       {toast ? <div className="home-toast">{toast}</div> : null}
     </div>
+  );
+}
+
+function CreditLevelPill({ credit }: { credit: TripCredit }) {
+  const [showDescription, setShowDescription] = useState(false);
+  const creditIcon = tripCreditIcon(credit.creditLevel);
+  const Icon = creditIcon.icon;
+  return (
+    <>
+      <button
+        className={`tool-credit-pill ${credit.reservable ? 'available' : 'blocked'} ${creditIcon.tone}`}
+        type="button"
+        onClick={() => setShowDescription(true)}
+        aria-label="查看信用级别说明"
+      >
+        <Icon size={16} />
+        <span>
+          <strong>{credit.creditLevel}</strong>
+          <em>{credit.creditScore}分</em>
+        </span>
+      </button>
+      {showDescription ? <CreditLevelDescription credit={credit} onClose={() => setShowDescription(false)} /> : null}
+    </>
   );
 }
 
@@ -582,6 +670,8 @@ function ProfileScreen({
   serviceStatus,
   loading,
   dynamic,
+  membership,
+  tripCredit,
   onReload,
   onLogout,
   onOpenMembership,
@@ -594,6 +684,8 @@ function ProfileScreen({
   serviceStatus: string;
   loading: boolean;
   dynamic: ProfileDynamic | null;
+  membership: Membership | null;
+  tripCredit: TripCredit;
   onReload: () => void;
   onLogout: () => void;
   onOpenMembership: () => void;
@@ -624,14 +716,7 @@ function ProfileScreen({
           <i />
         </button>
       </header>
-      <section className="profile-vip-card">
-        <Crown size={24} />
-        <div>
-          <strong>开通会员</strong>
-          <span>解锁更多高级功能</span>
-        </div>
-        <button type="button" onClick={onOpenMembership}>立即开通</button>
-      </section>
+      <ProfileAssetCards membership={membership} credit={tripCredit} onOpenMembership={onOpenMembership} />
       <div className="profile-stats">
         <button type="button" onClick={onOpenFavorites} aria-label="打开我的收藏">
           <strong>{dynamic?.favoriteCount ?? '-'}</strong>
@@ -661,6 +746,50 @@ function ProfileScreen({
         <MenuRow icon={LogOut} title="退出登录" onClick={onLogout} />
       </div>
     </div>
+  );
+}
+
+function ProfileAssetCards({
+  membership,
+  credit,
+  onOpenMembership,
+}: {
+  membership: Membership | null;
+  credit: TripCredit;
+  onOpenMembership: () => void;
+}) {
+  const [showCreditDescription, setShowCreditDescription] = useState(false);
+  const creditIcon = tripCreditIcon(credit.creditLevel);
+  const CreditIcon = creditIcon.icon;
+  const planName = membership?.planName || '普通会员';
+  const membershipStatus = membership?.status === 'ACTIVE' ? '权益生效中' : membership?.status || '基础权益';
+
+  return (
+    <>
+      <section className="profile-asset-grid">
+        <button className="profile-asset-card membership" type="button" onClick={onOpenMembership}>
+          <span className="profile-asset-icon">
+            <Crown size={22} />
+          </span>
+          <span>
+            <em>会员等级</em>
+            <strong>{planName}</strong>
+            <small>{membershipStatus}</small>
+          </span>
+        </button>
+        <button className={`profile-asset-card credit ${credit.reservable ? 'available' : 'blocked'} ${creditIcon.tone}`} type="button" onClick={() => setShowCreditDescription(true)}>
+          <span className="profile-asset-icon">
+            <CreditIcon size={22} />
+          </span>
+          <span>
+            <em>信用等级</em>
+            <strong>{credit.creditLevel} · {credit.creditScore}分</strong>
+            <small>{credit.reservable ? '可预约行程' : '暂不可预约'}</small>
+          </span>
+        </button>
+      </section>
+      {showCreditDescription ? <CreditLevelDescription credit={credit} onClose={() => setShowCreditDescription(false)} /> : null}
+    </>
   );
 }
 
@@ -796,6 +925,11 @@ function TripScheduleScreen({
   mode,
   displayName,
   username,
+  accountSecurity,
+  tripCredit,
+  onRefreshAccountSecurity,
+  onRefreshTripCredit,
+  onOpenPhoneVerification,
   onBack,
   onOpenMyTrips,
   onOpenBooking,
@@ -803,6 +937,11 @@ function TripScheduleScreen({
   mode: 'booking' | 'mine';
   displayName: string;
   username: string;
+  accountSecurity: AccountSecurity | null;
+  tripCredit: TripCredit;
+  onRefreshAccountSecurity: () => Promise<AccountSecurity | null>;
+  onRefreshTripCredit: () => Promise<void>;
+  onOpenPhoneVerification: () => void;
   onBack: () => void;
   onOpenMyTrips?: () => void;
   onOpenBooking?: () => void;
@@ -821,6 +960,7 @@ function TripScheduleScreen({
   const [endTime, setEndTime] = useState('15:00');
   const [toast, setToast] = useState<string | null>(null);
   const pendingRequests = mySlots.filter((slot) => slot.status === 'PENDING');
+  const phoneVerified = Boolean(accountSecurity?.phone?.trim());
   const startTimeOptions = buildTripStartTimeOptions(date);
   const endTimeOptions = buildTripEndTimeOptions(startTime);
 
@@ -849,6 +989,7 @@ function TripScheduleScreen({
         setMySlots(nextMySlots);
         setReservedSlots(nextReservations);
       }
+      await onRefreshTripCredit();
     } catch (err) {
       showTripToast(readSettingError(err));
     } finally {
@@ -870,6 +1011,9 @@ function TripScheduleScreen({
 
   async function publishSlot(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!(await ensurePhoneVerified())) {
+      return;
+    }
     if (!title.trim() || !place.trim() || !date || !startTime || !endTime) {
       showTripToast('请完整填写行程信息');
       return;
@@ -917,6 +1061,13 @@ function TripScheduleScreen({
   }
 
   async function requestSlot(slot: TripSlot) {
+    if (!(await ensurePhoneVerified())) {
+      return;
+    }
+    if (!tripCredit.reservable) {
+      showTripToast(`信用分低于 ${tripCredit.minReservableScore} 分，暂不可预约`);
+      return;
+    }
     if (isOwnTripSlot(slot, username)) {
       showTripToast('不能预约自己发布的行程');
       return;
@@ -946,10 +1097,32 @@ function TripScheduleScreen({
     }
   }
 
+  async function ensurePhoneVerified() {
+    const nextAccount = await onRefreshAccountSecurity();
+    if (!nextAccount?.phone?.trim()) {
+      showTripToast('请先在设置-账号与安全中认证手机号');
+      onOpenPhoneVerification();
+      return false;
+    }
+    return true;
+  }
+
   function reviewSlot(slotId: number, approved: boolean) {
     reviewTrip(slotId, approved)
       .then(() => reloadTrips())
       .then(() => showTripToast(approved ? '已通过预约申请' : '已拒绝预约申请'))
+      .catch((err) => showTripToast(readSettingError(err)));
+  }
+
+  function markNoShow(slot: TripSlot) {
+    const applicant = slot.applicantDisplayName || slot.applicantUsername || '预约人';
+    const confirmed = window.confirm(`确认将 ${applicant} 标记为未履约？系统将扣除 ${tripCredit.noShowPenalty} 信用分。`);
+    if (!confirmed) {
+      return;
+    }
+    markTripNoShow(slot.id)
+      .then(() => reloadTrips())
+      .then(() => showTripToast('已标记未履约并扣除信用分'))
       .catch((err) => showTripToast(readSettingError(err)));
   }
 
@@ -977,6 +1150,16 @@ function TripScheduleScreen({
         </div>
         <CalendarDays size={58} />
       </section>
+
+      {!phoneVerified ? (
+        <button className="trip-phone-alert" type="button" onClick={onOpenPhoneVerification}>
+          <ShieldCheck size={18} />
+          <span>发布行程和预约行程前，需要先认证手机号</span>
+          <ChevronRight size={16} />
+        </button>
+      ) : null}
+
+      <TripCreditCard credit={tripCredit} />
 
       <div className="trip-segment-row">
         {mode === 'mine' ? (
@@ -1021,9 +1204,15 @@ function TripScheduleScreen({
                 <TripTimePicker value={endTime} options={endTimeOptions} onChange={setEndTime} hourMode="options" />
               </label>
             </div>
-            <button className="app-primary" type="submit">发布行程</button>
+            <button className="app-primary" type="submit">{phoneVerified ? '发布行程' : '认证手机号后发布'}</button>
           </form>
-          <TripSlotList emptyText={loading ? '加载中' : '暂无已发布行程'} slots={mySlots} currentUser={username} />
+          <TripSlotList
+            emptyText={loading ? '加载中' : '暂无已发布行程'}
+            slots={mySlots}
+            currentUser={username}
+            actionLabel={(slot) => slot.status === 'BOOKED' && isTripSlotExpired(slot) ? '未履约' : null}
+            onAction={markNoShow}
+          />
         </>
       ) : null}
 
@@ -1046,7 +1235,9 @@ function TripScheduleScreen({
               emptyText="该用户暂无可预约时段"
               slots={selectedOwnerSlots}
               currentUser={username}
-              actionLabel="预约"
+              actionLabel={phoneVerified ? '预约' : '需认证手机号'}
+              actionDisabled={phoneVerified && !tripCredit.reservable}
+              disabledActionLabel="信用不足"
               onAction={requestSlot}
             />
           </>
@@ -1081,6 +1272,99 @@ function TripScheduleScreen({
     </div>
   );
 }
+
+function TripCreditCard({ credit }: { credit: TripCredit }) {
+  const [showDescription, setShowDescription] = useState(false);
+  const progress = Math.max(0, Math.min(100, credit.creditScore));
+  const creditIcon = tripCreditIcon(credit.creditLevel);
+  const Icon = creditIcon.icon;
+  return (
+    <>
+      <section className={`trip-credit-card ${credit.reservable ? 'available' : 'blocked'} ${creditIcon.tone}`}>
+      <button
+        className="trip-credit-score"
+        type="button"
+        onClick={() => setShowDescription(true)}
+        aria-label="查看信用级别说明"
+      >
+        <Icon size={22} />
+        <span>信用等级</span>
+        <strong>{credit.creditLevel}</strong>
+      </button>
+      <div className="trip-credit-main">
+        <div>
+          <strong>{credit.creditScore} 分</strong>
+          <span>低于 {credit.minReservableScore} 分不可预约 · 未履约扣 {credit.noShowPenalty} 分</span>
+        </div>
+        <div className="trip-credit-meter" aria-hidden="true">
+          <i style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+    </section>
+      {showDescription ? <CreditLevelDescription credit={credit} onClose={() => setShowDescription(false)} /> : null}
+    </>
+  );
+}
+
+function CreditLevelDescription({ credit, onClose }: { credit: TripCredit; onClose: () => void }) {
+  return (
+    <div className="credit-level-mask" role="dialog" aria-modal="true" aria-label="信用级别说明">
+      <div className="credit-level-sheet">
+        <header>
+          <div>
+            <strong>信用级别说明</strong>
+            <span>当前 {credit.creditLevel} 级 · {credit.creditScore} 分</span>
+          </div>
+          <button type="button" onClick={onClose} aria-label="关闭信用级别说明">
+            <X size={18} />
+          </button>
+        </header>
+        <div className="credit-level-rules">
+          {creditLevelRules().map((rule) => {
+            const Icon = rule.icon;
+            return (
+              <article key={rule.level} className={rule.tone}>
+                <Icon size={18} />
+                <strong>{rule.level}</strong>
+                <span>{rule.range}</span>
+                <small>{rule.description}</small>
+              </article>
+            );
+          })}
+        </div>
+        <p>低于 {credit.minReservableScore} 分将暂停预约；每次确认未履约扣 {credit.noShowPenalty} 分。</p>
+      </div>
+    </div>
+  );
+}
+
+function creditLevelRules() {
+  return [
+    { level: 'S', range: '95-100分', description: '信用优秀，预约优先级最高', icon: Crown, tone: 'credit-s' },
+    { level: 'A', range: '85-94分', description: '信用良好，可正常预约', icon: ShieldCheck, tone: 'credit-a' },
+    { level: 'B', range: '75-84分', description: '信用稳定，建议按时履约', icon: Star, tone: 'credit-b' },
+    { level: 'C', range: '60-74分', description: '信用偏低，需减少失约', icon: UserCheck, tone: 'credit-c' },
+    { level: 'D', range: '0-59分', description: '暂不可预约行程', icon: X, tone: 'credit-d' },
+  ];
+}
+
+function tripCreditIcon(level: string): { icon: typeof ShieldCheck; tone: string } {
+  const normalizedLevel = level.toUpperCase();
+  if (normalizedLevel === 'S') {
+    return { icon: Crown, tone: 'credit-s' };
+  }
+  if (normalizedLevel === 'A') {
+    return { icon: ShieldCheck, tone: 'credit-a' };
+  }
+  if (normalizedLevel === 'B') {
+    return { icon: Star, tone: 'credit-b' };
+  }
+  if (normalizedLevel === 'C') {
+    return { icon: UserCheck, tone: 'credit-c' };
+  }
+  return { icon: X, tone: 'credit-d' };
+}
+
 
 function TripOwnerList({ owners, loading, onSelect }: { owners: TripOwner[]; loading: boolean; onSelect: (ownerName: string) => void }) {
   return (
@@ -1271,27 +1555,36 @@ function TripSlotList({
   currentUser,
   emptyText,
   actionLabel,
+  actionDisabled,
+  disabledActionLabel,
   onAction,
   statusContext,
 }: {
   slots: TripSlot[];
   currentUser: string;
   emptyText: string;
-  actionLabel?: string;
+  actionLabel?: string | ((slot: TripSlot) => string | null);
+  actionDisabled?: boolean;
+  disabledActionLabel?: string;
   onAction?: (slot: TripSlot) => void;
   statusContext?: 'reservation';
 }) {
   return (
     <div className="trip-list">
       {slots.length === 0 ? <article className="settings-info-card">{emptyText}</article> : null}
-      {slots.map((slot) => (
-        <article key={slot.id} className="trip-card">
-          <TripCardMain slot={slot} currentUser={currentUser} statusContext={statusContext} />
-          {actionLabel && onAction ? (
-            <button className="trip-card-action" type="button" onClick={() => onAction(slot)}>{actionLabel}</button>
-          ) : null}
-        </article>
-      ))}
+      {slots.map((slot) => {
+        const resolvedActionLabel = typeof actionLabel === 'function' ? actionLabel(slot) : actionLabel;
+        return (
+          <article key={slot.id} className="trip-card">
+            <TripCardMain slot={slot} currentUser={currentUser} statusContext={statusContext} />
+            {resolvedActionLabel && onAction ? (
+              <button className="trip-card-action" type="button" disabled={actionDisabled} onClick={() => onAction(slot)}>
+                {actionDisabled ? disabledActionLabel || resolvedActionLabel : resolvedActionLabel}
+              </button>
+            ) : null}
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -1350,8 +1643,22 @@ function tripSubtitle(slot: TripSlot, ownSlot: boolean, context?: 'reservation')
   return applicant ? `我发布的行程 · 预约人：${applicant}` : '我发布的行程';
 }
 
-function SettingsScreen({ displayName, onBack, onLogout }: { displayName: string; onBack: () => void; onLogout: () => void }) {
-  const [detail, setDetail] = useState<SettingDetail | null>(null);
+function SettingsScreen({
+  displayName,
+  initialDetail = null,
+  focusPhone = false,
+  onAccountUpdated,
+  onBack,
+  onLogout,
+}: {
+  displayName: string;
+  initialDetail?: SettingDetail | null;
+  focusPhone?: boolean;
+  onAccountUpdated?: (account: AccountSecurity) => void;
+  onBack: () => void;
+  onLogout: () => void;
+}) {
+  const [detail, setDetail] = useState<SettingDetail | null>(initialDetail);
   const [cacheSize, setCacheSize] = useState('12.4MB');
   const [toast, setToast] = useState<string | null>(null);
 
@@ -1382,9 +1689,9 @@ function SettingsScreen({ displayName, onBack, onLogout }: { displayName: string
   if (detail) {
     return (
       <div className="tool-screen settings-detail-screen">
-        <HeaderWithBack title={settingTitle(detail)} onBack={() => setDetail(null)} />
+        <HeaderWithBack title={settingTitle(detail)} onBack={focusPhone && initialDetail === detail ? onBack : () => setDetail(null)} />
         {detail === 'account' ? (
-          <AccountSecurityDetail fallbackDisplayName={displayName} />
+          <AccountSecurityDetail fallbackDisplayName={displayName} focusPhone={focusPhone} onAccountUpdated={onAccountUpdated} />
         ) : (
           <SettingDetailContent
             detail={detail}
@@ -1412,21 +1719,52 @@ function SettingsScreen({ displayName, onBack, onLogout }: { displayName: string
   );
 }
 
-function AccountSecurityDetail({ fallbackDisplayName }: { fallbackDisplayName: string }) {
+function AccountSecurityDetail({
+  fallbackDisplayName,
+  focusPhone = false,
+  onAccountUpdated,
+}: {
+  fallbackDisplayName: string;
+  focusPhone?: boolean;
+  onAccountUpdated?: (account: AccountSecurity) => void;
+}) {
   const [account, setAccount] = useState<AccountSecurity | null>(null);
   const [displayName, setDisplayName] = useState(fallbackDisplayName);
   const [email, setEmail] = useState('');
+  const [phoneCountryCode, setPhoneCountryCode] = useState('+86');
+  const [countrySearch, setCountrySearch] = useState('');
+  const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [phone, setPhone] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [codeSending, setCodeSending] = useState(false);
+  const [codeCountdown, setCodeCountdown] = useState(0);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const countryCodeOptions = COUNTRY_CALLING_CODE_OPTIONS
+    .filter((option) => {
+      const keyword = countrySearch.trim().toLowerCase();
+      if (!keyword) {
+        return true;
+      }
+      return option.code.includes(keyword) || option.label.toLowerCase().includes(keyword);
+    })
+    .slice(0, 40);
 
   useEffect(() => {
     void reload();
   }, []);
+
+  useEffect(() => {
+    if (codeCountdown <= 0) {
+      return;
+    }
+    const timer = window.setTimeout(() => setCodeCountdown((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [codeCountdown]);
 
   async function reload() {
     setLoading(true);
@@ -1436,7 +1774,10 @@ function AccountSecurityDetail({ fallbackDisplayName }: { fallbackDisplayName: s
       setAccount(nextAccount);
       setDisplayName(nextAccount.displayName || '');
       setEmail(nextAccount.email || '');
+      setPhoneCountryCode(nextAccount.phoneCountryCode || '+86');
       setPhone(nextAccount.phone || '');
+      setVerificationCode('');
+      onAccountUpdated?.(nextAccount);
     } catch (err) {
       setMessage({ type: 'error', text: readSettingError(err) });
     } finally {
@@ -1454,23 +1795,59 @@ function AccountSecurityDetail({ fallbackDisplayName }: { fallbackDisplayName: s
       setMessage({ type: 'error', text: '请输入有效的邮箱地址' });
       return;
     }
+    const nextPhone = phone.trim();
+    const nextPhoneCountryCode = normalizePhoneCountryCode(phoneCountryCode);
+    const phoneChanged = nextPhone !== (account?.phone || '') || nextPhoneCountryCode !== (account?.phoneCountryCode || '+86');
+    if (nextPhone && !isValidPhone(nextPhoneCountryCode, nextPhone)) {
+      setMessage({ type: 'error', text: '请输入有效的手机号' });
+      return;
+    }
+    if (phoneChanged && nextPhone && !verificationCode.trim()) {
+      setMessage({ type: 'error', text: '请输入手机验证码' });
+      return;
+    }
     setSaving(true);
     setMessage(null);
     try {
       const nextAccount = await updateAccountSecurity({
         displayName: displayName.trim(),
         email: email.trim() || null,
-        phone: phone.trim() || null,
+        phoneCountryCode: nextPhone ? nextPhoneCountryCode : null,
+        phone: nextPhone || null,
+        verificationCode: phoneChanged && nextPhone ? verificationCode.trim() : null,
       });
       setAccount(nextAccount);
       setDisplayName(nextAccount.displayName || '');
       setEmail(nextAccount.email || '');
+      setPhoneCountryCode(nextAccount.phoneCountryCode || '+86');
       setPhone(nextAccount.phone || '');
+      setVerificationCode('');
+      onAccountUpdated?.(nextAccount);
       setMessage({ type: 'success', text: '账号资料已更新' });
     } catch (err) {
       setMessage({ type: 'error', text: readSettingError(err) });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function sendPhoneCode() {
+    const nextPhone = phone.trim();
+    const nextPhoneCountryCode = normalizePhoneCountryCode(phoneCountryCode);
+    if (!isValidPhone(nextPhoneCountryCode, nextPhone)) {
+      setMessage({ type: 'error', text: '请输入有效的手机号' });
+      return;
+    }
+    setCodeSending(true);
+    setMessage(null);
+    try {
+      const result = await sendPhoneVerificationCode(nextPhoneCountryCode, nextPhone);
+      setCodeCountdown(result.expiresInSeconds || 60);
+      setMessage({ type: 'success', text: '验证码已发送，请查收短信' });
+    } catch (err) {
+      setMessage({ type: 'error', text: readSettingError(err) });
+    } finally {
+      setCodeSending(false);
     }
   }
 
@@ -1523,8 +1900,73 @@ function AccountSecurityDetail({ fallbackDisplayName }: { fallbackDisplayName: s
           <input value={email} onChange={(event) => setEmail(event.target.value)} disabled={loading || saving} inputMode="email" />
         </label>
         <label>
+          国际区号
+          <div className="settings-country-code-field">
+            <input
+              value={phoneCountryCode}
+              onFocus={() => setCountryPickerOpen(true)}
+              onChange={(event) => {
+                setPhoneCountryCode(event.target.value);
+                setCountrySearch(event.target.value);
+                setCountryPickerOpen(true);
+              }}
+              disabled={loading || saving}
+              inputMode="tel"
+            />
+            <button
+              type="button"
+              aria-label="选择国际区号"
+              onClick={() => setCountryPickerOpen((open) => !open)}
+              disabled={loading || saving}
+            />
+            {countryPickerOpen ? (
+              <div className="settings-country-code-panel">
+                <input
+                  value={countrySearch}
+                  onChange={(event) => setCountrySearch(event.target.value)}
+                  placeholder="搜索国家/地区或区号"
+                />
+                <div className="settings-country-code-list">
+                  {countryCodeOptions.map((option) => (
+                    <button
+                      key={`${option.code}-${option.label}`}
+                      type="button"
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        setPhoneCountryCode(option.code);
+                        setCountrySearch('');
+                        setCountryPickerOpen(false);
+                      }}
+                      onClick={() => setCountryPickerOpen(false)}
+                    >
+                      <strong>{option.code}</strong>
+                      <span>{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </label>
+        <label>
           手机号
-          <input value={phone} onChange={(event) => setPhone(event.target.value)} disabled={loading || saving} inputMode="tel" />
+          <input value={phone} onFocus={() => setCountryPickerOpen(false)} onChange={(event) => setPhone(event.target.value)} disabled={loading || saving} inputMode="tel" autoFocus={focusPhone} />
+        </label>
+        <label>
+          手机验证码
+          <div className="settings-code-field">
+            <input
+              value={verificationCode}
+              onChange={(event) => setVerificationCode(event.target.value)}
+              disabled={loading || saving}
+              inputMode="numeric"
+              maxLength={6}
+              placeholder={phone.trim() === (account?.phone || '') && normalizePhoneCountryCode(phoneCountryCode) === (account?.phoneCountryCode || '+86') ? '手机号未变更可不填' : '请输入验证码'}
+            />
+            <button className="settings-code-button" type="button" onClick={sendPhoneCode} disabled={loading || saving || codeSending || codeCountdown > 0}>
+              {codeCountdown > 0 ? `${codeCountdown}s` : codeSending ? '发送中' : '获取验证码'}
+            </button>
+          </div>
         </label>
         <button className="app-primary" type="submit" disabled={loading || saving}>
           {saving ? '保存中' : '保存资料'}
@@ -1668,6 +2110,33 @@ function readSettingError(error: unknown) {
     if (error.message === 'duplicate trip slot') {
       return '该时间段已有发布行程，请更换时间';
     }
+    if (error.message === 'credit score is too low to book trips') {
+      return '信用分低于预约限制，暂不可预约行程';
+    }
+    if (error.message === 'trip no-show is not available') {
+      return '当前行程无法标记未履约';
+    }
+    if (error.message === 'trip is not finished yet') {
+      return '行程结束后才可标记未履约';
+    }
+    if (error.message === 'phone verification is required') {
+      return '请先认证手机号后再发布或预约行程';
+    }
+    if (error.message === 'phone format is invalid') {
+      return '请输入有效的手机号';
+    }
+    if (error.message === 'phone already exists') {
+      return '该手机号已被占用，请联系客服处理';
+    }
+    if (error.message === 'phone verification code is required') {
+      return '请输入手机验证码';
+    }
+    if (error.message === 'phone verification code expired') {
+      return '验证码已过期，请重新获取';
+    }
+    if (error.message === 'phone verification code is invalid') {
+      return '验证码不正确';
+    }
     return error.message;
   }
   return '操作失败';
@@ -1679,6 +2148,23 @@ function isStrongPassword(value: string) {
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
+}
+
+function isValidPhone(phoneCountryCode: string, phone: string) {
+  const countryCode = normalizePhoneCountryCode(phoneCountryCode);
+  const localPhone = phone.replace(/[\s\-()]/g, '').replace(/^\+/, '');
+  if (!/^\+[1-9]\d{0,3}$/.test(countryCode) || !/^\d{4,14}$/.test(localPhone)) {
+    return false;
+  }
+  return /^[1-9]\d{7,14}$/.test(`${countryCode.slice(1)}${localPhone}`);
+}
+
+function normalizePhoneCountryCode(value: string) {
+  const normalized = value.trim().replace(/[\s\-()]/g, '');
+  if (!normalized) {
+    return '+86';
+  }
+  return normalized.startsWith('+') ? normalized : `+${normalized}`;
 }
 
 function iconForTone(tone?: string | null) {
@@ -1800,6 +2286,7 @@ function tripStatusLabel(status: TripSlot['status'], context?: 'reservation') {
     OPEN: '可预约',
     PENDING: context === 'reservation' ? '预约中' : '待审核',
     BOOKED: '已预约',
+    NO_SHOW: '未履约',
   };
   return labels[status];
 }

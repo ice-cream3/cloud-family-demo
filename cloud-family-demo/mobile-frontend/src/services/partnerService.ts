@@ -10,8 +10,10 @@ import type {
   PageResult,
   PartnerHealth,
   PasswordChangeRequest,
+  PhoneVerificationCodeResponse,
   ProfileDynamic,
   RegisterRequest,
+  TripCredit,
   TripOwner,
   TripPublishRequest,
   TripSlot,
@@ -56,6 +58,12 @@ export function loadAccountSecurity() {
 export function updateAccountSecurity(request: AccountSecurityUpdateRequest) {
   return post<AccountSecurity>('/api/users/security/update', {
     body: request,
+  });
+}
+
+export function sendPhoneVerificationCode(phoneCountryCode: string, phone: string) {
+  return post<PhoneVerificationCodeResponse>('/api/users/security/phone/code', {
+    body: { phoneCountryCode, phone },
   });
 }
 
@@ -119,6 +127,10 @@ export function loadMyTripReservations() {
   return post<TripSlot[]>('/api/users/trips/my-reservations');
 }
 
+export function loadTripCredit() {
+  return post<TripCredit>('/api/users/trips/credit');
+}
+
 export function publishTrip(request: TripPublishRequest) {
   return post<TripSlot>('/api/users/trips/publish', {
     body: request,
@@ -135,6 +147,10 @@ export function reviewTrip(slotId: number, approved: boolean) {
   return post<TripSlot>('/api/users/trips/review', {
     body: { slotId, approved },
   });
+}
+
+export function markTripNoShow(slotId: number) {
+  return post<TripSlot>(`/api/users/trips/no-show/${slotId}`);
 }
 
 export function loadPartnerHealth() {

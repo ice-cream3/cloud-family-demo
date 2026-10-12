@@ -16,6 +16,7 @@ public interface AuthLoginAccountDao {
                       @Param("passwordHash") String passwordHash,
                       @Param("displayName") String displayName,
                       @Param("email") String email,
+                      @Param("phoneCountryCode") String phoneCountryCode,
                       @Param("phone") String phone);
 
     /**

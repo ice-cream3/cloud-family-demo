@@ -81,4 +81,6 @@ public interface UserProfileFeatureDao {
     int approveTripSlot(@Param("id") Long id, @Param("ownerUsername") String ownerUsername);
 
     int rejectTripSlot(@Param("id") Long id, @Param("ownerUsername") String ownerUsername);
+
+    int markTripNoShow(@Param("id") Long id, @Param("ownerUsername") String ownerUsername);
 }

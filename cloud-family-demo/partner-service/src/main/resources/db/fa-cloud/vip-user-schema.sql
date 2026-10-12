@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS vip_user (
     password_hash varchar(255) DEFAULT NULL,
     display_name varchar(100) NOT NULL,
     email varchar(255) DEFAULT NULL,
+    phone_country_code varchar(8) DEFAULT NULL,
     phone varchar(32) DEFAULT NULL,
     vip_level varchar(32) NOT NULL DEFAULT 'NORMAL',
     status varchar(32) NOT NULL DEFAULT 'ENABLED',
@@ -22,6 +23,6 @@ CREATE TABLE IF NOT EXISTS vip_user (
     KEY idx_vip_user_vip_level (vip_level)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-INSERT IGNORE INTO vip_user (username, password_hash, display_name, email, phone, vip_level, status)
+INSERT IGNORE INTO vip_user (username, password_hash, display_name, email, phone_country_code, phone, vip_level, status)
 VALUES
-    ('alice', 'demo', 'API Demo User', 'alice@example.com', NULL, 'NORMAL', 'ENABLED');
+    ('alice', 'demo', 'API Demo User', 'alice@example.com', NULL, NULL, 'NORMAL', 'ENABLED');

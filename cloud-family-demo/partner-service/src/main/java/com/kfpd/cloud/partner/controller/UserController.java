@@ -16,8 +16,11 @@ import com.kfpd.cloud.partner.pojo.vo.NotificationSettingsVO;
 import com.kfpd.cloud.partner.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.partner.pojo.vo.PageVO;
 import com.kfpd.cloud.partner.pojo.vo.PasswordChangeVO;
+import com.kfpd.cloud.partner.pojo.vo.PhoneVerificationCodeVO;
+import com.kfpd.cloud.partner.pojo.vo.PhoneVerificationSendVO;
 import com.kfpd.cloud.partner.pojo.vo.ProfileDynamicVO;
 import com.kfpd.cloud.partner.pojo.vo.TripApplyRequestVO;
+import com.kfpd.cloud.partner.pojo.vo.TripCreditVO;
 import com.kfpd.cloud.partner.pojo.vo.TripOwnerVO;
 import com.kfpd.cloud.partner.pojo.vo.TripPublishRequestVO;
 import com.kfpd.cloud.partner.pojo.vo.TripReviewRequestVO;
@@ -70,6 +73,14 @@ public class UserController {
             @RequestBody AccountSecurityUpdateVO request
     ) {
         return ApiResponse.success(userService.updateAccountSecurity(username, request));
+    }
+
+    @PostMapping("/security/phone/code")
+    public ApiResponse<PhoneVerificationCodeVO> sendPhoneVerificationCode(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+            @RequestBody PhoneVerificationSendVO request
+    ) {
+        return ApiResponse.success(userService.sendPhoneVerificationCode(username, request));
     }
 
     @PostMapping("/security/password")
@@ -165,6 +176,13 @@ public class UserController {
         return ApiResponse.success(userService.myReservedTrips(username));
     }
 
+    @PostMapping("/trips/credit")
+    public ApiResponse<TripCreditVO> tripCredit(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username
+    ) {
+        return ApiResponse.success(userService.tripCredit(username));
+    }
+
     @PostMapping("/trips/publish")
     public ApiResponse<TripSlotVO> publishTrip(
             @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
@@ -187,6 +205,14 @@ public class UserController {
             @RequestBody TripReviewRequestVO request
     ) {
         return ApiResponse.success(userService.reviewTrip(username, request));
+    }
+
+    @PostMapping("/trips/no-show/{slotId}")
+    public ApiResponse<TripSlotVO> markTripNoShow(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+            @PathVariable Long slotId
+    ) {
+        return ApiResponse.success(userService.markTripNoShow(username, slotId));
     }
 
     @PostMapping("/vip-users/page")

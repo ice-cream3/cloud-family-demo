@@ -3,10 +3,15 @@ package com.kfpd.cloud.partner.service.impl;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.common.exception.BusinessException;
@@ -25,8 +30,11 @@ import com.kfpd.cloud.partner.pojo.vo.NotificationSettingsVO;
 import com.kfpd.cloud.partner.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.partner.pojo.vo.PageVO;
 import com.kfpd.cloud.partner.pojo.vo.PasswordChangeVO;
+import com.kfpd.cloud.partner.pojo.vo.PhoneVerificationCodeVO;
+import com.kfpd.cloud.partner.pojo.vo.PhoneVerificationSendVO;
 import com.kfpd.cloud.partner.pojo.vo.ProfileDynamicVO;
 import com.kfpd.cloud.partner.pojo.vo.TripApplyRequestVO;
+import com.kfpd.cloud.partner.pojo.vo.TripCreditVO;
 import com.kfpd.cloud.partner.pojo.vo.TripOwnerVO;
 import com.kfpd.cloud.partner.pojo.vo.TripPublishRequestVO;
 import com.kfpd.cloud.partner.pojo.vo.TripReviewRequestVO;
@@ -50,6 +58,12 @@ public class UserServiceImpl implements UserService {
     private static final int DEFAULT_PAGE_NUM = 1;
     private static final int DEFAULT_PAGE_SIZE = 10;
     private static final int MAX_PAGE_SIZE = 100;
+    private static final int DEFAULT_CREDIT_SCORE = 100;
+    private static final int MIN_RESERVABLE_CREDIT_SCORE = 60;
+    private static final int TRIP_NO_SHOW_PENALTY = 5;
+    private static final Duration PHONE_CODE_TTL = Duration.ofMinutes(5);
+    private static final SecureRandom PHONE_CODE_RANDOM = new SecureRandom();
+    private static final Map<String, PhoneVerificationCode> PHONE_CODES = new ConcurrentHashMap<>();
 
     private final VipUserDao vipUserDao;
     private final UserProfileFeatureDao userProfileFeatureDao;
@@ -108,14 +122,40 @@ public class UserServiceImpl implements UserService {
         if (email != null && vipUserDao.countByEmailExcludingUsername(email, username) > 0) {
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "email already exists");
         }
+        String phone = normalizePhone(request.phone());
+        String phoneCountryCode = normalizePhoneCountryCode(request.phoneCountryCode());
+        if (phone != null) {
+            validatePhone(phoneCountryCode, phone);
+            validatePhoneAvailable(phoneCountryCode, phone, username);
+        }
+        if (phone != null && (!phone.equals(vipUser.getPhone()) || !phoneCountryCode.equals(defaultPhoneCountryCode(vipUser.getPhoneCountryCode())))) {
+            verifyPhoneCode(username, phoneCountryCode, phone, request.verificationCode());
+        }
         vipUser.setDisplayName(request.displayName().trim());
         vipUser.setEmail(email);
-        vipUser.setPhone(blankToNull(request.phone()));
+        vipUser.setPhoneCountryCode(phone == null ? null : phoneCountryCode);
+        vipUser.setPhone(phone);
         if (vipUserDao.update(vipUser) == 0) {
             log.warn("Partner service exception: action=updateAccountSecurity, username={}, message=Vip user not found", username);
             throw notFound("Vip user not found");
         }
         return toAccountSecurityVO(findCurrentVipUser(username));
+    }
+
+    @Override
+    public PhoneVerificationCodeVO sendPhoneVerificationCode(String username, PhoneVerificationSendVO request) {
+        findCurrentVipUser(username);
+        if (request == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "request is required");
+        }
+        String phone = normalizePhone(request.phone());
+        String phoneCountryCode = normalizePhoneCountryCode(request.phoneCountryCode());
+        validatePhone(phoneCountryCode, phone);
+        validatePhoneAvailable(phoneCountryCode, phone, username);
+        String code = String.format("%06d", PHONE_CODE_RANDOM.nextInt(1_000_000));
+        PHONE_CODES.put(phoneCodeKey(username, phoneCountryCode, phone), new PhoneVerificationCode(code, Instant.now().plus(PHONE_CODE_TTL)));
+        log.info("Phone verification code generated: username={}, phone={}, code={}", username, maskPhone(phoneCountryCode, phone), code);
+        return new PhoneVerificationCodeVO(phoneCountryCode, phone, (int) PHONE_CODE_TTL.toSeconds());
     }
 
     @Override
@@ -259,9 +299,15 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public TripCreditVO tripCredit(String username) {
+        return toTripCredit(findCurrentVipUser(username));
+    }
+
+    @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public TripSlotVO publishTrip(String username, TripPublishRequestVO request) {
         VipUser vipUser = findCurrentVipUser(username);
+        requireVerifiedPhone(vipUser);
         if (request == null) {
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "request is required");
         }
@@ -298,6 +344,10 @@ public class UserServiceImpl implements UserService {
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public TripSlotVO applyTrip(String username, TripApplyRequestVO request) {
         VipUser vipUser = findCurrentVipUser(username);
+        requireVerifiedPhone(vipUser);
+        if (currentCreditScore(vipUser) < MIN_RESERVABLE_CREDIT_SCORE) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "credit score is too low to book trips");
+        }
         if (request == null || request.slotId() == null) {
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "slotId is required");
         }
@@ -330,6 +380,30 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public TripSlotVO markTripNoShow(String username, Long slotId) {
+        findCurrentVipUser(username);
+        if (slotId == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "slotId is required");
+        }
+        TripSlotVO slot = Optional.ofNullable(userProfileFeatureDao.findTripSlotById(slotId))
+                .orElseThrow(() -> notFound("Trip slot not found"));
+        if (slot.applicantUsername() == null || slot.applicantUsername().isBlank()) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "trip has no applicant");
+        }
+        LocalDateTime tripEndAt = LocalDateTime.of(slot.tripDate(), slot.endTime());
+        if (tripEndAt.isAfter(LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "trip is not finished yet");
+        }
+        int affected = userProfileFeatureDao.markTripNoShow(slotId, username);
+        if (affected == 0) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "trip no-show is not available");
+        }
+        vipUserDao.deductCreditScore(slot.applicantUsername(), TRIP_NO_SHOW_PENALTY);
+        return userProfileFeatureDao.findTripSlotById(slotId);
+    }
+
+    @Override
+    @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public TripSlotVO reviewTrip(String username, TripReviewRequestVO request) {
         findCurrentVipUser(username);
         if (request == null || request.slotId() == null || request.approved() == null) {
@@ -351,6 +425,7 @@ public class UserServiceImpl implements UserService {
         requireText(request.username(), "username is required");
         requireText(request.displayName(), "displayName is required");
         validateEmailUnique(request.email(), null);
+        validateOptionalPhone(request.phoneCountryCode(), request.phone());
         VipUser vipUser = new VipUser();
         apply(vipUser, request);
         vipUserDao.insert(vipUser);
@@ -364,6 +439,7 @@ public class UserServiceImpl implements UserService {
         requireText(request.username(), "username is required");
         requireText(request.displayName(), "displayName is required");
         validateEmailUnique(request.email(), id);
+        validateOptionalPhone(request.phoneCountryCode(), request.phone());
         VipUser vipUser = new VipUser();
         vipUser.setId(id);
         apply(vipUser, request);
@@ -411,8 +487,10 @@ public class UserServiceImpl implements UserService {
                 vipUser.getUsername(),
                 vipUser.getDisplayName(),
                 vipUser.getEmail(),
+                vipUser.getPhoneCountryCode(),
                 vipUser.getPhone(),
                 vipUser.getVipLevel(),
+                currentCreditScore(vipUser),
                 vipUser.getStatus(),
                 vipUser.getCreatedAt(),
                 vipUser.getUpdatedAt()
@@ -424,10 +502,23 @@ public class UserServiceImpl implements UserService {
                 vipUser.getUsername(),
                 vipUser.getDisplayName(),
                 vipUser.getEmail(),
+                vipUser.getPhoneCountryCode(),
                 vipUser.getPhone(),
                 vipUser.getVipLevel(),
+                currentCreditScore(vipUser),
                 vipUser.getStatus(),
                 vipUser.getUpdatedAt()
+        );
+    }
+
+    private TripCreditVO toTripCredit(VipUser vipUser) {
+        int creditScore = currentCreditScore(vipUser);
+        return new TripCreditVO(
+                creditScore,
+                creditLevel(creditScore),
+                MIN_RESERVABLE_CREDIT_SCORE,
+                TRIP_NO_SHOW_PENALTY,
+                creditScore >= MIN_RESERVABLE_CREDIT_SCORE
         );
     }
 
@@ -446,15 +537,128 @@ public class UserServiceImpl implements UserService {
         vipUser.setPasswordHash(request.passwordHash());
         vipUser.setDisplayName(request.displayName().trim());
         vipUser.setEmail(blankToNull(request.email()));
-        vipUser.setPhone(blankToNull(request.phone()));
+        String phone = normalizePhone(request.phone());
+        vipUser.setPhoneCountryCode(phone == null ? null : normalizePhoneCountryCode(request.phoneCountryCode()));
+        vipUser.setPhone(phone);
         vipUser.setVipLevel(defaultValue(request.vipLevel(), "NORMAL"));
+        vipUser.setCreditScore(normalizeCreditScore(request.creditScore()));
         vipUser.setStatus(defaultValue(request.status(), "ENABLED"));
+    }
+
+    private int currentCreditScore(VipUser vipUser) {
+        return normalizeCreditScore(vipUser.getCreditScore());
+    }
+
+    private int normalizeCreditScore(Integer score) {
+        if (score == null) {
+            return DEFAULT_CREDIT_SCORE;
+        }
+        return Math.max(0, Math.min(DEFAULT_CREDIT_SCORE, score));
+    }
+
+    private String creditLevel(int score) {
+        if (score >= 95) {
+            return "S";
+        }
+        if (score >= 85) {
+            return "A";
+        }
+        if (score >= 75) {
+            return "B";
+        }
+        if (score >= MIN_RESERVABLE_CREDIT_SCORE) {
+            return "C";
+        }
+        return "D";
     }
 
     private void requireRequest(VipUserRequestVO request) {
         if (request == null) {
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "request is required");
         }
+    }
+
+    private void requireVerifiedPhone(VipUser vipUser) {
+        if (vipUser.getPhone() == null || vipUser.getPhone().isBlank()) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "phone verification is required");
+        }
+    }
+
+    private void validatePhone(String phoneCountryCode, String phone) {
+        if (!isValidPhoneCountryCode(phoneCountryCode) || phone == null || !phone.matches("^\\d{4,14}$")) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "phone format is invalid");
+        }
+        String fullDigits = phoneCountryCode.substring(1) + phone;
+        if (!fullDigits.matches("^[1-9]\\d{7,14}$")) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "phone format is invalid");
+        }
+    }
+
+    private void validateOptionalPhone(String rawPhoneCountryCode, String rawPhone) {
+        String phone = normalizePhone(rawPhone);
+        if (phone != null) {
+            validatePhone(normalizePhoneCountryCode(rawPhoneCountryCode), phone);
+        }
+    }
+
+    private void validatePhoneAvailable(String phoneCountryCode, String phone, String username) {
+        if (vipUserDao.countByPhoneExcludingUsername(phoneCountryCode, phone, username) > 0) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "phone already exists");
+        }
+    }
+
+    private void verifyPhoneCode(String username, String phoneCountryCode, String phone, String rawCode) {
+        String code = blankToNull(rawCode);
+        if (code == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "phone verification code is required");
+        }
+        String key = phoneCodeKey(username, phoneCountryCode, phone);
+        PhoneVerificationCode savedCode = PHONE_CODES.get(key);
+        if (savedCode == null || savedCode.expiresAt().isBefore(Instant.now())) {
+            PHONE_CODES.remove(key);
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "phone verification code expired");
+        }
+        if (!savedCode.code().equals(code)) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "phone verification code is invalid");
+        }
+        PHONE_CODES.remove(key);
+    }
+
+    private String phoneCodeKey(String username, String phoneCountryCode, String phone) {
+        return username + ":" + phoneCountryCode + phone;
+    }
+
+    private String maskPhone(String phoneCountryCode, String phone) {
+        String normalized = phoneCountryCode + phone;
+        if (phone == null || phone.length() < 4) {
+            return normalized;
+        }
+        return normalized.substring(0, 3) + "****" + normalized.substring(normalized.length() - 4);
+    }
+
+    private String normalizePhone(String phone) {
+        String normalized = phone == null ? null : phone.trim().replaceAll("[\\s\\-()]", "");
+        if (normalized != null && normalized.startsWith("+")) {
+            normalized = normalized.substring(1);
+        }
+        return normalized == null || normalized.isBlank() ? null : normalized;
+    }
+
+    private String normalizePhoneCountryCode(String phoneCountryCode) {
+        String normalized = blankToNull(phoneCountryCode);
+        if (normalized == null) {
+            return "+86";
+        }
+        normalized = normalized.replaceAll("[\\s\\-()]", "");
+        return normalized.startsWith("+") ? normalized : "+" + normalized;
+    }
+
+    private String defaultPhoneCountryCode(String phoneCountryCode) {
+        return normalizePhoneCountryCode(phoneCountryCode);
+    }
+
+    private boolean isValidPhoneCountryCode(String phoneCountryCode) {
+        return phoneCountryCode != null && phoneCountryCode.matches("^\\+[1-9]\\d{0,3}$");
     }
 
     private void validateEmailUnique(String rawEmail, Long excludeId) {
@@ -545,5 +749,8 @@ public class UserServiceImpl implements UserService {
             return null;
         }
         return value.trim();
+    }
+
+    private record PhoneVerificationCode(String code, Instant expiresAt) {
     }
 }

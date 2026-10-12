@@ -35,7 +35,10 @@
               OR LOWER(TRIM(email)) = LOWER(TRIM(#{username}))
               OR phone = #{username}
               OR phone = CONCAT('+86', #{username})
-              OR REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+86', '') = REPLACE(REPLACE(REPLACE(#{username}, ' ', ''), '-', ''), '+86', '')
+              OR CONCAT(COALESCE(phone_country_code, '+86'), REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '')) =
+                 REPLACE(REPLACE(REPLACE(REPLACE(#{username}, ' ', ''), '-', ''), '(', ''), ')', '')
+              OR REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') =
+                 REPLACE(REPLACE(REPLACE(REPLACE(#{username}, ' ', ''), '-', ''), '(', ''), ')', '')
           )
         ORDER BY CASE
             WHEN username = #{username} THEN 0
@@ -54,8 +57,8 @@
     </select>
 
     <insert id="insertApiUser">
-        INSERT INTO vip_user (username, password_hash, display_name, email, phone, vip_level, status)
-        VALUES (#{username}, #{passwordHash}, #{displayName}, #{email}, #{phone}, 'NORMAL', 'ENABLED')
+        INSERT INTO vip_user (username, password_hash, display_name, email, phone_country_code, phone, vip_level, status)
+        VALUES (#{username}, #{passwordHash}, #{displayName}, #{email}, #{phoneCountryCode}, #{phone}, 'NORMAL', 'ENABLED')
     </insert>
 
     <select id="findManagerByUsername" resultMap="AuthLoginAccountResultMap">

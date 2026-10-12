@@ -104,10 +104,23 @@ export default function App() {
 
 function readError(error: unknown) {
   if (error instanceof ApiError) {
-    return `${error.message} (${error.status})`;
+    return `${formatApiErrorMessage(error.message)} (${error.status})`;
   }
   if (error instanceof Error) {
-    return error.message;
+    return formatApiErrorMessage(error.message);
   }
   return '请求失败';
+}
+
+function formatApiErrorMessage(message: string) {
+  if (message === 'email format is invalid') {
+    return '请输入有效的邮箱地址';
+  }
+  if (message === 'phone format is invalid') {
+    return '请输入有效的手机号';
+  }
+  if (message === 'phone already exists') {
+    return '该手机号已被占用，请联系客服处理';
+  }
+  return message;
 }

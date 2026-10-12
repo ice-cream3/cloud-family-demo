@@ -17,8 +17,10 @@ public class VipUser {
     private String passwordHash;
     private String displayName;
     private String email;
+    private String phoneCountryCode;
     private String phone;
     private String vipLevel;
+    private Integer creditScore;
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

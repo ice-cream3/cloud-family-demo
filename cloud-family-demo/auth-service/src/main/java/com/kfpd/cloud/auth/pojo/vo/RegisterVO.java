@@ -10,6 +10,7 @@ public record RegisterVO(
         @NotBlank String password,
         @NotBlank String displayName,
         String email,
+        String phoneCountryCode,
         String phone
 ) {
 }

@@ -22,6 +22,7 @@ export type RegisterRequest = {
   password: string;
   displayName: string;
   email?: string;
+  phoneCountryCode?: string;
   phone?: string;
 };
 
@@ -37,8 +38,10 @@ export type AccountSecurity = {
   username: string;
   displayName: string;
   email?: string | null;
+  phoneCountryCode?: string | null;
   phone?: string | null;
   vipLevel?: string | null;
+  creditScore?: number | null;
   status?: string | null;
   updatedAt?: string | null;
 };
@@ -46,12 +49,20 @@ export type AccountSecurity = {
 export type AccountSecurityUpdateRequest = {
   displayName: string;
   email?: string | null;
+  phoneCountryCode?: string | null;
   phone?: string | null;
+  verificationCode?: string | null;
 };
 
 export type PasswordChangeRequest = {
   currentPassword: string;
   newPassword: string;
+};
+
+export type PhoneVerificationCodeResponse = {
+  phoneCountryCode: string;
+  phone: string;
+  expiresInSeconds: number;
 };
 
 export type PartnerHealth = {
@@ -129,6 +140,14 @@ export type TripOwner = {
   nextTime: string;
 };
 
+export type TripCredit = {
+  creditScore: number;
+  creditLevel: string;
+  minReservableScore: number;
+  noShowPenalty: number;
+  reservable: boolean;
+};
+
 export type TripSlot = {
   id: number;
   ownerUsername: string;
@@ -138,7 +157,7 @@ export type TripSlot = {
   tripDate: string;
   startTime: string;
   endTime: string;
-  status: 'OPEN' | 'PENDING' | 'BOOKED';
+  status: 'OPEN' | 'PENDING' | 'BOOKED' | 'NO_SHOW';
   applicantUsername?: string | null;
   applicantDisplayName?: string | null;
   applyNote?: string | null;

@@ -10,15 +10,17 @@
         <result property="passwordHash" column="password_hash"/>
         <result property="displayName" column="display_name"/>
         <result property="email" column="email"/>
+        <result property="phoneCountryCode" column="phone_country_code"/>
         <result property="phone" column="phone"/>
         <result property="vipLevel" column="vip_level"/>
+        <result property="creditScore" column="credit_score"/>
         <result property="status" column="status"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
     <sql id="VipUserColumns">
-        id, username, password_hash, display_name, email, phone, vip_level, status, created_at, updated_at
+        id, username, password_hash, display_name, email, phone_country_code, phone, vip_level, credit_score, status, created_at, updated_at
     </sql>
 
     <sql id="VipUserFilters">
@@ -71,10 +73,19 @@
           AND id != #{id}
     </select>
 
+    <select id="countByPhoneExcludingId" resultType="long">
+        SELECT COUNT(*)
+        FROM vip_user
+        WHERE COALESCE(phone_country_code, '+86') = COALESCE(#{phoneCountryCode}, '+86')
+          AND REPLACE(REPLACE(REPLACE(REPLACE(TRIM(phone), ' ', ''), '-', ''), '(', ''), ')', '') =
+              REPLACE(REPLACE(REPLACE(REPLACE(TRIM(#{phone}), ' ', ''), '-', ''), '(', ''), ')', '')
+          AND (#{id} IS NULL OR id != #{id})
+    </select>
+
     <insert id="insert" parameterType="com.kfpd.cloud.manager.pojo.entity.VipUser"
             useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO vip_user (username, password_hash, display_name, email, phone, vip_level, status)
-        VALUES (#{username}, #{passwordHash}, #{displayName}, #{email}, #{phone}, #{vipLevel}, #{status})
+        INSERT INTO vip_user (username, password_hash, display_name, email, phone_country_code, phone, vip_level, credit_score, status)
+        VALUES (#{username}, #{passwordHash}, #{displayName}, #{email}, #{phoneCountryCode}, #{phone}, #{vipLevel}, #{creditScore}, #{status})
     </insert>
 
     <update id="update" parameterType="com.kfpd.cloud.manager.pojo.entity.VipUser">
@@ -83,8 +94,10 @@
             password_hash = #{passwordHash},
             display_name = #{displayName},
             email = #{email},
+            phone_country_code = #{phoneCountryCode},
             phone = #{phone},
             vip_level = #{vipLevel},
+            credit_score = #{creditScore},
             status = #{status}
         WHERE id = #{id}
     </update>

@@ -27,6 +27,10 @@ public interface VipUserDao extends BaseMapper<VipUser> {
 
     long countByEmailExcludingId(@Param("email") String email, @Param("id") Long id);
 
+    long countByPhoneExcludingId(@Param("phoneCountryCode") String phoneCountryCode,
+                                 @Param("phone") String phone,
+                                 @Param("id") Long id);
+
     int insert(VipUser vipUser);
 
     int update(VipUser vipUser);

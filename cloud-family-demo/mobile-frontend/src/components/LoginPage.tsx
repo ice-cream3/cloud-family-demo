@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Check, ChevronLeft, Eye, EyeOff, KeyRound, LockKeyhole, Mail, MessageCircle } from 'lucide-react';
 import type { RegisterRequest } from '../types/api';
+import { COUNTRY_CALLING_CODE_OPTIONS } from '../constants/countryCallingCodes';
 
 type LoginPageProps = {
   loading: boolean;
@@ -16,6 +17,9 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
   const [mode, setMode] = useState<AuthMode>('login');
   const [method, setMethod] = useState<AuthMethod>('phone');
   const [username, setUsername] = useState('');
+  const [phoneCountryCode, setPhoneCountryCode] = useState('+86');
+  const [countrySearch, setCountrySearch] = useState('');
+  const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -28,7 +32,8 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const account = normalizeAuthAccount(method, username);
-    const validationMessage = validateAuthForm(method, account, password, isRegister ? confirmPassword : undefined);
+    const normalizedCountryCode = normalizePhoneCountryCode(phoneCountryCode);
+    const validationMessage = validateAuthForm(method, account, password, isRegister ? confirmPassword : undefined, normalizedCountryCode);
     if (validationMessage) {
       setFormError(validationMessage);
       return;
@@ -40,12 +45,13 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
         password,
         displayName: buildDisplayName(account),
         email: method === 'email' ? account : undefined,
+        phoneCountryCode: method === 'phone' ? normalizedCountryCode : undefined,
         phone: method === 'phone' ? account : undefined,
       };
       await onRegister(request);
       return;
     }
-    await onLogin(account, password, rememberMe);
+    await onLogin(method === 'phone' ? `${normalizedCountryCode}${account}` : account, password, rememberMe);
     if (!rememberMe) {
       setPassword('');
     }
@@ -67,6 +73,15 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
     ? (method === 'phone' ? '注册后即可使用全部工具功能' : '使用邮箱注册，方便快捷')
     : '登录账号，享受更多功能';
   const accountPlaceholder = method === 'phone' ? '请输入手机号' : '请输入邮箱地址';
+  const countryCodeOptions = COUNTRY_CALLING_CODE_OPTIONS
+    .filter((option) => {
+      const keyword = countrySearch.trim().toLowerCase();
+      if (!keyword) {
+        return true;
+      }
+      return option.code.includes(keyword) || option.label.toLowerCase().includes(keyword);
+    })
+    .slice(0, 40);
   const submitDisabled = loading
     || !username.trim()
     || !password
@@ -109,9 +124,57 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
         </div>
 
         <form className="mobile-auth-form" onSubmit={handleSubmit}>
-          <label className="mobile-auth-input">
+          <label className={`mobile-auth-input ${method === 'phone' ? 'phone-auth-input' : ''}`}>
             {method === 'phone' ? (
-              <span className="country-code">+86</span>
+              <span className="country-code-control">
+                <input
+                  className="country-code-input"
+                  autoComplete="tel-country-code"
+                  inputMode="tel"
+                  value={phoneCountryCode}
+                  onFocus={() => setCountryPickerOpen(true)}
+                  onChange={(event) => {
+                    setPhoneCountryCode(event.target.value);
+                    setCountrySearch(event.target.value);
+                    setCountryPickerOpen(true);
+                    setFormError(null);
+                  }}
+                  aria-label="国际区号"
+                />
+                <button
+                  type="button"
+                  aria-label="选择国际区号"
+                  onClick={() => setCountryPickerOpen((open) => !open)}
+                />
+                {countryPickerOpen ? (
+                  <div className="country-code-panel">
+                    <input
+                      value={countrySearch}
+                      onChange={(event) => setCountrySearch(event.target.value)}
+                      placeholder="搜索国家/地区或区号"
+                    />
+                    <div className="country-code-list">
+                      {countryCodeOptions.map((option) => (
+                        <button
+                          key={`${option.code}-${option.label}`}
+                          type="button"
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            setPhoneCountryCode(option.code);
+                            setCountrySearch('');
+                            setCountryPickerOpen(false);
+                            setFormError(null);
+                          }}
+                          onClick={() => setCountryPickerOpen(false)}
+                        >
+                          <strong>{option.code}</strong>
+                          <span>{option.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </span>
             ) : (
               <Mail size={17} />
             )}
@@ -123,6 +186,7 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
                 setUsername(event.target.value);
                 setFormError(null);
               }}
+              onFocus={() => setCountryPickerOpen(false)}
               placeholder={accountPlaceholder}
             />
           </label>
@@ -278,13 +342,12 @@ function normalizeAuthAccount(method: AuthMethod, value: string) {
     return trimmed;
   }
   return trimmed
-    .replace(/[\s-]/g, '')
-    .replace(/^\+86/, '')
-    .replace(/^86(?=1[3-9]\d{9}$)/, '');
+    .replace(/[\s\-()]/g, '')
+    .replace(/^\+/, '');
 }
 
-function validateAuthForm(method: AuthMethod, account: string, password: string, confirmPassword?: string) {
-  if (method === 'phone' && !isValidPhone(account)) {
+function validateAuthForm(method: AuthMethod, account: string, password: string, confirmPassword?: string, phoneCountryCode = '+86') {
+  if (method === 'phone' && !isValidPhone(phoneCountryCode, account)) {
     return '请输入有效的手机号。';
   }
   if (method === 'email' && !isValidEmail(account)) {
@@ -302,8 +365,21 @@ function validateAuthForm(method: AuthMethod, account: string, password: string,
   return null;
 }
 
-function isValidPhone(value: string) {
-  return /^\+?\d{6,20}$/.test(value);
+function isValidPhone(phoneCountryCode: string, phone: string) {
+  const countryCode = normalizePhoneCountryCode(phoneCountryCode);
+  const localPhone = phone.replace(/[\s\-()]/g, '').replace(/^\+/, '');
+  if (!/^\+[1-9]\d{0,3}$/.test(countryCode) || !/^\d{4,14}$/.test(localPhone)) {
+    return false;
+  }
+  return /^[1-9]\d{7,14}$/.test(`${countryCode.slice(1)}${localPhone}`);
+}
+
+function normalizePhoneCountryCode(value: string) {
+  const normalized = value.trim().replace(/[\s\-()]/g, '');
+  if (!normalized) {
+    return '+86';
+  }
+  return normalized.startsWith('+') ? normalized : `+${normalized}`;
 }
 
 function isValidEmail(value: string) {

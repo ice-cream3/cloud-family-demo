@@ -11,8 +11,11 @@ import com.kfpd.cloud.partner.pojo.vo.NotificationSettingsVO;
 import com.kfpd.cloud.partner.pojo.vo.PageQueryVO;
 import com.kfpd.cloud.partner.pojo.vo.PageVO;
 import com.kfpd.cloud.partner.pojo.vo.PasswordChangeVO;
+import com.kfpd.cloud.partner.pojo.vo.PhoneVerificationCodeVO;
+import com.kfpd.cloud.partner.pojo.vo.PhoneVerificationSendVO;
 import com.kfpd.cloud.partner.pojo.vo.ProfileDynamicVO;
 import com.kfpd.cloud.partner.pojo.vo.TripApplyRequestVO;
+import com.kfpd.cloud.partner.pojo.vo.TripCreditVO;
 import com.kfpd.cloud.partner.pojo.vo.TripOwnerVO;
 import com.kfpd.cloud.partner.pojo.vo.TripPublishRequestVO;
 import com.kfpd.cloud.partner.pojo.vo.TripReviewRequestVO;
@@ -34,6 +37,8 @@ public interface UserService {
     AccountSecurityVO accountSecurity(String username);
 
     AccountSecurityVO updateAccountSecurity(String username, AccountSecurityUpdateVO request);
+
+    PhoneVerificationCodeVO sendPhoneVerificationCode(String username, PhoneVerificationSendVO request);
 
     void changePassword(String username, PasswordChangeVO request);
 
@@ -61,11 +66,15 @@ public interface UserService {
 
     java.util.List<TripSlotVO> myReservedTrips(String username);
 
+    TripCreditVO tripCredit(String username);
+
     TripSlotVO publishTrip(String username, TripPublishRequestVO request);
 
     TripSlotVO applyTrip(String username, TripApplyRequestVO request);
 
     TripSlotVO reviewTrip(String username, TripReviewRequestVO request);
+
+    TripSlotVO markTripNoShow(String username, Long slotId);
 
     VipUserVO createVipUser(VipUserRequestVO request);
 

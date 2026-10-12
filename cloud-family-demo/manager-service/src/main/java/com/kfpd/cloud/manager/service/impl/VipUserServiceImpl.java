@@ -88,6 +88,7 @@ public class VipUserServiceImpl implements VipUserService {
         SystemManagementSupport.requireText(request.username(), "username is required");
         SystemManagementSupport.requireText(request.displayName(), "displayName is required");
         validateEmailUnique(request.email(), null);
+        validatePhoneUnique(request.phoneCountryCode(), request.phone(), null);
         VipUser vipUser = new VipUser();
         apply(vipUser, request);
         vipUserDao.insert(vipUser);
@@ -104,6 +105,7 @@ public class VipUserServiceImpl implements VipUserService {
         SystemManagementSupport.requireText(request.displayName(), "displayName is required");
         VipUser before = findVipUserEntityById(id);
         validateEmailUnique(request.email(), id);
+        validatePhoneUnique(request.phoneCountryCode(), request.phone(), id);
         VipUser vipUser = new VipUser();
         vipUser.setId(id);
         apply(vipUser, request);
@@ -132,6 +134,7 @@ public class VipUserServiceImpl implements VipUserService {
         vipUser.setEmail(before.getEmail());
         vipUser.setPhone(before.getPhone());
         vipUser.setVipLevel(before.getVipLevel());
+        vipUser.setCreditScore(before.getCreditScore());
         vipUser.setStatus(before.getStatus());
         if (vipUserDao.update(vipUser) == 0) {
             log.warn("Vip user service exception: action=resetVipUserPassword, id={}, message=Vip user not found", id);
@@ -176,8 +179,11 @@ public class VipUserServiceImpl implements VipUserService {
         vipUser.setPasswordHash(request.passwordHash());
         vipUser.setDisplayName(request.displayName().trim());
         vipUser.setEmail(trimToNull(request.email()));
-        vipUser.setPhone(trimToNull(request.phone()));
+        String phone = normalizePhone(request.phone());
+        vipUser.setPhoneCountryCode(phone == null ? null : normalizePhoneCountryCode(request.phoneCountryCode()));
+        vipUser.setPhone(phone);
         vipUser.setVipLevel(defaultValue(request.vipLevel(), "NORMAL"));
+        vipUser.setCreditScore(normalizeCreditScore(request.creditScore()));
         vipUser.setStatus(SystemManagementSupport.defaultStatus(request.status()));
     }
 
@@ -207,14 +213,54 @@ public class VipUserServiceImpl implements VipUserService {
         return value != null && value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
     }
 
+    private void validatePhoneUnique(String rawPhoneCountryCode, String rawPhone, Long excludeId) {
+        String phone = normalizePhone(rawPhone);
+        if (phone == null) {
+            return;
+        }
+        String phoneCountryCode = normalizePhoneCountryCode(rawPhoneCountryCode);
+        if (!isValidPhone(phoneCountryCode, phone)) {
+            throw SystemManagementSupport.badRequest("phone format is invalid");
+        }
+        if (vipUserDao.countByPhoneExcludingId(phoneCountryCode, phone, excludeId) > 0) {
+            throw SystemManagementSupport.badRequest("phone already exists");
+        }
+    }
+
+    private boolean isValidPhone(String phoneCountryCode, String phone) {
+        if (phoneCountryCode == null || !phoneCountryCode.matches("^\\+[1-9]\\d{0,3}$") || phone == null || !phone.matches("^\\d{4,14}$")) {
+            return false;
+        }
+        return (phoneCountryCode.substring(1) + phone).matches("^[1-9]\\d{7,14}$");
+    }
+
+    private String normalizePhone(String phone) {
+        String normalized = phone == null ? null : phone.trim().replaceAll("[\\s\\-()]", "");
+        if (normalized != null && normalized.startsWith("+")) {
+            normalized = normalized.substring(1);
+        }
+        return normalized == null || normalized.isBlank() ? null : normalized;
+    }
+
+    private String normalizePhoneCountryCode(String phoneCountryCode) {
+        String normalized = trimToNull(phoneCountryCode);
+        if (normalized == null) {
+            return "+86";
+        }
+        normalized = normalized.replaceAll("[\\s\\-()]", "");
+        return normalized.startsWith("+") ? normalized : "+" + normalized;
+    }
+
     private VipUserVO toVO(VipUser vipUser) {
         return new VipUserVO(
                 vipUser.getId(),
                 vipUser.getUsername(),
                 vipUser.getDisplayName(),
                 vipUser.getEmail(),
+                vipUser.getPhoneCountryCode(),
                 vipUser.getPhone(),
                 vipUser.getVipLevel(),
+                normalizeCreditScore(vipUser.getCreditScore()),
                 vipUser.getStatus(),
                 vipUser.getCreatedAt(),
                 vipUser.getUpdatedAt(),
@@ -232,8 +278,10 @@ public class VipUserServiceImpl implements VipUserService {
                     vipUser.username(),
                     vipUser.displayName(),
                     vipUser.email(),
+                    vipUser.phoneCountryCode(),
                     vipUser.phone(),
                     vipUser.vipLevel(),
+                    vipUser.creditScore(),
                     vipUser.status(),
                     vipUser.createdAt(),
                     vipUser.updatedAt(),
@@ -248,8 +296,10 @@ public class VipUserServiceImpl implements VipUserService {
                 vipUser.username(),
                 vipUser.displayName(),
                 vipUser.email(),
+                vipUser.phoneCountryCode(),
                 vipUser.phone(),
                 vipUser.vipLevel(),
+                vipUser.creditScore(),
                 vipUser.status(),
                 vipUser.createdAt(),
                 vipUser.updatedAt(),
@@ -258,6 +308,13 @@ public class VipUserServiceImpl implements VipUserService {
                 status.latestAccessTokenExpiresAt() == null ? null : status.latestAccessTokenExpiresAt().toString(),
                 status.latestRefreshTokenExpiresAt() == null ? null : status.latestRefreshTokenExpiresAt().toString()
         );
+    }
+
+    private int normalizeCreditScore(Integer score) {
+        if (score == null) {
+            return 100;
+        }
+        return Math.max(0, Math.min(100, score));
     }
 
     private String defaultValue(String value, String defaultValue) {
