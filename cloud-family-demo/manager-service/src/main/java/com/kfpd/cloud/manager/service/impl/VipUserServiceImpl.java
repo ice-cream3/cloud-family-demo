@@ -1,16 +1,20 @@
 package com.kfpd.cloud.manager.service.impl;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
 import com.kfpd.cloud.manager.dao.cloud.VipUserDao;
 import com.kfpd.cloud.manager.pojo.entity.VipUser;
+import com.kfpd.cloud.manager.pojo.vo.AuthSessionStatusVO;
 import com.kfpd.cloud.manager.pojo.vo.PageVO;
 import com.kfpd.cloud.manager.pojo.vo.PasswordResetRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.VipUserPageQueryVO;
 import com.kfpd.cloud.manager.pojo.vo.VipUserRequestVO;
 import com.kfpd.cloud.manager.pojo.vo.VipUserVO;
+import com.kfpd.cloud.manager.service.AuthSessionAdminService;
 import com.kfpd.cloud.manager.service.OperationLogService;
 import com.kfpd.cloud.manager.service.VipUserService;
 
@@ -28,10 +32,14 @@ public class VipUserServiceImpl implements VipUserService {
 
     private final VipUserDao vipUserDao;
     private final OperationLogService operationLogService;
+    private final AuthSessionAdminService authSessionAdminService;
 
-    public VipUserServiceImpl(VipUserDao vipUserDao, OperationLogService operationLogService) {
+    public VipUserServiceImpl(VipUserDao vipUserDao,
+                              OperationLogService operationLogService,
+                              AuthSessionAdminService authSessionAdminService) {
         this.vipUserDao = vipUserDao;
         this.operationLogService = operationLogService;
+        this.authSessionAdminService = authSessionAdminService;
     }
 
     @Override
@@ -49,6 +57,23 @@ public class VipUserServiceImpl implements VipUserService {
                 .map(this::toVO)
                 .toList();
         return new PageVO<>(total, pageNum, pageSize, records);
+    }
+
+    @Override
+    public PageVO<VipUserVO> findPartnerInfoUsers(VipUserPageQueryVO query, String authorization) {
+        PageVO<VipUserVO> page = findVipUsers(query);
+        List<String> usernames = page.records().stream()
+                .map(VipUserVO::username)
+                .filter(username -> username != null && !username.isBlank())
+                .distinct()
+                .toList();
+        Map<String, AuthSessionStatusVO> statuses = authSessionAdminService.apiSessionStatuses(usernames, authorization)
+                .stream()
+                .collect(Collectors.toMap(AuthSessionStatusVO::username, status -> status, (left, right) -> left));
+        List<VipUserVO> records = page.records().stream()
+                .map(record -> withSessionStatus(record, statuses.get(record.username())))
+                .toList();
+        return new PageVO<>(page.total(), page.pageNum(), page.pageSize(), records);
     }
 
     @Override
@@ -128,6 +153,17 @@ public class VipUserServiceImpl implements VipUserService {
         operationLogService.recordDelete(MODULE_PARTNER, BUSINESS_VIP_USER, id, before.getUsername(), toVO(before));
     }
 
+    @Override
+    public int kickOutVipUser(Long id, String authorization) {
+        VipUser vipUser = findVipUserEntityById(id);
+        int revokedCount = authSessionAdminService.kickOutApiUser(vipUser.getUsername(), authorization);
+        operationLogService.recordUpdate(MODULE_PARTNER, BUSINESS_VIP_USER, id, vipUser.getUsername(), "KICK_OUT", Map.of(
+                "username", vipUser.getUsername(),
+                "revokedCount", revokedCount
+        ));
+        return revokedCount;
+    }
+
     private VipUser findVipUserEntityById(Long id) {
         return Optional.ofNullable(vipUserDao.findById(id)).orElseThrow(() -> {
             log.warn("Vip user service exception: action=findVipUserById, id={}, message=Vip user not found", id);
@@ -181,7 +217,46 @@ public class VipUserServiceImpl implements VipUserService {
                 vipUser.getVipLevel(),
                 vipUser.getStatus(),
                 vipUser.getCreatedAt(),
-                vipUser.getUpdatedAt()
+                vipUser.getUpdatedAt(),
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    private VipUserVO withSessionStatus(VipUserVO vipUser, AuthSessionStatusVO status) {
+        if (status == null) {
+            return new VipUserVO(
+                    vipUser.id(),
+                    vipUser.username(),
+                    vipUser.displayName(),
+                    vipUser.email(),
+                    vipUser.phone(),
+                    vipUser.vipLevel(),
+                    vipUser.status(),
+                    vipUser.createdAt(),
+                    vipUser.updatedAt(),
+                    false,
+                    0,
+                    null,
+                    null
+            );
+        }
+        return new VipUserVO(
+                vipUser.id(),
+                vipUser.username(),
+                vipUser.displayName(),
+                vipUser.email(),
+                vipUser.phone(),
+                vipUser.vipLevel(),
+                vipUser.status(),
+                vipUser.createdAt(),
+                vipUser.updatedAt(),
+                status.online(),
+                status.sessionCount(),
+                status.latestAccessTokenExpiresAt() == null ? null : status.latestAccessTokenExpiresAt().toString(),
+                status.latestRefreshTokenExpiresAt() == null ? null : status.latestRefreshTokenExpiresAt().toString()
         );
     }
 

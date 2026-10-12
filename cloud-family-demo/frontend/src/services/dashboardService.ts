@@ -149,6 +149,10 @@ export function resetPartnerInfoPassword(id: number, password: string) {
   });
 }
 
+export function kickOutPartnerInfo(id: number) {
+  return post<number>(`/api/manager/partner/info/kick-out/${id}`);
+}
+
 export function loadSystemMenuPermissions(id: number) {
   return post<SysPermission[]>(`/api/manager/system/menus/permissions/${id}`);
 }

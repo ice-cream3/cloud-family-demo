@@ -11,6 +11,10 @@ public record VipUserVO(
         String vipLevel,
         String status,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        Boolean online,
+        Integer activeSessionCount,
+        String latestAccessTokenExpiresAt,
+        String latestRefreshTokenExpiresAt
 ) {
 }

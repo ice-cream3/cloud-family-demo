@@ -22,6 +22,7 @@ import com.kfpd.cloud.auth.dao.cloud.OAuth2AuthorizationDao;
 import com.kfpd.cloud.auth.dao.model.ManagerLoginLogDao;
 import com.kfpd.cloud.auth.dao.model.PartnerLoginLogDao;
 import com.kfpd.cloud.auth.pojo.dto.LoginRequestContext;
+import com.kfpd.cloud.auth.pojo.dto.SessionStatusVO;
 import com.kfpd.cloud.auth.pojo.entity.ManagerLoginLog;
 import com.kfpd.cloud.auth.pojo.entity.PartnerLoginLog;
 import com.kfpd.cloud.auth.pojo.vo.LoginVO;
@@ -373,12 +374,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public int kickOut(KickOutVO request, String operatorAuthorization) {
-        TokenValidation operator = validate(operatorAuthorization);
-        if (!operator.valid() || !hasManagerAccess(operator.roles())) {
-            log.warn("Kick-out rejected: operator={}, target={}, reason=manager_role_required",
-                    operator.username(), request.username());
-            throw new BusinessException(ErrorCode.AUTH_MANAGER_PERMISSION_REQUIRED);
-        }
+        TokenValidation operator = requireManagerOperator(operatorAuthorization, request.username(), "Kick-out");
         if (sessionProperties.isRedis()) {
             int revokedCount = kickOutWithRedis(request.username());
             log.info("Redis kick-out succeeded: operator={}, target={}, revokedCount={}",
@@ -397,6 +393,38 @@ public class AuthServiceImpl implements AuthService {
         }
 
         log.info("Kick-out succeeded: operator={}, target={}, revokedCount={}",
+                operator.username(), request.username(), revokedCount);
+        return revokedCount;
+    }
+
+    @Override
+    public List<SessionStatusVO> apiSessionStatuses(List<String> usernames, String operatorAuthorization) {
+        TokenValidation operator = requireManagerOperator(operatorAuthorization, String.join(",", normalizeUsernames(usernames)), "API session status");
+        List<String> normalizedUsernames = normalizeUsernames(usernames);
+        List<SessionStatusVO> statuses = sessionProperties.isRedis()
+                ? redisApiSessionStatuses(normalizedUsernames)
+                : jdbcApiSessionStatuses(normalizedUsernames);
+        log.debug("API session status queried: operator={}, userCount={}", operator.username(), normalizedUsernames.size());
+        return statuses;
+    }
+
+    @Override
+    public int kickOutApiUser(KickOutVO request, String operatorAuthorization) {
+        TokenValidation operator = requireManagerOperator(operatorAuthorization, request.username(), "API kick-out");
+        int revokedCount;
+        if (sessionProperties.isRedis()) {
+            revokedCount = revokeExistingRedisSessions(request.username(), AuthOAuth2JdbcConfig.API_CLIENT_ID);
+            log.info("Redis API kick-out succeeded: operator={}, target={}, revokedCount={}",
+                    operator.username(), request.username(), revokedCount);
+            return revokedCount;
+        }
+
+        RegisteredClient apiClient = registeredClientRepository.findByClientId(AuthOAuth2JdbcConfig.API_CLIENT_ID);
+        if (apiClient == null) {
+            throw new BusinessException(ErrorCode.AUTH_CLIENT_NOT_INITIALIZED);
+        }
+        revokedCount = revokeExistingJdbcSessions(request.username(), apiClient.getId());
+        log.info("JDBC API kick-out succeeded: operator={}, target={}, revokedCount={}",
                 operator.username(), request.username(), revokedCount);
         return revokedCount;
     }
@@ -532,6 +560,70 @@ public class AuthServiceImpl implements AuthService {
         return revokedCount;
     }
 
+    private List<SessionStatusVO> jdbcApiSessionStatuses(List<String> usernames) {
+        RegisteredClient apiClient = registeredClientRepository.findByClientId(AuthOAuth2JdbcConfig.API_CLIENT_ID);
+        if (apiClient == null) {
+            throw new BusinessException(ErrorCode.AUTH_CLIENT_NOT_INITIALIZED);
+        }
+
+        return usernames.stream()
+                .map(username -> jdbcSessionStatus(username, apiClient.getId()))
+                .toList();
+    }
+
+    private SessionStatusVO jdbcSessionStatus(String username, String registeredClientId) {
+        int sessionCount = 0;
+        Instant latestAccessTokenExpiresAt = null;
+        Instant latestRefreshTokenExpiresAt = null;
+        for (String authorizationId : findAuthorizationIdsByPrincipalNameAndRegisteredClientId(username, registeredClientId)) {
+            OAuth2Authorization authorization = authorizationService.findById(authorizationId);
+            if (authorization == null) {
+                continue;
+            }
+            boolean active = false;
+            if (authorization.getAccessToken() != null && authorization.getAccessToken().isActive()) {
+                active = true;
+                latestAccessTokenExpiresAt = latest(latestAccessTokenExpiresAt, authorization.getAccessToken().getToken().getExpiresAt());
+            }
+            if (authorization.getRefreshToken() != null && authorization.getRefreshToken().isActive()) {
+                active = true;
+                latestRefreshTokenExpiresAt = latest(latestRefreshTokenExpiresAt, authorization.getRefreshToken().getToken().getExpiresAt());
+            }
+            if (active) {
+                sessionCount++;
+            }
+        }
+        return new SessionStatusVO(username, sessionCount > 0, sessionCount, latestAccessTokenExpiresAt, latestRefreshTokenExpiresAt);
+    }
+
+    private List<SessionStatusVO> redisApiSessionStatuses(List<String> usernames) {
+        return usernames.stream()
+                .map(this::redisApiSessionStatus)
+                .toList();
+    }
+
+    private SessionStatusVO redisApiSessionStatus(String username) {
+        RSet<String> refreshTokens = redissonClient().getSet(redisUserSessionsKey(username));
+        Set<String> tokenSnapshot = new LinkedHashSet<>(refreshTokens.readAll());
+        int sessionCount = 0;
+        Instant latestAccessTokenExpiresAt = null;
+        Instant latestRefreshTokenExpiresAt = null;
+        for (String refreshToken : tokenSnapshot) {
+            RedisLoginSession session = readRedisSession(redisRefreshTokenKey(refreshToken));
+            if (session == null) {
+                refreshTokens.remove(refreshToken);
+                continue;
+            }
+            if (!AuthOAuth2JdbcConfig.API_CLIENT_ID.equals(session.clientId()) || session.refreshTokenExpiresAt().isBefore(Instant.now())) {
+                continue;
+            }
+            sessionCount++;
+            latestAccessTokenExpiresAt = latest(latestAccessTokenExpiresAt, session.accessTokenExpiresAt());
+            latestRefreshTokenExpiresAt = latest(latestRefreshTokenExpiresAt, session.refreshTokenExpiresAt());
+        }
+        return new SessionStatusVO(username, sessionCount > 0, sessionCount, latestAccessTokenExpiresAt, latestRefreshTokenExpiresAt);
+    }
+
     private int revokeExistingJdbcSessions(String username, String registeredClientId) {
         List<String> authorizationIds = findAuthorizationIdsByPrincipalNameAndRegisteredClientId(username, registeredClientId);
         int revokedCount = 0;
@@ -569,6 +661,34 @@ public class AuthServiceImpl implements AuthService {
                     username, clientId, revokedCount);
         }
         return revokedCount;
+    }
+
+    private TokenValidation requireManagerOperator(String operatorAuthorization, String target, String action) {
+        TokenValidation operator = validate(operatorAuthorization);
+        if (!operator.valid() || !hasManagerAccess(operator.roles())) {
+            log.warn("{} rejected: operator={}, target={}, reason=manager_role_required",
+                    action, operator.username(), target);
+            throw new BusinessException(ErrorCode.AUTH_MANAGER_PERMISSION_REQUIRED);
+        }
+        return operator;
+    }
+
+    private List<String> normalizeUsernames(List<String> usernames) {
+        if (usernames == null) {
+            return List.of();
+        }
+        return usernames.stream()
+                .filter(username -> username != null && !username.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+    }
+
+    private Instant latest(Instant current, Instant candidate) {
+        if (candidate == null) {
+            return current;
+        }
+        return current == null || candidate.isAfter(current) ? candidate : current;
     }
 
     private void saveRedisSession(RedisLoginSession session) {

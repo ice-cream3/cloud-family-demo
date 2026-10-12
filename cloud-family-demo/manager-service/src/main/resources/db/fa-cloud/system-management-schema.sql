@@ -137,6 +137,7 @@ VALUES
     ('partner:info:add', 'Partner Info 新增', 'Allows creating partner info records', 'ENABLED'),
     ('partner:info:edit', 'Partner Info 修改', 'Allows updating partner info records', 'ENABLED'),
     ('partner:info:reset-password', 'Partner Info 修改密码', 'Allows resetting partner info passwords', 'ENABLED'),
+    ('partner:info:kick-out', 'Partner Info 踢线', 'Allows kicking out partner info login sessions', 'ENABLED'),
     ('partner:info:delete', 'Partner Info 删除', 'Allows deleting partner info records', 'ENABLED');
 
 INSERT IGNORE INTO sys_menu (menu_code, menu_name, path, component, icon, menu_level, button_flag, sort_order, visible, status)
@@ -198,7 +199,8 @@ JOIN (
     UNION ALL SELECT 'partner-info', 'partner-info-add', '新增', 'partner:info:add', 411
     UNION ALL SELECT 'partner-info', 'partner-info-edit', '修改', 'partner:info:edit', 412
     UNION ALL SELECT 'partner-info', 'partner-info-reset-password', '修改密码', 'partner:info:reset-password', 413
-    UNION ALL SELECT 'partner-info', 'partner-info-delete', '删除', 'partner:info:delete', 414
+    UNION ALL SELECT 'partner-info', 'partner-info-kick-out', '踢线', 'partner:info:kick-out', 414
+    UNION ALL SELECT 'partner-info', 'partner-info-delete', '删除', 'partner:info:delete', 415
 ) item ON item.parent_code = parent.menu_code;
 
 INSERT IGNORE INTO sys_menu_permission (menu_id, permission_id)
@@ -250,5 +252,5 @@ WHERE r.role_code = 'SUPER_ADMIN'
       'system-roles-add', 'system-roles-edit', 'system-roles-delete', 'system-roles-menu',
       'system-permissions-add', 'system-permissions-edit', 'system-permissions-delete',
       'system-menus-add', 'system-menus-edit', 'system-menus-delete', 'system-menus-button-permission',
-      'partner-management', 'partner-info', 'partner-info-add', 'partner-info-edit', 'partner-info-reset-password', 'partner-info-delete'
+      'partner-management', 'partner-info', 'partner-info-add', 'partner-info-edit', 'partner-info-reset-password', 'partner-info-kick-out', 'partner-info-delete'
   );

@@ -5,6 +5,7 @@ import { login, logout } from './services/authService';
 import {
   createSystemRecord,
   deleteSystemRecord,
+  kickOutPartnerInfo,
   loadManagerVipUsers,
   loadSystemMenuPermissions,
   loadCurrentUser,
@@ -176,6 +177,11 @@ export default function App() {
     await reloadCurrentSystemPage(systemPage?.pageNum || 1);
   }
 
+  async function handleKickOutPartnerInfo(id: number) {
+    await kickOutPartnerInfo(id);
+    await reloadCurrentSystemPage(systemPage?.pageNum || 1);
+  }
+
   async function handleLoadMenuPermissionOptions() {
     const page = await loadSystemPermissions(1, 100);
     return page.records;
@@ -282,6 +288,7 @@ export default function App() {
       onUpdateSystemRecord={handleUpdateSystemRecord}
       onDeleteSystemRecord={handleDeleteSystemRecord}
       onResetUserPassword={handleResetUserPassword}
+      onKickOutPartnerInfo={handleKickOutPartnerInfo}
       onLoadMenuPermissionOptions={handleLoadMenuPermissionOptions}
       onLoadMenuPermissions={handleLoadMenuPermissions}
       onReplaceMenuPermissions={handleReplaceMenuPermissions}

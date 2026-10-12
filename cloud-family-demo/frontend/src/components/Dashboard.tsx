@@ -24,6 +24,7 @@ type DashboardProps = {
   onUpdateSystemRecord: (id: number, payload: SystemRecordPayload) => Promise<void>;
   onDeleteSystemRecord: (id: number) => Promise<void>;
   onResetUserPassword: (id: number, password: string) => Promise<void>;
+  onKickOutPartnerInfo: (id: number) => Promise<void>;
   onLoadMenuPermissionOptions: () => Promise<SysPermission[]>;
   onLoadMenuPermissions: (id: number) => Promise<SysPermission[]>;
   onReplaceMenuPermissions: (id: number, ids: number[]) => Promise<void>;
@@ -59,6 +60,7 @@ export function Dashboard({
   onUpdateSystemRecord,
   onDeleteSystemRecord,
   onResetUserPassword,
+  onKickOutPartnerInfo,
   onLoadMenuPermissionOptions,
   onLoadMenuPermissions,
   onReplaceMenuPermissions,
@@ -131,6 +133,7 @@ export function Dashboard({
             onUpdate={onUpdateSystemRecord}
             onDelete={onDeleteSystemRecord}
             onResetPassword={onResetUserPassword}
+            onKickOutPartnerInfo={onKickOutPartnerInfo}
             onLoadMenuPermissionOptions={onLoadMenuPermissionOptions}
             onLoadMenuPermissions={onLoadMenuPermissions}
             onReplaceMenuPermissions={onReplaceMenuPermissions}
@@ -469,6 +472,7 @@ function SystemPagePanel({
   onUpdate,
   onDelete,
   onResetPassword,
+  onKickOutPartnerInfo,
   onLoadMenuPermissionOptions,
   onLoadMenuPermissions,
   onReplaceMenuPermissions,
@@ -493,6 +497,7 @@ function SystemPagePanel({
   onUpdate: (id: number, payload: SystemRecordPayload) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onResetPassword: (id: number, password: string) => Promise<void>;
+  onKickOutPartnerInfo: (id: number) => Promise<void>;
   onLoadMenuPermissionOptions: () => Promise<SysPermission[]>;
   onLoadMenuPermissions: (id: number) => Promise<SysPermission[]>;
   onReplaceMenuPermissions: (id: number, ids: number[]) => Promise<void>;
@@ -520,12 +525,14 @@ function SystemPagePanel({
   const canResetPassword = hasPermission(permissions, 'system:user:reset-password');
   const canResetPartnerPassword = menu?.path === '/api/manager/partner/info'
     && (hasPermission(permissions, 'partner:info:reset-password') || hasMenuButton(menu, 'partner-info-reset-password'));
+  const canKickOutPartner = menu?.path === '/api/manager/partner/info'
+    && (hasPermission(permissions, 'partner:info:kick-out') || hasMenuButton(menu, 'partner-info-kick-out'));
   const canAssignUserRoles = hasPermission(permissions, 'system:user:edit');
   const canAssignRolePermissions = hasPermission(permissions, 'system:role:edit');
   const canAssignRoleMenus = hasPermission(permissions, 'system:role:menu');
   const canAssignMenuPermissions = hasPermission(permissions, 'system:menu:button-permission');
   const canShowOperationColumn = isOperationLogPage
-    || (!readOnly && (canEdit || canDelete || canResetPassword || canResetPartnerPassword || canAssignUserRoles || canAssignRolePermissions || canAssignRoleMenus || canAssignMenuPermissions));
+    || (!readOnly && (canEdit || canDelete || canResetPassword || canResetPartnerPassword || canKickOutPartner || canAssignUserRoles || canAssignRolePermissions || canAssignRoleMenus || canAssignMenuPermissions));
   const [viewMode, setViewMode] = useState<'table' | 'tree'>('table');
   const [editorRecord, setEditorRecord] = useState<SystemPageRecord | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -705,6 +712,23 @@ function SystemPagePanel({
     } catch (err) {
       const message = readErrorMessage(err);
       setPasswordError(message);
+      setOperationMessage({ type: 'error', text: message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function kickOutPartner(record: SystemPageRecord) {
+    if (!window.confirm(`确认踢出 ${recordLabel(record)} 的当前登录会话？`)) {
+      return;
+    }
+    setSaving(true);
+    setOperationMessage(null);
+    try {
+      await onKickOutPartnerInfo(record.id);
+      setOperationMessage({ type: 'success', text: '踢线成功' });
+    } catch (err) {
+      const message = readErrorMessage(err);
       setOperationMessage({ type: 'error', text: message });
     } finally {
       setSaving(false);
@@ -1042,6 +1066,12 @@ function SystemPagePanel({
                           <button type="button" onClick={() => setPasswordRecord(record)} disabled={saving}>
                             <KeyRound size={14} />
                             修改密码
+                          </button>
+                        ) : null}
+                        {canKickOutPartner ? (
+                          <button type="button" onClick={() => kickOutPartner(record)} disabled={saving || !readBooleanField(record, 'online')}>
+                            <LogOut size={14} />
+                            踢线
                           </button>
                         ) : null}
                         {menu?.path === '/api/manager/system/roles' ? (
@@ -2798,6 +2828,9 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
         { key: 'email', title: '邮箱', render: (record) => textValue(readField(record, 'email')) },
         { key: 'phone', title: '手机号', render: (record) => textValue(readField(record, 'phone')) },
         { key: 'vipLevel', title: '会员等级', render: (record) => textValue(readField(record, 'vipLevel')) },
+        ...(isPartnerInfo ? [
+          { key: 'online', title: '登录状态', render: (record: SystemPageRecord) => <OnlineStatusValue record={record} /> },
+        ] : []),
         commonColumns[1],
         commonColumns[2],
       ],
@@ -3225,6 +3258,20 @@ function OperationTypeValue({ value }: { value?: string }) {
 
 function BooleanValue({ value }: { value: boolean }) {
   return <span className={value ? 'status-pill' : 'muted-pill'}>{value ? '开启' : '关闭'}</span>;
+}
+
+function OnlineStatusValue({ record }: { record: SystemPageRecord }) {
+  const online = readBooleanField(record, 'online');
+  const sessionCount = Number(readField(record, 'activeSessionCount') || 0);
+  const latestRefreshTokenExpiresAt = readField(record, 'latestRefreshTokenExpiresAt');
+  const title = online
+    ? `活跃会话 ${sessionCount || 1} 个，刷新令牌到期 ${formatDate(latestRefreshTokenExpiresAt)}`
+    : '暂无活跃登录会话';
+  return (
+    <span className={online ? 'status-pill' : 'muted-pill'} title={title}>
+      {online ? `在线${sessionCount > 1 ? ` · ${sessionCount}` : ''}` : '离线'}
+    </span>
+  );
 }
 
 function operationTypeLabel(value?: string) {

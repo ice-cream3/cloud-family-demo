@@ -10,6 +10,8 @@ public interface VipUserService {
 
     PageVO<VipUserVO> findVipUsers(VipUserPageQueryVO query);
 
+    PageVO<VipUserVO> findPartnerInfoUsers(VipUserPageQueryVO query, String authorization);
+
     VipUserVO findVipUserById(Long id);
 
     VipUserVO createVipUser(VipUserRequestVO request);
@@ -19,4 +21,6 @@ public interface VipUserService {
     VipUserVO resetVipUserPassword(Long id, PasswordResetRequestVO request);
 
     void deleteVipUser(Long id);
+
+    int kickOutVipUser(Long id, String authorization);
 }

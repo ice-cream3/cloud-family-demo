@@ -5,6 +5,7 @@ VALUES
     ('partner:info:add', 'Partner Info Add', 'Allows creating partner info records', 'ENABLED'),
     ('partner:info:edit', 'Partner Info Edit', 'Allows updating partner info records', 'ENABLED'),
     ('partner:info:reset-password', 'Partner Info Reset Password', 'Allows resetting partner info passwords', 'ENABLED'),
+    ('partner:info:kick-out', 'Partner Info Kick Out', 'Allows kicking out partner info login sessions', 'ENABLED'),
     ('partner:info:delete', 'Partner Info Delete', 'Allows deleting partner info records', 'ENABLED'),
     ('partner:feature:add', 'Partner Feature Add', 'Allows creating partner feature records', 'ENABLED'),
     ('partner:feature:edit', 'Partner Feature Edit', 'Allows updating partner feature records', 'ENABLED'),
@@ -15,6 +16,7 @@ SET permission_name = CASE permission_code
     WHEN 'partner:info:add' THEN 'Partner Info Add'
     WHEN 'partner:info:edit' THEN 'Partner Info Edit'
     WHEN 'partner:info:reset-password' THEN 'Partner Info Reset Password'
+    WHEN 'partner:info:kick-out' THEN 'Partner Info Kick Out'
     WHEN 'partner:info:delete' THEN 'Partner Info Delete'
     WHEN 'partner:feature:add' THEN 'Partner Feature Add'
     WHEN 'partner:feature:edit' THEN 'Partner Feature Edit'
@@ -25,6 +27,7 @@ WHERE permission_code IN (
     'partner:info:add',
     'partner:info:edit',
     'partner:info:reset-password',
+    'partner:info:kick-out',
     'partner:info:delete',
     'partner:feature:add',
     'partner:feature:edit',
@@ -88,7 +91,8 @@ JOIN (
     SELECT 'partner-info-add' menu_code, 'Add' menu_name, 'partner:info:add' permission_code, 411 sort_order
     UNION ALL SELECT 'partner-info-edit', 'Edit', 'partner:info:edit', 412
     UNION ALL SELECT 'partner-info-reset-password', 'Reset Password', 'partner:info:reset-password', 413
-    UNION ALL SELECT 'partner-info-delete', 'Delete', 'partner:info:delete', 414
+    UNION ALL SELECT 'partner-info-kick-out', 'Kick Out', 'partner:info:kick-out', 414
+    UNION ALL SELECT 'partner-info-delete', 'Delete', 'partner:info:delete', 415
 ) item ON 1 = 1
 WHERE parent.menu_code = 'partner-info';
 
@@ -114,10 +118,11 @@ SET menu_name = CASE menu_code
     WHEN 'partner-info-add' THEN 'Add'
     WHEN 'partner-info-edit' THEN 'Edit'
     WHEN 'partner-info-reset-password' THEN 'Reset Password'
+    WHEN 'partner-info-kick-out' THEN 'Kick Out'
     WHEN 'partner-info-delete' THEN 'Delete'
     ELSE menu_name
 END
-WHERE menu_code IN ('partner-info-add', 'partner-info-edit', 'partner-info-reset-password', 'partner-info-delete');
+WHERE menu_code IN ('partner-info-add', 'partner-info-edit', 'partner-info-reset-password', 'partner-info-kick-out', 'partner-info-delete');
 
 UPDATE sys_menu
 SET menu_name = CASE
@@ -140,7 +145,7 @@ INSERT IGNORE INTO sys_menu_permission (menu_id, permission_id)
 SELECT m.id, p.id
 FROM sys_menu m
 INNER JOIN sys_permission p ON p.permission_code = m.path
-WHERE m.menu_code IN ('partner-info-add', 'partner-info-edit', 'partner-info-reset-password', 'partner-info-delete');
+WHERE m.menu_code IN ('partner-info-add', 'partner-info-edit', 'partner-info-reset-password', 'partner-info-kick-out', 'partner-info-delete');
 
 INSERT IGNORE INTO sys_menu_permission (menu_id, permission_id)
 SELECT m.id, p.id
@@ -155,20 +160,20 @@ FROM sys_role_permission rp
 INNER JOIN sys_role r ON r.id = rp.role_id
 INNER JOIN sys_permission p ON p.id = rp.permission_id
 WHERE r.role_code = 'MANAGER'
-  AND p.permission_code IN ('partner:info:add', 'partner:info:edit', 'partner:info:reset-password', 'partner:info:delete');
+  AND p.permission_code IN ('partner:info:add', 'partner:info:edit', 'partner:info:reset-password', 'partner:info:kick-out', 'partner:info:delete');
 
 DELETE rm
 FROM sys_role_menu rm
 INNER JOIN sys_role r ON r.id = rm.role_id
 INNER JOIN sys_menu m ON m.id = rm.menu_id
 WHERE r.role_code = 'MANAGER'
-  AND m.menu_code IN ('partner-management', 'partner-info', 'partner-info-add', 'partner-info-edit', 'partner-info-reset-password', 'partner-info-delete');
+  AND m.menu_code IN ('partner-management', 'partner-info', 'partner-info-add', 'partner-info-edit', 'partner-info-reset-password', 'partner-info-kick-out', 'partner-info-delete');
 
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
 SELECT r.id, p.id
 FROM sys_role r, sys_permission p
 WHERE r.role_code = 'SUPER_ADMIN'
-  AND p.permission_code IN ('partner:info:add', 'partner:info:edit', 'partner:info:reset-password', 'partner:info:delete', 'partner:feature:add', 'partner:feature:edit', 'partner:feature:delete');
+  AND p.permission_code IN ('partner:info:add', 'partner:info:edit', 'partner:info:reset-password', 'partner:info:kick-out', 'partner:info:delete', 'partner:feature:add', 'partner:feature:edit', 'partner:feature:delete');
 
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
 SELECT r.id, p.id
@@ -181,7 +186,7 @@ SELECT r.id, m.id
 FROM sys_role r, sys_menu m
 WHERE r.role_code = 'SUPER_ADMIN'
   AND (
-      m.menu_code IN ('partner-management', 'partner-info', 'partner-info-add', 'partner-info-edit', 'partner-info-reset-password', 'partner-info-delete')
+      m.menu_code IN ('partner-management', 'partner-info', 'partner-info-add', 'partner-info-edit', 'partner-info-reset-password', 'partner-info-kick-out', 'partner-info-delete')
       OR m.menu_code IN ('partner-notification-settings', 'partner-documents', 'partner-versions', 'partner-memberships', 'partner-histories', 'partner-favorites')
       OR m.menu_code LIKE 'partner-notification-settings-%'
       OR m.menu_code LIKE 'partner-documents-%'

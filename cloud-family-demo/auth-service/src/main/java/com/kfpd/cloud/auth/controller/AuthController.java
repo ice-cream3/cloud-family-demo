@@ -3,14 +3,18 @@ package com.kfpd.cloud.auth.controller;
 import com.kfpd.cloud.auth.pojo.vo.LoginVO;
 import com.kfpd.cloud.auth.pojo.dto.LoginRequestContext;
 import com.kfpd.cloud.auth.pojo.dto.LoginResponse;
+import com.kfpd.cloud.auth.pojo.dto.SessionStatusVO;
 import com.kfpd.cloud.auth.pojo.vo.KickOutVO;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
 import com.kfpd.cloud.auth.pojo.vo.RegisterVO;
+import com.kfpd.cloud.auth.pojo.vo.SessionStatusQueryVO;
 import com.kfpd.cloud.auth.pojo.dto.TokenValidation;
 import com.kfpd.cloud.auth.service.AuthService;
 import com.kfpd.cloud.common.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+
+import java.util.List;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -61,6 +65,18 @@ public class AuthController {
     public ApiResponse<Integer> kickOut(@Valid @RequestBody KickOutVO request,
                                         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
         return ApiResponse.success(authService.kickOut(request, authorization));
+    }
+
+    @PostMapping("/manager/api-session-status")
+    public ApiResponse<List<SessionStatusVO>> apiSessionStatus(@RequestBody(required = false) SessionStatusQueryVO request,
+                                                               @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+        return ApiResponse.success(authService.apiSessionStatuses(request == null ? List.of() : request.usernames(), authorization));
+    }
+
+    @PostMapping("/manager/api-kick-out")
+    public ApiResponse<Integer> kickOutApiUser(@Valid @RequestBody KickOutVO request,
+                                               @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+        return ApiResponse.success(authService.kickOutApiUser(request, authorization));
     }
 
     @PostMapping("/validate")

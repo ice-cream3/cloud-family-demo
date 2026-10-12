@@ -10,12 +10,14 @@ import com.kfpd.cloud.manager.service.VipUserService;
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,8 +32,10 @@ public class PartnerInfoController {
     }
 
     @PostMapping("/page")
-    public ApiResponse<PageVO<VipUserVO>> partnerInfoPage(@ModelAttribute VipUserPageQueryVO query) {
-        return ApiResponse.success(vipUserService.findVipUsers(query));
+    public ApiResponse<PageVO<VipUserVO>> partnerInfoPage(
+            @ModelAttribute VipUserPageQueryVO query,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+        return ApiResponse.success(vipUserService.findPartnerInfoUsers(query, authorization));
     }
 
     @PostMapping("/detail/{id}")
@@ -62,5 +66,12 @@ public class PartnerInfoController {
     public ApiResponse<Void> deletePartnerInfo(@PathVariable Long id) {
         vipUserService.deleteVipUser(id);
         return ApiResponse.success();
+    }
+
+    @PostMapping("/kick-out/{id}")
+    @PreAuthorize("hasAuthority('partner:info:kick-out')")
+    public ApiResponse<Integer> kickOutPartnerInfo(@PathVariable Long id,
+                                                   @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+        return ApiResponse.success(vipUserService.kickOutVipUser(id, authorization));
     }
 }

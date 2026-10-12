@@ -136,6 +136,10 @@ export type VipUser = {
   status?: string;
   createdAt?: string;
   updatedAt?: string;
+  online?: boolean;
+  activeSessionCount?: number;
+  latestAccessTokenExpiresAt?: string;
+  latestRefreshTokenExpiresAt?: string;
 };
 
 export type SystemPageRecord = SysUser | SysRole | SysPermission | SysMenu | OperationLog | VipUser;

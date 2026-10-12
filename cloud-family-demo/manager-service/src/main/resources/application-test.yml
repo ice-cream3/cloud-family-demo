@@ -9,6 +9,7 @@ spring:
         nodes: ${REDIS_TEST_CLUSTER_NODES:127.0.0.1:7000,127.0.0.1:7001,127.0.0.1:7002,127.0.0.1:7003,127.0.0.1:7004,127.0.0.1:7005}
 
 demo:
+  auth-service-url: ${AUTH_SERVICE_TEST_URL:http://localhost:38081}
   redisson:
     enabled: ${REDISSON_TEST_ENABLED:false}
     lock:
