@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { FocusEvent, FormEvent } from 'react';
+import type { FocusEvent, FormEvent, MouseEvent } from 'react';
 import {
   Archive,
   Bell,
@@ -57,6 +57,7 @@ import {
   refreshProfileDynamic,
   applyTrip,
   reviewTrip,
+  sendEmailVerificationCode,
   sendPhoneVerificationCode,
   updateAccountSecurity,
   updateNotificationSettings,
@@ -695,10 +696,16 @@ function ProfileScreen({
   onOpenSettings: () => void;
 }) {
   const [statsMessage, setStatsMessage] = useState<string | null>(null);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   function showStatsMessage(message: string) {
     setStatsMessage(message);
     window.setTimeout(() => setStatsMessage(null), 1600);
+  }
+
+  function confirmLogout() {
+    setLogoutConfirmOpen(false);
+    onLogout();
   }
 
   return (
@@ -743,8 +750,13 @@ function ProfileScreen({
         <MenuRow icon={Star} title="我的收藏" onClick={onOpenFavorites} />
         <MenuRow icon={RefreshCw} title={loading ? '刷新中' : '刷新动态'} onClick={onReload} />
         <MenuRow icon={Settings} title="设置" onClick={onOpenSettings} />
-        <MenuRow icon={LogOut} title="退出登录" onClick={onLogout} />
+        <MenuRow icon={LogOut} title="退出登录" onClick={() => setLogoutConfirmOpen(true)} />
       </div>
+      <LogoutConfirmDialog
+        open={logoutConfirmOpen}
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={confirmLogout}
+      />
     </div>
   );
 }
@@ -1661,6 +1673,7 @@ function SettingsScreen({
   const [detail, setDetail] = useState<SettingDetail | null>(initialDetail);
   const [cacheSize, setCacheSize] = useState('12.4MB');
   const [toast, setToast] = useState<string | null>(null);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   function showToast(message: string) {
     setToast(message);
@@ -1681,9 +1694,12 @@ function SettingsScreen({
   }
 
   function logout() {
-    if (window.confirm('确认退出登录？')) {
-      onLogout();
-    }
+    setLogoutConfirmOpen(true);
+  }
+
+  function confirmLogout() {
+    setLogoutConfirmOpen(false);
+    onLogout();
   }
 
   if (detail) {
@@ -1714,7 +1730,51 @@ function SettingsScreen({
         <MenuRow icon={RefreshCw} title="版本更新" meta="v1.2.0" onClick={checkVersion} />
       </div>
       <button className="logout-button" type="button" onClick={logout}>退出登录</button>
+      <LogoutConfirmDialog
+        open={logoutConfirmOpen}
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={confirmLogout}
+      />
       {toast ? <div className="settings-toast">{toast}</div> : null}
+    </div>
+  );
+}
+
+function LogoutConfirmDialog({
+  open,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  function cancel(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    onCancel();
+  }
+
+  function confirm(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    onConfirm();
+  }
+
+  return (
+    <div className="settings-confirm-mask" role="presentation" onClick={onCancel}>
+      <section className="settings-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="logout-confirm-title" onClick={(event) => event.stopPropagation()}>
+        <h2 id="logout-confirm-title">确认退出登录？</h2>
+        <p>退出后需要重新登录才能继续使用账号相关功能。</p>
+        <div className="settings-confirm-actions">
+          <button type="button" onClick={cancel}>取消</button>
+          <button type="button" className="danger" onClick={confirm}>退出登录</button>
+        </div>
+      </section>
     </div>
   );
 }
@@ -1735,9 +1795,12 @@ function AccountSecurityDetail({
   const [countrySearch, setCountrySearch] = useState('');
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [phone, setPhone] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [codeSending, setCodeSending] = useState(false);
-  const [codeCountdown, setCodeCountdown] = useState(0);
+  const [currentPhoneVerificationCode, setCurrentPhoneVerificationCode] = useState('');
+  const [newPhoneVerificationCode, setNewPhoneVerificationCode] = useState('');
+  const [currentEmailVerificationCode, setCurrentEmailVerificationCode] = useState('');
+  const [newEmailVerificationCode, setNewEmailVerificationCode] = useState('');
+  const [codeSending, setCodeSending] = useState<string | null>(null);
+  const [codeCountdowns, setCodeCountdowns] = useState<Record<string, number>>({});
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -1759,12 +1822,16 @@ function AccountSecurityDetail({
   }, []);
 
   useEffect(() => {
-    if (codeCountdown <= 0) {
+    if (!Object.values(codeCountdowns).some((value) => value > 0)) {
       return;
     }
-    const timer = window.setTimeout(() => setCodeCountdown((value) => Math.max(0, value - 1)), 1000);
+    const timer = window.setTimeout(() => {
+      setCodeCountdowns((counts) => Object.fromEntries(
+        Object.entries(counts).map(([key, value]) => [key, Math.max(0, value - 1)])
+      ));
+    }, 1000);
     return () => window.clearTimeout(timer);
-  }, [codeCountdown]);
+  }, [codeCountdowns]);
 
   async function reload() {
     setLoading(true);
@@ -1776,13 +1843,20 @@ function AccountSecurityDetail({
       setEmail(nextAccount.email || '');
       setPhoneCountryCode(nextAccount.phoneCountryCode || '+86');
       setPhone(nextAccount.phone || '');
-      setVerificationCode('');
+      clearVerificationCodes();
       onAccountUpdated?.(nextAccount);
     } catch (err) {
       setMessage({ type: 'error', text: readSettingError(err) });
     } finally {
       setLoading(false);
     }
+  }
+
+  function clearVerificationCodes() {
+    setCurrentPhoneVerificationCode('');
+    setNewPhoneVerificationCode('');
+    setCurrentEmailVerificationCode('');
+    setNewEmailVerificationCode('');
   }
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
@@ -1795,15 +1869,32 @@ function AccountSecurityDetail({
       setMessage({ type: 'error', text: '请输入有效的邮箱地址' });
       return;
     }
+    const nextEmail = email.trim() || null;
+    const currentEmail = account?.email?.trim() || null;
+    const emailChanged = nextEmail !== currentEmail;
     const nextPhone = phone.trim();
     const nextPhoneCountryCode = normalizePhoneCountryCode(phoneCountryCode);
-    const phoneChanged = nextPhone !== (account?.phone || '') || nextPhoneCountryCode !== (account?.phoneCountryCode || '+86');
+    const currentPhone = account?.phone || '';
+    const currentPhoneCountryCode = normalizePhoneCountryCode(account?.phoneCountryCode || '+86');
+    const phoneChanged = nextPhone !== currentPhone || (nextPhone ? nextPhoneCountryCode !== currentPhoneCountryCode : Boolean(currentPhone));
     if (nextPhone && !isValidPhone(nextPhoneCountryCode, nextPhone)) {
       setMessage({ type: 'error', text: '请输入有效的手机号' });
       return;
     }
-    if (phoneChanged && nextPhone && !verificationCode.trim()) {
-      setMessage({ type: 'error', text: '请输入手机验证码' });
+    if (emailChanged && currentEmail && !currentEmailVerificationCode.trim()) {
+      setMessage({ type: 'error', text: '请输入当前邮箱验证码' });
+      return;
+    }
+    if (emailChanged && nextEmail && !newEmailVerificationCode.trim()) {
+      setMessage({ type: 'error', text: '请输入新邮箱验证码' });
+      return;
+    }
+    if (phoneChanged && currentPhone && !currentPhoneVerificationCode.trim()) {
+      setMessage({ type: 'error', text: '请输入当前手机号验证码' });
+      return;
+    }
+    if (phoneChanged && nextPhone && !newPhoneVerificationCode.trim()) {
+      setMessage({ type: 'error', text: '请输入新手机号验证码' });
       return;
     }
     setSaving(true);
@@ -1811,17 +1902,20 @@ function AccountSecurityDetail({
     try {
       const nextAccount = await updateAccountSecurity({
         displayName: displayName.trim(),
-        email: email.trim() || null,
+        email: nextEmail,
         phoneCountryCode: nextPhone ? nextPhoneCountryCode : null,
         phone: nextPhone || null,
-        verificationCode: phoneChanged && nextPhone ? verificationCode.trim() : null,
+        currentPhoneVerificationCode: phoneChanged && currentPhone ? currentPhoneVerificationCode.trim() : null,
+        newPhoneVerificationCode: phoneChanged && nextPhone ? newPhoneVerificationCode.trim() : null,
+        currentEmailVerificationCode: emailChanged && currentEmail ? currentEmailVerificationCode.trim() : null,
+        newEmailVerificationCode: emailChanged && nextEmail ? newEmailVerificationCode.trim() : null,
       });
       setAccount(nextAccount);
       setDisplayName(nextAccount.displayName || '');
       setEmail(nextAccount.email || '');
       setPhoneCountryCode(nextAccount.phoneCountryCode || '+86');
       setPhone(nextAccount.phone || '');
-      setVerificationCode('');
+      clearVerificationCodes();
       onAccountUpdated?.(nextAccount);
       setMessage({ type: 'success', text: '账号资料已更新' });
     } catch (err) {
@@ -1831,25 +1925,61 @@ function AccountSecurityDetail({
     }
   }
 
-  async function sendPhoneCode() {
-    const nextPhone = phone.trim();
-    const nextPhoneCountryCode = normalizePhoneCountryCode(phoneCountryCode);
-    if (!isValidPhone(nextPhoneCountryCode, nextPhone)) {
+  async function sendPhoneCode(target: 'currentPhone' | 'newPhone') {
+    const targetPhone = target === 'currentPhone' ? account?.phone || '' : phone.trim();
+    const targetPhoneCountryCode = target === 'currentPhone'
+      ? normalizePhoneCountryCode(account?.phoneCountryCode || '+86')
+      : normalizePhoneCountryCode(phoneCountryCode);
+    if (!isValidPhone(targetPhoneCountryCode, targetPhone)) {
       setMessage({ type: 'error', text: '请输入有效的手机号' });
       return;
     }
-    setCodeSending(true);
+    setCodeSending(target);
     setMessage(null);
     try {
-      const result = await sendPhoneVerificationCode(nextPhoneCountryCode, nextPhone);
-      setCodeCountdown(result.expiresInSeconds || 60);
+      const result = await sendPhoneVerificationCode(targetPhoneCountryCode, targetPhone);
+      setCodeCountdowns((counts) => ({ ...counts, [target]: result.expiresInSeconds || 60 }));
       setMessage({ type: 'success', text: '验证码已发送，请查收短信' });
     } catch (err) {
       setMessage({ type: 'error', text: readSettingError(err) });
     } finally {
-      setCodeSending(false);
+      setCodeSending(null);
     }
   }
+
+  async function sendEmailCode(target: 'currentEmail' | 'newEmail') {
+    const targetEmail = target === 'currentEmail' ? account?.email?.trim() || '' : email.trim();
+    if (!isValidEmail(targetEmail)) {
+      setMessage({ type: 'error', text: '请输入有效的邮箱地址' });
+      return;
+    }
+    setCodeSending(target);
+    setMessage(null);
+    try {
+      const result = await sendEmailVerificationCode(targetEmail);
+      setCodeCountdowns((counts) => ({ ...counts, [target]: result.expiresInSeconds || 60 }));
+      setMessage({ type: 'success', text: '验证码已发送，请查收邮箱' });
+    } catch (err) {
+      setMessage({ type: 'error', text: readSettingError(err) });
+    } finally {
+      setCodeSending(null);
+    }
+  }
+
+  function closeCountryPickerOnBlur(event: FocusEvent<HTMLElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setCountryPickerOpen(false);
+    }
+  }
+
+  const currentEmail = account?.email?.trim() || '';
+  const nextEmail = email.trim();
+  const emailChanged = nextEmail !== currentEmail;
+  const currentPhone = account?.phone || '';
+  const currentPhoneCountryCode = normalizePhoneCountryCode(account?.phoneCountryCode || '+86');
+  const nextPhone = phone.trim();
+  const nextPhoneCountryCode = normalizePhoneCountryCode(phoneCountryCode);
+  const phoneChanged = nextPhone !== currentPhone || (nextPhone ? nextPhoneCountryCode !== currentPhoneCountryCode : Boolean(currentPhone));
 
   async function savePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1899,75 +2029,142 @@ function AccountSecurityDetail({
           邮箱
           <input value={email} onChange={(event) => setEmail(event.target.value)} disabled={loading || saving} inputMode="email" />
         </label>
-        <label>
-          国际区号
-          <div className="settings-country-code-field">
-            <input
-              value={phoneCountryCode}
-              onFocus={() => setCountryPickerOpen(true)}
-              onChange={(event) => {
-                setPhoneCountryCode(event.target.value);
-                setCountrySearch(event.target.value);
-                setCountryPickerOpen(true);
-              }}
-              disabled={loading || saving}
-              inputMode="tel"
-            />
-            <button
-              type="button"
-              aria-label="选择国际区号"
-              onClick={() => setCountryPickerOpen((open) => !open)}
-              disabled={loading || saving}
-            />
-            {countryPickerOpen ? (
-              <div className="settings-country-code-panel">
-                <input
-                  value={countrySearch}
-                  onChange={(event) => setCountrySearch(event.target.value)}
-                  placeholder="搜索国家/地区或区号"
-                />
-                <div className="settings-country-code-list">
-                  {countryCodeOptions.map((option) => (
-                    <button
-                      key={`${option.code}-${option.label}`}
-                      type="button"
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        setPhoneCountryCode(option.code);
-                        setCountrySearch('');
-                        setCountryPickerOpen(false);
-                      }}
-                      onClick={() => setCountryPickerOpen(false)}
-                    >
-                      <strong>{option.code}</strong>
-                      <span>{option.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </label>
+        {emailChanged && currentEmail ? (
+          <label>
+            当前邮箱验证码
+            <div className="settings-code-field">
+              <input
+                value={currentEmailVerificationCode}
+                onChange={(event) => setCurrentEmailVerificationCode(event.target.value)}
+                disabled={loading || saving}
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="请输入当前邮箱验证码"
+              />
+              <button className="settings-code-button" type="button" onClick={() => sendEmailCode('currentEmail')} disabled={loading || saving || codeSending !== null || (codeCountdowns.currentEmail || 0) > 0}>
+                {(codeCountdowns.currentEmail || 0) > 0 ? `${codeCountdowns.currentEmail}s` : codeSending === 'currentEmail' ? '发送中' : '获取验证码'}
+              </button>
+            </div>
+          </label>
+        ) : null}
+        {emailChanged && nextEmail ? (
+          <label>
+            {currentEmail ? '新邮箱验证码' : '邮箱验证码'}
+            <div className="settings-code-field">
+              <input
+                value={newEmailVerificationCode}
+                onChange={(event) => setNewEmailVerificationCode(event.target.value)}
+                disabled={loading || saving}
+                inputMode="numeric"
+                maxLength={6}
+                placeholder={currentEmail ? '请输入新邮箱验证码' : '请输入邮箱验证码'}
+              />
+              <button className="settings-code-button" type="button" onClick={() => sendEmailCode('newEmail')} disabled={loading || saving || codeSending !== null || (codeCountdowns.newEmail || 0) > 0}>
+                {(codeCountdowns.newEmail || 0) > 0 ? `${codeCountdowns.newEmail}s` : codeSending === 'newEmail' ? '发送中' : '获取验证码'}
+              </button>
+            </div>
+          </label>
+        ) : null}
         <label>
           手机号
-          <input value={phone} onFocus={() => setCountryPickerOpen(false)} onChange={(event) => setPhone(event.target.value)} disabled={loading || saving} inputMode="tel" autoFocus={focusPhone} />
-        </label>
-        <label>
-          手机验证码
-          <div className="settings-code-field">
+          <div className="mobile-auth-input phone-auth-input settings-phone-auth-input">
+            <span className="country-code-control" onBlur={closeCountryPickerOnBlur}>
+              <input
+                className="country-code-input"
+                autoComplete="tel-country-code"
+                inputMode="tel"
+                value={phoneCountryCode}
+                onFocus={() => setCountryPickerOpen(true)}
+                onChange={(event) => {
+                  setPhoneCountryCode(event.target.value);
+                  setCountrySearch(event.target.value);
+                  setCountryPickerOpen(true);
+                }}
+                disabled={loading || saving}
+                aria-label="国际区号"
+              />
+              <button
+                type="button"
+                aria-label="选择国际区号"
+                onClick={() => setCountryPickerOpen((open) => !open)}
+                disabled={loading || saving}
+              />
+              {countryPickerOpen ? (
+                <div className="country-code-panel">
+                  <input
+                    value={countrySearch}
+                    onChange={(event) => setCountrySearch(event.target.value)}
+                    placeholder="搜索国家/地区或区号"
+                  />
+                  <div className="country-code-list">
+                    {countryCodeOptions.map((option) => (
+                      <button
+                        key={`${option.code}-${option.label}`}
+                        type="button"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          setPhoneCountryCode(option.code);
+                          setCountrySearch('');
+                          setCountryPickerOpen(false);
+                        }}
+                        onClick={() => setCountryPickerOpen(false)}
+                      >
+                        <strong>{option.code}</strong>
+                        <span>{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </span>
             <input
-              value={verificationCode}
-              onChange={(event) => setVerificationCode(event.target.value)}
+              value={phone}
+              onFocus={() => setCountryPickerOpen(false)}
+              onChange={(event) => setPhone(event.target.value)}
               disabled={loading || saving}
-              inputMode="numeric"
-              maxLength={6}
-              placeholder={phone.trim() === (account?.phone || '') && normalizePhoneCountryCode(phoneCountryCode) === (account?.phoneCountryCode || '+86') ? '手机号未变更可不填' : '请输入验证码'}
+              inputMode="tel"
+              autoComplete="tel"
+              autoFocus={focusPhone}
+              placeholder="请输入手机号"
             />
-            <button className="settings-code-button" type="button" onClick={sendPhoneCode} disabled={loading || saving || codeSending || codeCountdown > 0}>
-              {codeCountdown > 0 ? `${codeCountdown}s` : codeSending ? '发送中' : '获取验证码'}
-            </button>
           </div>
         </label>
+        {phoneChanged && currentPhone ? (
+          <label>
+            当前手机号验证码
+            <div className="settings-code-field">
+              <input
+                value={currentPhoneVerificationCode}
+                onChange={(event) => setCurrentPhoneVerificationCode(event.target.value)}
+                disabled={loading || saving}
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="请输入当前手机号验证码"
+              />
+              <button className="settings-code-button" type="button" onClick={() => sendPhoneCode('currentPhone')} disabled={loading || saving || codeSending !== null || (codeCountdowns.currentPhone || 0) > 0}>
+                {(codeCountdowns.currentPhone || 0) > 0 ? `${codeCountdowns.currentPhone}s` : codeSending === 'currentPhone' ? '发送中' : '获取验证码'}
+              </button>
+            </div>
+          </label>
+        ) : null}
+        {phoneChanged && nextPhone ? (
+          <label>
+            {currentPhone ? '新手机号验证码' : '手机验证码'}
+            <div className="settings-code-field">
+              <input
+                value={newPhoneVerificationCode}
+                onChange={(event) => setNewPhoneVerificationCode(event.target.value)}
+                disabled={loading || saving}
+                inputMode="numeric"
+                maxLength={6}
+                placeholder={currentPhone ? '请输入新手机号验证码' : '请输入手机验证码'}
+              />
+              <button className="settings-code-button" type="button" onClick={() => sendPhoneCode('newPhone')} disabled={loading || saving || codeSending !== null || (codeCountdowns.newPhone || 0) > 0}>
+                {(codeCountdowns.newPhone || 0) > 0 ? `${codeCountdowns.newPhone}s` : codeSending === 'newPhone' ? '发送中' : '获取验证码'}
+              </button>
+            </div>
+          </label>
+        ) : null}
         <button className="app-primary" type="submit" disabled={loading || saving}>
           {saving ? '保存中' : '保存资料'}
         </button>
@@ -2136,6 +2333,15 @@ function readSettingError(error: unknown) {
     }
     if (error.message === 'phone verification code is invalid') {
       return '验证码不正确';
+    }
+    if (error.message === 'email verification code is required') {
+      return '请输入邮箱验证码';
+    }
+    if (error.message === 'email verification code expired') {
+      return '邮箱验证码已过期，请重新获取';
+    }
+    if (error.message === 'email verification code is invalid') {
+      return '邮箱验证码不正确';
     }
     return error.message;
   }

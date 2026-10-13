@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FocusEvent, FormEvent, useState } from 'react';
 import { Check, ChevronLeft, Eye, EyeOff, KeyRound, LockKeyhole, Mail, MessageCircle } from 'lucide-react';
 import type { RegisterRequest } from '../types/api';
 import { COUNTRY_CALLING_CODE_OPTIONS } from '../constants/countryCallingCodes';
@@ -67,6 +67,12 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
     setFormError(null);
   }
 
+  function closeCountryPickerOnBlur(event: FocusEvent<HTMLElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setCountryPickerOpen(false);
+    }
+  }
+
   const isRegister = mode === 'register';
   const title = isRegister ? (method === 'phone' ? '手机号注册' : '邮箱注册') : '欢迎回来';
   const subtitle = isRegister
@@ -126,7 +132,7 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
         <form className="mobile-auth-form" onSubmit={handleSubmit}>
           <label className={`mobile-auth-input ${method === 'phone' ? 'phone-auth-input' : ''}`}>
             {method === 'phone' ? (
-              <span className="country-code-control">
+              <span className="country-code-control" onBlur={closeCountryPickerOnBlur}>
                 <input
                   className="country-code-input"
                   autoComplete="tel-country-code"

@@ -9,6 +9,8 @@ import com.kfpd.cloud.partner.pojo.vo.AccountSecurityUpdateVO;
 import com.kfpd.cloud.partner.pojo.vo.AccountSecurityVO;
 import com.kfpd.cloud.partner.pojo.vo.AppDocumentVO;
 import com.kfpd.cloud.partner.pojo.vo.AppVersionVO;
+import com.kfpd.cloud.partner.pojo.vo.EmailVerificationCodeVO;
+import com.kfpd.cloud.partner.pojo.vo.EmailVerificationSendVO;
 import com.kfpd.cloud.partner.pojo.vo.FavoriteItemVO;
 import com.kfpd.cloud.partner.pojo.vo.MembershipVO;
 import com.kfpd.cloud.partner.pojo.vo.NotificationSettingsUpdateVO;
@@ -81,6 +83,14 @@ public class UserController {
             @RequestBody PhoneVerificationSendVO request
     ) {
         return ApiResponse.success(userService.sendPhoneVerificationCode(username, request));
+    }
+
+    @PostMapping("/security/email/code")
+    public ApiResponse<EmailVerificationCodeVO> sendEmailVerificationCode(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+            @RequestBody EmailVerificationSendVO request
+    ) {
+        return ApiResponse.success(userService.sendEmailVerificationCode(username, request));
     }
 
     @PostMapping("/security/password")

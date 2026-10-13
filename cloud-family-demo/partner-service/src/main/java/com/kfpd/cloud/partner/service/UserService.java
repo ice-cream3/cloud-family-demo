@@ -4,6 +4,8 @@ import com.kfpd.cloud.partner.pojo.vo.AccountSecurityUpdateVO;
 import com.kfpd.cloud.partner.pojo.vo.AccountSecurityVO;
 import com.kfpd.cloud.partner.pojo.vo.AppDocumentVO;
 import com.kfpd.cloud.partner.pojo.vo.AppVersionVO;
+import com.kfpd.cloud.partner.pojo.vo.EmailVerificationCodeVO;
+import com.kfpd.cloud.partner.pojo.vo.EmailVerificationSendVO;
 import com.kfpd.cloud.partner.pojo.vo.FavoriteItemVO;
 import com.kfpd.cloud.partner.pojo.vo.MembershipVO;
 import com.kfpd.cloud.partner.pojo.vo.NotificationSettingsUpdateVO;
@@ -39,6 +41,8 @@ public interface UserService {
     AccountSecurityVO updateAccountSecurity(String username, AccountSecurityUpdateVO request);
 
     PhoneVerificationCodeVO sendPhoneVerificationCode(String username, PhoneVerificationSendVO request);
+
+    EmailVerificationCodeVO sendEmailVerificationCode(String username, EmailVerificationSendVO request);
 
     void changePassword(String username, PasswordChangeVO request);
 

@@ -23,6 +23,8 @@ import com.kfpd.cloud.partner.pojo.vo.AccountSecurityUpdateVO;
 import com.kfpd.cloud.partner.pojo.vo.AccountSecurityVO;
 import com.kfpd.cloud.partner.pojo.vo.AppDocumentVO;
 import com.kfpd.cloud.partner.pojo.vo.AppVersionVO;
+import com.kfpd.cloud.partner.pojo.vo.EmailVerificationCodeVO;
+import com.kfpd.cloud.partner.pojo.vo.EmailVerificationSendVO;
 import com.kfpd.cloud.partner.pojo.vo.FavoriteItemVO;
 import com.kfpd.cloud.partner.pojo.vo.MembershipVO;
 import com.kfpd.cloud.partner.pojo.vo.NotificationSettingsUpdateVO;
@@ -64,6 +66,9 @@ public class UserServiceImpl implements UserService {
     private static final Duration PHONE_CODE_TTL = Duration.ofMinutes(5);
     private static final SecureRandom PHONE_CODE_RANDOM = new SecureRandom();
     private static final Map<String, PhoneVerificationCode> PHONE_CODES = new ConcurrentHashMap<>();
+    private static final Duration EMAIL_CODE_TTL = Duration.ofMinutes(5);
+    private static final SecureRandom EMAIL_CODE_RANDOM = new SecureRandom();
+    private static final Map<String, EmailVerificationCode> EMAIL_CODES = new ConcurrentHashMap<>();
 
     private final VipUserDao vipUserDao;
     private final UserProfileFeatureDao userProfileFeatureDao;
@@ -119,17 +124,35 @@ public class UserServiceImpl implements UserService {
         if (email != null && !isValidEmail(email)) {
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "email format is invalid");
         }
+        String currentEmail = blankToNull(vipUser.getEmail());
+        boolean emailChanged = !sameNullable(email, currentEmail);
         if (email != null && vipUserDao.countByEmailExcludingUsername(email, username) > 0) {
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "email already exists");
         }
         String phone = normalizePhone(request.phone());
         String phoneCountryCode = normalizePhoneCountryCode(request.phoneCountryCode());
+        String currentPhone = normalizePhone(vipUser.getPhone());
+        String currentPhoneCountryCode = defaultPhoneCountryCode(vipUser.getPhoneCountryCode());
+        boolean phoneChanged = !sameNullable(phone, currentPhone) || (phone != null && !phoneCountryCode.equals(currentPhoneCountryCode));
         if (phone != null) {
             validatePhone(phoneCountryCode, phone);
             validatePhoneAvailable(phoneCountryCode, phone, username);
         }
-        if (phone != null && (!phone.equals(vipUser.getPhone()) || !phoneCountryCode.equals(defaultPhoneCountryCode(vipUser.getPhoneCountryCode())))) {
-            verifyPhoneCode(username, phoneCountryCode, phone, request.verificationCode());
+        if (emailChanged) {
+            if (currentEmail != null) {
+                verifyEmailCode(username, currentEmail, request.currentEmailVerificationCode());
+            }
+            if (email != null) {
+                verifyEmailCode(username, email, request.newEmailVerificationCode());
+            }
+        }
+        if (phoneChanged) {
+            if (currentPhone != null) {
+                verifyPhoneCode(username, currentPhoneCountryCode, currentPhone, request.currentPhoneVerificationCode());
+            }
+            if (phone != null) {
+                verifyPhoneCode(username, phoneCountryCode, phone, firstNonBlank(request.newPhoneVerificationCode(), request.verificationCode()));
+            }
         }
         vipUser.setDisplayName(request.displayName().trim());
         vipUser.setEmail(email);
@@ -156,6 +179,25 @@ public class UserServiceImpl implements UserService {
         PHONE_CODES.put(phoneCodeKey(username, phoneCountryCode, phone), new PhoneVerificationCode(code, Instant.now().plus(PHONE_CODE_TTL)));
         log.info("Phone verification code generated: username={}, phone={}, code={}", username, maskPhone(phoneCountryCode, phone), code);
         return new PhoneVerificationCodeVO(phoneCountryCode, phone, (int) PHONE_CODE_TTL.toSeconds());
+    }
+
+    @Override
+    public EmailVerificationCodeVO sendEmailVerificationCode(String username, EmailVerificationSendVO request) {
+        findCurrentVipUser(username);
+        if (request == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "request is required");
+        }
+        String email = blankToNull(request.email());
+        if (!isValidEmail(email)) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "email format is invalid");
+        }
+        if (vipUserDao.countByEmailExcludingUsername(email, username) > 0) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "email already exists");
+        }
+        String code = String.format("%06d", EMAIL_CODE_RANDOM.nextInt(1_000_000));
+        EMAIL_CODES.put(emailCodeKey(username, email), new EmailVerificationCode(code, Instant.now().plus(EMAIL_CODE_TTL)));
+        log.info("Email verification code generated: username={}, email={}, code={}", username, maskEmail(email), code);
+        return new EmailVerificationCodeVO(email, (int) EMAIL_CODE_TTL.toSeconds());
     }
 
     @Override
@@ -624,8 +666,29 @@ public class UserServiceImpl implements UserService {
         PHONE_CODES.remove(key);
     }
 
+    private void verifyEmailCode(String username, String email, String rawCode) {
+        String code = blankToNull(rawCode);
+        if (code == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "email verification code is required");
+        }
+        String key = emailCodeKey(username, email);
+        EmailVerificationCode savedCode = EMAIL_CODES.get(key);
+        if (savedCode == null || savedCode.expiresAt().isBefore(Instant.now())) {
+            EMAIL_CODES.remove(key);
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "email verification code expired");
+        }
+        if (!savedCode.code().equals(code)) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "email verification code is invalid");
+        }
+        EMAIL_CODES.remove(key);
+    }
+
     private String phoneCodeKey(String username, String phoneCountryCode, String phone) {
         return username + ":" + phoneCountryCode + phone;
+    }
+
+    private String emailCodeKey(String username, String email) {
+        return username + ":" + email;
     }
 
     private String maskPhone(String phoneCountryCode, String phone) {
@@ -634,6 +697,14 @@ public class UserServiceImpl implements UserService {
             return normalized;
         }
         return normalized.substring(0, 3) + "****" + normalized.substring(normalized.length() - 4);
+    }
+
+    private String maskEmail(String email) {
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 1) {
+            return "***" + email.substring(Math.max(atIndex, 0));
+        }
+        return email.charAt(0) + "***" + email.substring(atIndex);
     }
 
     private String normalizePhone(String phone) {
@@ -712,6 +783,15 @@ public class UserServiceImpl implements UserService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    private String firstNonBlank(String first, String second) {
+        String normalized = blankToNull(first);
+        return normalized == null ? blankToNull(second) : normalized;
+    }
+
+    private boolean sameNullable(String first, String second) {
+        return first == null ? second == null : first.equals(second);
+    }
+
     private boolean isStrongPassword(String value) {
         return value != null && value.matches("^(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{6,20}$");
     }
@@ -752,5 +832,8 @@ public class UserServiceImpl implements UserService {
     }
 
     private record PhoneVerificationCode(String code, Instant expiresAt) {
+    }
+
+    private record EmailVerificationCode(String code, Instant expiresAt) {
     }
 }

@@ -52,6 +52,10 @@ export type AccountSecurityUpdateRequest = {
   phoneCountryCode?: string | null;
   phone?: string | null;
   verificationCode?: string | null;
+  currentPhoneVerificationCode?: string | null;
+  newPhoneVerificationCode?: string | null;
+  currentEmailVerificationCode?: string | null;
+  newEmailVerificationCode?: string | null;
 };
 
 export type PasswordChangeRequest = {
@@ -62,6 +66,11 @@ export type PasswordChangeRequest = {
 export type PhoneVerificationCodeResponse = {
   phoneCountryCode: string;
   phone: string;
+  expiresInSeconds: number;
+};
+
+export type EmailVerificationCodeResponse = {
+  email: string;
   expiresInSeconds: number;
 };
 

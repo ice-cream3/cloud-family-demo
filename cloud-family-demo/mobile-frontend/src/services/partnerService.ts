@@ -3,6 +3,7 @@ import type {
   AccountSecurityUpdateRequest,
   AppDocument,
   AppVersion,
+  EmailVerificationCodeResponse,
   FavoriteItem,
   LoginResponse,
   Membership,
@@ -64,6 +65,12 @@ export function updateAccountSecurity(request: AccountSecurityUpdateRequest) {
 export function sendPhoneVerificationCode(phoneCountryCode: string, phone: string) {
   return post<PhoneVerificationCodeResponse>('/api/users/security/phone/code', {
     body: { phoneCountryCode, phone },
+  });
+}
+
+export function sendEmailVerificationCode(email: string) {
+  return post<EmailVerificationCodeResponse>('/api/users/security/email/code', {
+    body: { email },
   });
 }
 
