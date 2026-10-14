@@ -71,7 +71,7 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
       return;
     }
     setFormError(null);
-    if (!antiAbuseChallenge?.challengeId || selectedPatternValues.length !== 3) {
+    if (!antiAbuseChallenge?.challengeId || selectedPatternValues.length !== requiredPatternSelections) {
       setFormError('请先完成人机验证。');
       return;
     }
@@ -143,18 +143,19 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
     })
     .slice(0, 40);
   const selectedPatternValues = antiAbuseAnswer ? antiAbuseAnswer.split(',').filter(Boolean) : [];
+  const requiredPatternSelections = antiAbuseChallenge?.requiredSelectionCount || 3;
   const submitDisabled = loading
     || !username.trim()
     || !password
     || !agreed
     || (isRegister && (!code.trim() || password !== confirmPassword))
     || !antiAbuseChallenge
-    || selectedPatternValues.length !== 3;
+    || selectedPatternValues.length !== requiredPatternSelections;
 
   function selectPatternOption(value: string) {
     const nextValues = selectedPatternValues.includes(value)
       ? selectedPatternValues.filter((selectedValue) => selectedValue !== value)
-      : [...selectedPatternValues, value].slice(0, 3);
+      : [...selectedPatternValues, value].slice(0, requiredPatternSelections);
     setAntiAbuseAnswer(nextValues.join(','));
     setFormError(null);
   }

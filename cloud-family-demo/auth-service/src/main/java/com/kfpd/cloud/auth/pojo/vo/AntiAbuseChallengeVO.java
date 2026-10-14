@@ -7,6 +7,8 @@ public record AntiAbuseChallengeVO(
         String question,
         String questionImage,
         Integer expiresInSeconds,
+        String scheme,
+        Integer requiredSelectionCount,
         List<ChallengeOptionVO> options
 ) {
     public record ChallengeOptionVO(

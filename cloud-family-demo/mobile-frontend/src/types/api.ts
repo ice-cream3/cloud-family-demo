@@ -67,6 +67,8 @@ export type AntiAbuseChallenge = {
   question: string;
   questionImage?: string;
   expiresInSeconds: number;
+  scheme?: string;
+  requiredSelectionCount?: number;
   options?: AntiAbuseChallengeOption[];
 };
 

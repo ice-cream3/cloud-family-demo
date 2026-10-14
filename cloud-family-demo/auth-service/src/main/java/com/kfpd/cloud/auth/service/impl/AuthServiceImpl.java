@@ -83,6 +83,11 @@ public class AuthServiceImpl implements AuthService {
     private static final String LOGIN_RESULT_FAILURE = "FAILURE";
     private static final String CHALLENGE_PURPOSE_API_LOGIN = "api_login";
     private static final String CHALLENGE_PURPOSE_API_REGISTER = "api_register";
+    private static final List<ChallengeScheme> CHALLENGE_SCHEMES = List.of(
+            new ChallengeScheme("graphic_set", 3, false, "请选择:"),
+            new ChallengeScheme("graphic_sequence", 3, true, "按顺序选择:"),
+            new ChallengeScheme("graphic_pair", 2, false, "请选择:")
+    );
     private static final Duration LOGIN_CHALLENGE_TTL = Duration.ofMinutes(3);
     private static final Map<String, LoginChallenge> LOGIN_CHALLENGES = new ConcurrentHashMap<>();
     private static final List<String> READABLE_SHAPE_CLIP_PATHS = List.of(
@@ -231,11 +236,12 @@ public class AuthServiceImpl implements AuthService {
     public AntiAbuseChallengeVO createLoginChallenge(String purpose, LoginRequestContext context) {
         String normalizedPurpose = normalizeChallengePurpose(purpose);
         pruneExpiredLoginChallenges();
+        ChallengeScheme scheme = randomChallengeScheme();
         List<LoginChallengeOption> options = buildChallengeOptions();
         List<LoginChallengeOption> targets = new ArrayList<>(options);
         Collections.shuffle(targets);
-        targets = targets.subList(0, 3);
-        String question = "请选择:";
+        targets = targets.subList(0, scheme.requiredSelectionCount());
+        String question = scheme.prompt();
         String answer = targets.stream()
                 .map(LoginChallengeOption::value)
                 .reduce((first, second) -> first + "," + second)
@@ -245,6 +251,7 @@ public class AuthServiceImpl implements AuthService {
                 answer,
                 normalizedPurpose,
                 contextFingerprint(context),
+                scheme.ordered(),
                 Instant.now().plus(LOGIN_CHALLENGE_TTL)
         ));
         List<ChallengeOptionVO> challengeOptions = options.stream()
@@ -258,8 +265,10 @@ public class AuthServiceImpl implements AuthService {
         return new AntiAbuseChallengeVO(
                 challengeId,
                 question,
-                buildQuestionImage(targets),
+                buildQuestionImage(targets, scheme),
                 (int) LOGIN_CHALLENGE_TTL.toSeconds(),
+                scheme.value(),
+                scheme.requiredSelectionCount(),
                 challengeOptions
         );
     }
@@ -1026,7 +1035,7 @@ public class AuthServiceImpl implements AuthService {
             LOGIN_CHALLENGES.remove(normalizedChallengeId);
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification is invalid");
         }
-        if (!matchesLoginChallengeAnswer(challenge.answer(), answer)) {
+        if (!matchesLoginChallengeAnswer(challenge.answer(), answer, challenge.ordered())) {
             LOGIN_CHALLENGES.remove(normalizedChallengeId);
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification is invalid");
         }
@@ -1050,9 +1059,13 @@ public class AuthServiceImpl implements AuthService {
         return (clientIp == null ? "" : clientIp) + "|" + (userAgent == null ? "" : userAgent);
     }
 
-    private boolean matchesLoginChallengeAnswer(String expectedAnswer, String answer) {
-        List<String> expected = Arrays.stream(expectedAnswer.split(",")).sorted().toList();
-        List<String> actual = Arrays.stream(answer.split(",")).filter(value -> !value.isBlank()).sorted().toList();
+    private boolean matchesLoginChallengeAnswer(String expectedAnswer, String answer, boolean ordered) {
+        List<String> expected = Arrays.stream(expectedAnswer.split(",")).filter(value -> !value.isBlank()).toList();
+        List<String> actual = Arrays.stream(answer.split(",")).filter(value -> !value.isBlank()).toList();
+        if (!ordered) {
+            expected = expected.stream().sorted().toList();
+            actual = actual.stream().sorted().toList();
+        }
         return expected.equals(actual);
     }
 
@@ -1064,19 +1077,32 @@ public class AuthServiceImpl implements AuthService {
         return ThreadLocalRandom.current().nextBoolean() ? "solid" : "outline";
     }
 
-    private String buildQuestionImage(List<LoginChallengeOption> targets) {
+    private ChallengeScheme randomChallengeScheme() {
+        return CHALLENGE_SCHEMES.get(ThreadLocalRandom.current().nextInt(CHALLENGE_SCHEMES.size()));
+    }
+
+    private String buildQuestionImage(List<LoginChallengeOption> targets, ChallengeScheme scheme) {
         StringBuilder svg = new StringBuilder();
         String antiForgeryCode = randomAntiForgeryCode();
-        svg.append("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"214\" height=\"42\" viewBox=\"0 0 214 42\">");
-        svg.append("<rect width=\"214\" height=\"42\" rx=\"8\" fill=\"#f7f9ff\"/>");
+        svg.append("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"240\" height=\"42\" viewBox=\"0 0 240 42\">");
+        svg.append("<rect width=\"240\" height=\"42\" rx=\"8\" fill=\"#f7f9ff\"/>");
         appendQuestionImageNoise(svg, antiForgeryCode);
-        svg.append("<text x=\"10\" y=\"25\" font-size=\"14\" font-weight=\"700\" fill=\"#245bff\">请选择:</text>");
-        int x = 78;
+        svg.append("<text x=\"10\" y=\"25\" font-size=\"14\" font-weight=\"700\" fill=\"#245bff\">")
+                .append(scheme.prompt())
+                .append("</text>");
+        int x = scheme.ordered() ? 116 : 78;
+        int index = 1;
         for (LoginChallengeOption target : targets) {
+            if (scheme.ordered()) {
+                svg.append("<text x=\"").append(x - 15).append("\" y=\"25\" font-size=\"10\" font-weight=\"800\" fill=\"#245bff\">")
+                        .append(index)
+                        .append("</text>");
+            }
             appendSvgShape(svg, target.shapeClipPath(), target.color(), target.fillMode(), x, 21, 9);
             x += 28;
+            index++;
         }
-        svg.append("<text x=\"158\" y=\"26\" font-size=\"11\" font-weight=\"700\" fill=\"#7f8da8\" opacity=\"0.62\" transform=\"rotate(-8 158 26)\">")
+        svg.append("<text x=\"194\" y=\"26\" font-size=\"11\" font-weight=\"700\" fill=\"#7f8da8\" opacity=\"0.62\" transform=\"rotate(-8 194 26)\">")
                 .append(antiForgeryCode)
                 .append("</text>");
         svg.append("</svg>");
@@ -1281,7 +1307,10 @@ public class AuthServiceImpl implements AuthService {
     private record LoginAttempt(int failedCount, LocalDateTime lockedUntil) {
     }
 
-    private record LoginChallenge(String answer, String purpose, String contextFingerprint, Instant expiresAt) {
+    private record LoginChallenge(String answer, String purpose, String contextFingerprint, boolean ordered, Instant expiresAt) {
+    }
+
+    private record ChallengeScheme(String value, int requiredSelectionCount, boolean ordered, String prompt) {
     }
 
     private List<LoginChallengeOption> buildChallengeOptions() {
