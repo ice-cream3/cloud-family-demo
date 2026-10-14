@@ -5,5 +5,10 @@ import jakarta.validation.constraints.NotBlank;
 /**
  * Login credentials shared by API and manager login endpoints.
  */
-public record LoginVO(@NotBlank String username, @NotBlank String password) {
+public record LoginVO(
+        @NotBlank String username,
+        @NotBlank String password,
+        String antiAbuseChallengeId,
+        String antiAbuseAnswer
+) {
 }

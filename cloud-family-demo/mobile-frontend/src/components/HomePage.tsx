@@ -40,6 +40,7 @@ import type { AppDocument, FavoriteItem, Membership, PartnerHealth, ProfileDynam
 import type { AccountSecurity } from '../types/api';
 import {
   changeAccountPassword,
+  createAccountSecurityChallenge,
   loadAccountSecurity,
   loadAppDocument,
   loadAppVersion,
@@ -1788,6 +1789,7 @@ function AccountSecurityDetail({
   focusPhone?: boolean;
   onAccountUpdated?: (account: AccountSecurity) => void;
 }) {
+  type AccountFieldErrorKey = 'displayName' | 'email' | 'phone' | 'currentEmailCode' | 'newEmailCode' | 'currentPhoneCode' | 'newPhoneCode' | 'antiAbuse' | 'currentPassword' | 'newPassword' | 'confirmPassword';
   const [account, setAccount] = useState<AccountSecurity | null>(null);
   const [displayName, setDisplayName] = useState(fallbackDisplayName);
   const [email, setEmail] = useState('');
@@ -1804,9 +1806,13 @@ function AccountSecurityDetail({
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [antiAbuseChallenge, setAntiAbuseChallenge] = useState<{ challengeId: string; question: string; expiresInSeconds: number } | null>(null);
+  const [antiAbuseAnswer, setAntiAbuseAnswer] = useState('');
+  const [antiAbuseLoading, setAntiAbuseLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<AccountFieldErrorKey, string>>>({});
   const countryCodeOptions = COUNTRY_CALLING_CODE_OPTIONS
     .filter((option) => {
       const keyword = countrySearch.trim().toLowerCase();
@@ -1819,6 +1825,7 @@ function AccountSecurityDetail({
 
   useEffect(() => {
     void reload();
+    void reloadAntiAbuseChallenge();
   }, []);
 
   useEffect(() => {
@@ -1836,6 +1843,7 @@ function AccountSecurityDetail({
   async function reload() {
     setLoading(true);
     setMessage(null);
+    setFieldErrors({});
     try {
       const nextAccount = await loadAccountSecurity();
       setAccount(nextAccount);
@@ -1852,6 +1860,18 @@ function AccountSecurityDetail({
     }
   }
 
+  async function reloadAntiAbuseChallenge() {
+    setAntiAbuseLoading(true);
+    try {
+      setAntiAbuseChallenge(await createAccountSecurityChallenge());
+      setAntiAbuseAnswer('');
+    } catch (err) {
+      setMessage({ type: 'error', text: readSettingError(err) });
+    } finally {
+      setAntiAbuseLoading(false);
+    }
+  }
+
   function clearVerificationCodes() {
     setCurrentPhoneVerificationCode('');
     setNewPhoneVerificationCode('');
@@ -1859,14 +1879,62 @@ function AccountSecurityDetail({
     setNewEmailVerificationCode('');
   }
 
+  function clearFieldError(key: AccountFieldErrorKey) {
+    setFieldErrors((errors) => ({ ...errors, [key]: undefined }));
+  }
+
+  function showFieldError(key: AccountFieldErrorKey, text: string) {
+    setMessage(null);
+    setFieldErrors((errors) => ({ ...errors, [key]: text }));
+  }
+
+  function showServerFieldError(error: unknown) {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+    const message = error.message;
+    if (message === 'email already exists' || message === 'email format is invalid') {
+      showFieldError('email', readSettingError(error));
+      return true;
+    }
+    if (message === 'phone format is invalid' || message === 'phone already exists') {
+      showFieldError('phone', readSettingError(error));
+      return true;
+    }
+    if (message === 'phone verification code is required' || message === 'phone verification code expired' || message === 'phone verification code is invalid') {
+      const key = phoneChanged && currentPhone ? 'currentPhoneCode' : 'newPhoneCode';
+      showFieldError(key, readSettingError(error));
+      return true;
+    }
+    if (message === 'email verification code is required' || message === 'email verification code expired' || message === 'email verification code is invalid') {
+      const key = emailChanged && currentEmail ? 'currentEmailCode' : 'newEmailCode';
+      showFieldError(key, readSettingError(error));
+      return true;
+    }
+    if (message === 'anti abuse verification is required' || message === 'anti abuse verification expired' || message === 'anti abuse verification is invalid') {
+      showFieldError('antiAbuse', readSettingError(error));
+      return true;
+    }
+    if (message === 'Current password is incorrect') {
+      showFieldError('currentPassword', readSettingError(error));
+      return true;
+    }
+    if (message === 'newPassword is not strong enough') {
+      showFieldError('newPassword', readSettingError(error));
+      return true;
+    }
+    return false;
+  }
+
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setFieldErrors({});
     if (!displayName.trim()) {
-      setMessage({ type: 'error', text: '请输入显示名称' });
+      showFieldError('displayName', '请输入显示名称');
       return;
     }
     if (email.trim() && !isValidEmail(email.trim())) {
-      setMessage({ type: 'error', text: '请输入有效的邮箱地址' });
+      showFieldError('email', '请输入有效的邮箱地址');
       return;
     }
     const nextEmail = email.trim() || null;
@@ -1878,23 +1946,27 @@ function AccountSecurityDetail({
     const currentPhoneCountryCode = normalizePhoneCountryCode(account?.phoneCountryCode || '+86');
     const phoneChanged = nextPhone !== currentPhone || (nextPhone ? nextPhoneCountryCode !== currentPhoneCountryCode : Boolean(currentPhone));
     if (nextPhone && !isValidPhone(nextPhoneCountryCode, nextPhone)) {
-      setMessage({ type: 'error', text: '请输入有效的手机号' });
+      showFieldError('phone', '请输入有效的手机号');
       return;
     }
     if (emailChanged && currentEmail && !currentEmailVerificationCode.trim()) {
-      setMessage({ type: 'error', text: '请输入当前邮箱验证码' });
+      showFieldError('currentEmailCode', '请输入当前邮箱验证码');
       return;
     }
     if (emailChanged && nextEmail && !newEmailVerificationCode.trim()) {
-      setMessage({ type: 'error', text: '请输入新邮箱验证码' });
+      showFieldError('newEmailCode', '请输入新邮箱验证码');
       return;
     }
     if (phoneChanged && currentPhone && !currentPhoneVerificationCode.trim()) {
-      setMessage({ type: 'error', text: '请输入当前手机号验证码' });
+      showFieldError('currentPhoneCode', '请输入当前手机号验证码');
       return;
     }
     if (phoneChanged && nextPhone && !newPhoneVerificationCode.trim()) {
-      setMessage({ type: 'error', text: '请输入新手机号验证码' });
+      showFieldError('newPhoneCode', '请输入新手机号验证码');
+      return;
+    }
+    if (!antiAbuseChallenge?.challengeId || !antiAbuseAnswer.trim()) {
+      showFieldError('antiAbuse', '请先完成人机验证');
       return;
     }
     setSaving(true);
@@ -1909,6 +1981,8 @@ function AccountSecurityDetail({
         newPhoneVerificationCode: phoneChanged && nextPhone ? newPhoneVerificationCode.trim() : null,
         currentEmailVerificationCode: emailChanged && currentEmail ? currentEmailVerificationCode.trim() : null,
         newEmailVerificationCode: emailChanged && nextEmail ? newEmailVerificationCode.trim() : null,
+        antiAbuseChallengeId: antiAbuseChallenge.challengeId,
+        antiAbuseAnswer: antiAbuseAnswer.trim(),
       });
       setAccount(nextAccount);
       setDisplayName(nextAccount.displayName || '');
@@ -1916,10 +1990,15 @@ function AccountSecurityDetail({
       setPhoneCountryCode(nextAccount.phoneCountryCode || '+86');
       setPhone(nextAccount.phone || '');
       clearVerificationCodes();
+      setFieldErrors({});
+      await reloadAntiAbuseChallenge();
       onAccountUpdated?.(nextAccount);
       setMessage({ type: 'success', text: '账号资料已更新' });
     } catch (err) {
-      setMessage({ type: 'error', text: readSettingError(err) });
+      if (!showServerFieldError(err)) {
+        setMessage({ type: 'error', text: readSettingError(err) });
+      }
+      void reloadAntiAbuseChallenge();
     } finally {
       setSaving(false);
     }
@@ -1931,7 +2010,7 @@ function AccountSecurityDetail({
       ? normalizePhoneCountryCode(account?.phoneCountryCode || '+86')
       : normalizePhoneCountryCode(phoneCountryCode);
     if (!isValidPhone(targetPhoneCountryCode, targetPhone)) {
-      setMessage({ type: 'error', text: '请输入有效的手机号' });
+      showFieldError('phone', '请输入有效的手机号');
       return;
     }
     setCodeSending(target);
@@ -1950,7 +2029,7 @@ function AccountSecurityDetail({
   async function sendEmailCode(target: 'currentEmail' | 'newEmail') {
     const targetEmail = target === 'currentEmail' ? account?.email?.trim() || '' : email.trim();
     if (!isValidEmail(targetEmail)) {
-      setMessage({ type: 'error', text: '请输入有效的邮箱地址' });
+      showFieldError('email', '请输入有效的邮箱地址');
       return;
     }
     setCodeSending(target);
@@ -1983,16 +2062,17 @@ function AccountSecurityDetail({
 
   async function savePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setFieldErrors({});
     if (!currentPassword || !newPassword) {
-      setMessage({ type: 'error', text: '请输入当前密码和新密码' });
+      showFieldError(!currentPassword ? 'currentPassword' : 'newPassword', '请输入当前密码和新密码');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setMessage({ type: 'error', text: '两次输入的新密码不一致' });
+      showFieldError('confirmPassword', '两次输入的新密码不一致');
       return;
     }
     if (!isStrongPassword(newPassword)) {
-      setMessage({ type: 'error', text: '新密码需为 6-20 位，并包含数字、大小写字母和特殊字符' });
+      showFieldError('newPassword', '新密码需为 6-20 位，并包含数字、大小写字母和特殊字符');
       return;
     }
     setSaving(true);
@@ -2002,9 +2082,12 @@ function AccountSecurityDetail({
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setFieldErrors({});
       setMessage({ type: 'success', text: '密码已修改' });
     } catch (err) {
-      setMessage({ type: 'error', text: readSettingError(err) });
+      if (!showServerFieldError(err)) {
+        setMessage({ type: 'error', text: readSettingError(err) });
+      }
     } finally {
       setSaving(false);
     }
@@ -2023,11 +2106,19 @@ function AccountSecurityDetail({
         <h2>基础信息</h2>
         <label>
           显示名称
-          <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} disabled={loading || saving} />
+          <input value={displayName} onChange={(event) => {
+            setDisplayName(event.target.value);
+            clearFieldError('displayName');
+          }} disabled={loading || saving} />
+          {fieldErrors.displayName ? <small className="settings-field-error">{fieldErrors.displayName}</small> : null}
         </label>
         <label>
           邮箱
-          <input value={email} onChange={(event) => setEmail(event.target.value)} disabled={loading || saving} inputMode="email" />
+          <input value={email} onChange={(event) => {
+            setEmail(event.target.value);
+            clearFieldError('email');
+          }} disabled={loading || saving} inputMode="email" />
+          {fieldErrors.email ? <small className="settings-field-error">{fieldErrors.email}</small> : null}
         </label>
         {emailChanged && currentEmail ? (
           <label>
@@ -2035,7 +2126,10 @@ function AccountSecurityDetail({
             <div className="settings-code-field">
               <input
                 value={currentEmailVerificationCode}
-                onChange={(event) => setCurrentEmailVerificationCode(event.target.value)}
+                onChange={(event) => {
+                  setCurrentEmailVerificationCode(event.target.value);
+                  clearFieldError('currentEmailCode');
+                }}
                 disabled={loading || saving}
                 inputMode="numeric"
                 maxLength={6}
@@ -2045,6 +2139,7 @@ function AccountSecurityDetail({
                 {(codeCountdowns.currentEmail || 0) > 0 ? `${codeCountdowns.currentEmail}s` : codeSending === 'currentEmail' ? '发送中' : '获取验证码'}
               </button>
             </div>
+            {fieldErrors.currentEmailCode ? <small className="settings-field-error">{fieldErrors.currentEmailCode}</small> : null}
           </label>
         ) : null}
         {emailChanged && nextEmail ? (
@@ -2053,7 +2148,10 @@ function AccountSecurityDetail({
             <div className="settings-code-field">
               <input
                 value={newEmailVerificationCode}
-                onChange={(event) => setNewEmailVerificationCode(event.target.value)}
+                onChange={(event) => {
+                  setNewEmailVerificationCode(event.target.value);
+                  clearFieldError('newEmailCode');
+                }}
                 disabled={loading || saving}
                 inputMode="numeric"
                 maxLength={6}
@@ -2063,6 +2161,7 @@ function AccountSecurityDetail({
                 {(codeCountdowns.newEmail || 0) > 0 ? `${codeCountdowns.newEmail}s` : codeSending === 'newEmail' ? '发送中' : '获取验证码'}
               </button>
             </div>
+            {fieldErrors.newEmailCode ? <small className="settings-field-error">{fieldErrors.newEmailCode}</small> : null}
           </label>
         ) : null}
         <label>
@@ -2079,6 +2178,7 @@ function AccountSecurityDetail({
                   setPhoneCountryCode(event.target.value);
                   setCountrySearch(event.target.value);
                   setCountryPickerOpen(true);
+                  clearFieldError('phone');
                 }}
                 disabled={loading || saving}
                 aria-label="国际区号"
@@ -2120,7 +2220,10 @@ function AccountSecurityDetail({
             <input
               value={phone}
               onFocus={() => setCountryPickerOpen(false)}
-              onChange={(event) => setPhone(event.target.value)}
+              onChange={(event) => {
+                setPhone(event.target.value);
+                clearFieldError('phone');
+              }}
               disabled={loading || saving}
               inputMode="tel"
               autoComplete="tel"
@@ -2128,6 +2231,7 @@ function AccountSecurityDetail({
               placeholder="请输入手机号"
             />
           </div>
+          {fieldErrors.phone ? <small className="settings-field-error">{fieldErrors.phone}</small> : null}
         </label>
         {phoneChanged && currentPhone ? (
           <label>
@@ -2135,7 +2239,10 @@ function AccountSecurityDetail({
             <div className="settings-code-field">
               <input
                 value={currentPhoneVerificationCode}
-                onChange={(event) => setCurrentPhoneVerificationCode(event.target.value)}
+                onChange={(event) => {
+                  setCurrentPhoneVerificationCode(event.target.value);
+                  clearFieldError('currentPhoneCode');
+                }}
                 disabled={loading || saving}
                 inputMode="numeric"
                 maxLength={6}
@@ -2145,6 +2252,7 @@ function AccountSecurityDetail({
                 {(codeCountdowns.currentPhone || 0) > 0 ? `${codeCountdowns.currentPhone}s` : codeSending === 'currentPhone' ? '发送中' : '获取验证码'}
               </button>
             </div>
+            {fieldErrors.currentPhoneCode ? <small className="settings-field-error">{fieldErrors.currentPhoneCode}</small> : null}
           </label>
         ) : null}
         {phoneChanged && nextPhone ? (
@@ -2153,7 +2261,10 @@ function AccountSecurityDetail({
             <div className="settings-code-field">
               <input
                 value={newPhoneVerificationCode}
-                onChange={(event) => setNewPhoneVerificationCode(event.target.value)}
+                onChange={(event) => {
+                  setNewPhoneVerificationCode(event.target.value);
+                  clearFieldError('newPhoneCode');
+                }}
                 disabled={loading || saving}
                 inputMode="numeric"
                 maxLength={6}
@@ -2163,8 +2274,29 @@ function AccountSecurityDetail({
                 {(codeCountdowns.newPhone || 0) > 0 ? `${codeCountdowns.newPhone}s` : codeSending === 'newPhone' ? '发送中' : '获取验证码'}
               </button>
             </div>
+            {fieldErrors.newPhoneCode ? <small className="settings-field-error">{fieldErrors.newPhoneCode}</small> : null}
           </label>
         ) : null}
+        <label>
+          人机验证
+          <div className="settings-anti-abuse-field">
+            <span>{antiAbuseChallenge?.question || '加载中'}</span>
+            <input
+              value={antiAbuseAnswer}
+              onChange={(event) => {
+                setAntiAbuseAnswer(event.target.value);
+                clearFieldError('antiAbuse');
+              }}
+              disabled={loading || saving || antiAbuseLoading || !antiAbuseChallenge}
+              inputMode="numeric"
+              placeholder="答案"
+            />
+            <button type="button" onClick={reloadAntiAbuseChallenge} disabled={loading || saving || antiAbuseLoading}>
+              {antiAbuseLoading ? '刷新中' : '换一题'}
+            </button>
+          </div>
+          {fieldErrors.antiAbuse ? <small className="settings-field-error">{fieldErrors.antiAbuse}</small> : null}
+        </label>
         <button className="app-primary" type="submit" disabled={loading || saving}>
           {saving ? '保存中' : '保存资料'}
         </button>
@@ -2174,15 +2306,27 @@ function AccountSecurityDetail({
         <h2>修改密码</h2>
         <label>
           当前密码
-          <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} disabled={saving} autoComplete="current-password" />
+          <input type="password" value={currentPassword} onChange={(event) => {
+            setCurrentPassword(event.target.value);
+            clearFieldError('currentPassword');
+          }} disabled={saving} autoComplete="current-password" />
+          {fieldErrors.currentPassword ? <small className="settings-field-error">{fieldErrors.currentPassword}</small> : null}
         </label>
         <label>
           新密码
-          <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} disabled={saving} autoComplete="new-password" />
+          <input type="password" value={newPassword} onChange={(event) => {
+            setNewPassword(event.target.value);
+            clearFieldError('newPassword');
+          }} disabled={saving} autoComplete="new-password" />
+          {fieldErrors.newPassword ? <small className="settings-field-error">{fieldErrors.newPassword}</small> : null}
         </label>
         <label>
           确认新密码
-          <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} disabled={saving} autoComplete="new-password" />
+          <input type="password" value={confirmPassword} onChange={(event) => {
+            setConfirmPassword(event.target.value);
+            clearFieldError('confirmPassword');
+          }} disabled={saving} autoComplete="new-password" />
+          {fieldErrors.confirmPassword ? <small className="settings-field-error">{fieldErrors.confirmPassword}</small> : null}
         </label>
         <button className="app-primary" type="submit" disabled={saving}>
           {saving ? '提交中' : '修改密码'}
@@ -2342,6 +2486,15 @@ function readSettingError(error: unknown) {
     }
     if (error.message === 'email verification code is invalid') {
       return '邮箱验证码不正确';
+    }
+    if (error.message === 'anti abuse verification is required') {
+      return '请先完成人机验证';
+    }
+    if (error.message === 'anti abuse verification expired') {
+      return '人机验证已过期，请重新验证';
+    }
+    if (error.message === 'anti abuse verification is invalid') {
+      return '人机验证答案不正确';
     }
     return error.message;
   }

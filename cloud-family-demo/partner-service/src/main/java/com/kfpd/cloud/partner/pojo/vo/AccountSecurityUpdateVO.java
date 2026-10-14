@@ -9,6 +9,8 @@ public record AccountSecurityUpdateVO(
         String currentPhoneVerificationCode,
         String newPhoneVerificationCode,
         String currentEmailVerificationCode,
-        String newEmailVerificationCode
+        String newEmailVerificationCode,
+        String antiAbuseChallengeId,
+        String antiAbuseAnswer
 ) {
 }

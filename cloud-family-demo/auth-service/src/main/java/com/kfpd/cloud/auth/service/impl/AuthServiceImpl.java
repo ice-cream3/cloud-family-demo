@@ -4,7 +4,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +16,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,6 +33,8 @@ import com.kfpd.cloud.auth.pojo.entity.PartnerLoginLog;
 import com.kfpd.cloud.auth.pojo.vo.LoginVO;
 import com.kfpd.cloud.auth.pojo.dto.LoginResponse;
 import com.kfpd.cloud.auth.pojo.dto.RedisLoginSession;
+import com.kfpd.cloud.auth.pojo.vo.AntiAbuseChallengeVO;
+import com.kfpd.cloud.auth.pojo.vo.AntiAbuseChallengeVO.ChallengeOptionVO;
 import com.kfpd.cloud.auth.pojo.vo.KickOutVO;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
 import com.kfpd.cloud.auth.pojo.vo.RegisterVO;
@@ -73,6 +80,49 @@ public class AuthServiceImpl implements AuthService {
     private static final String MANAGER_LOGIN_PERMISSION = "manager:login";
     private static final String LOGIN_RESULT_SUCCESS = "SUCCESS";
     private static final String LOGIN_RESULT_FAILURE = "FAILURE";
+    private static final String CHALLENGE_PURPOSE_API_LOGIN = "api_login";
+    private static final String CHALLENGE_PURPOSE_API_REGISTER = "api_register";
+    private static final Duration LOGIN_CHALLENGE_TTL = Duration.ofMinutes(3);
+    private static final Map<String, LoginChallenge> LOGIN_CHALLENGES = new ConcurrentHashMap<>();
+    private static final List<PatternShape> LOGIN_PATTERN_SHAPES = List.of(
+            new PatternShape("shape-01", "圆形"),
+            new PatternShape("shape-02", "方形"),
+            new PatternShape("shape-03", "三角形"),
+            new PatternShape("shape-04", "菱形"),
+            new PatternShape("shape-05", "五边形"),
+            new PatternShape("shape-06", "六边形"),
+            new PatternShape("shape-07", "八边形"),
+            new PatternShape("shape-08", "星形"),
+            new PatternShape("shape-09", "十字形"),
+            new PatternShape("shape-10", "盾形"),
+            new PatternShape("shape-11", "梯形"),
+            new PatternShape("shape-12", "平行四边形"),
+            new PatternShape("shape-13", "不规则图案A"),
+            new PatternShape("shape-14", "不规则图案B"),
+            new PatternShape("shape-15", "不规则图案C"),
+            new PatternShape("shape-16", "不规则图案D"),
+            new PatternShape("shape-17", "不规则图案E"),
+            new PatternShape("shape-18", "不规则图案F"),
+            new PatternShape("shape-19", "不规则图案G"),
+            new PatternShape("shape-20", "不规则图案H"),
+            new PatternShape("shape-21", "不规则图案I"),
+            new PatternShape("shape-22", "不规则图案J"),
+            new PatternShape("shape-23", "不规则图案K"),
+            new PatternShape("shape-24", "不规则图案L"),
+            new PatternShape("shape-25", "不规则图案M"),
+            new PatternShape("shape-26", "不规则图案N"),
+            new PatternShape("shape-27", "不规则图案O"),
+            new PatternShape("shape-28", "不规则图案P"),
+            new PatternShape("shape-29", "不规则图案Q"),
+            new PatternShape("shape-30", "不规则图案R")
+    );
+    private static final List<PatternColor> LOGIN_PATTERN_COLORS = List.of(
+            new PatternColor("blue", "蓝色", "#2563eb"),
+            new PatternColor("green", "绿色", "#059669"),
+            new PatternColor("orange", "橙色", "#ea580c"),
+            new PatternColor("purple", "紫色", "#7c3aed"),
+            new PatternColor("red", "红色", "#dc2626")
+    );
 
     // Demo rate-limit storage. Replace with database/cache backed storage in production.
     private final Map<String, LoginAttempt> apiLoginAttempts = new ConcurrentHashMap<>();
@@ -124,6 +174,7 @@ public class AuthServiceImpl implements AuthService {
         String clientIp = context.clientIp();
         String attemptKey = request.username() + "@" + clientIp;
         log.info("API login attempt: username={}, clientIp={}", request.username(), clientIp);
+        verifyLoginChallenge(request.antiAbuseChallengeId(), request.antiAbuseAnswer(), CHALLENGE_PURPOSE_API_LOGIN, context);
         assertApiLoginNotLocked(attemptKey);
 
         Optional<AuthLoginAccount> account = Optional.ofNullable(loginAccountDao.findApiByUsername(request.username()));
@@ -147,6 +198,7 @@ public class AuthServiceImpl implements AuthService {
         requireRegisterText(request.username(), "username is required");
         requireRegisterText(request.password(), "password is required");
         requireRegisterText(request.displayName(), "displayName is required");
+        verifyLoginChallenge(request.antiAbuseChallengeId(), request.antiAbuseAnswer(), CHALLENGE_PURPOSE_API_REGISTER, context);
         String username = request.username().trim();
         if (loginAccountDao.countApiByUsername(username) > 0) {
             log.warn("API register rejected: username={}, reason=duplicate_username", username);
@@ -166,7 +218,53 @@ public class AuthServiceImpl implements AuthService {
                 phone
         );
         log.info("API user registered: username={}, clientIp={}", username, context.clientIp());
-        return apiLogin(new LoginVO(username, request.password()), context);
+        AuthLoginAccount account = loginAccountDao.findApiByUsername(username);
+        if (account == null) {
+            log.error("API register login failed: username={}, reason=created_account_not_found", username);
+            throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, "created account not found");
+        }
+        return login(account, AuthOAuth2JdbcConfig.API_CLIENT_ID, AuthOAuth2JdbcConfig.API_LOGIN_GRANT_TYPE, context);
+    }
+
+    @Override
+    public AntiAbuseChallengeVO createLoginChallenge(String purpose, LoginRequestContext context) {
+        String normalizedPurpose = normalizeChallengePurpose(purpose);
+        pruneExpiredLoginChallenges();
+        List<PatternOption> candidates = buildPatternOptions();
+        Collections.shuffle(candidates);
+        List<LoginChallengeOption> options = candidates.subList(0, 9).stream()
+                .map(option -> new LoginChallengeOption(
+                        randomChallengeOptionValue(),
+                        option.label(),
+                        option.shape(),
+                        option.color()
+                ))
+                .toList();
+        List<LoginChallengeOption> targets = new ArrayList<>(options);
+        Collections.shuffle(targets);
+        targets = targets.subList(0, 3);
+        String question = "请选择:";
+        String answer = targets.stream()
+                .map(LoginChallengeOption::value)
+                .reduce((first, second) -> first + "," + second)
+                .orElse("");
+        String challengeId = UUID.randomUUID().toString();
+        LOGIN_CHALLENGES.put(challengeId, new LoginChallenge(
+                answer,
+                normalizedPurpose,
+                contextFingerprint(context),
+                Instant.now().plus(LOGIN_CHALLENGE_TTL)
+        ));
+        List<ChallengeOptionVO> challengeOptions = options.stream()
+                .map(option -> new ChallengeOptionVO(option.value(), option.shape(), option.color()))
+                .toList();
+        return new AntiAbuseChallengeVO(
+                challengeId,
+                question,
+                buildQuestionImage(targets),
+                (int) LOGIN_CHALLENGE_TTL.toSeconds(),
+                challengeOptions
+        );
     }
 
     @Override
@@ -913,6 +1011,167 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    private void verifyLoginChallenge(String challengeId, String rawAnswer, String purpose, LoginRequestContext context) {
+        String normalizedChallengeId = blankToNull(challengeId);
+        String answer = blankToNull(rawAnswer);
+        if (answer != null) {
+            answer = answer.replaceAll("\\s+", "");
+        }
+        if (normalizedChallengeId == null || answer == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification is required");
+        }
+        LoginChallenge challenge = LOGIN_CHALLENGES.get(normalizedChallengeId);
+        if (challenge == null || challenge.expiresAt().isBefore(Instant.now())) {
+            LOGIN_CHALLENGES.remove(normalizedChallengeId);
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification expired");
+        }
+        if (!challenge.purpose().equals(purpose) || !challenge.contextFingerprint().equals(contextFingerprint(context))) {
+            LOGIN_CHALLENGES.remove(normalizedChallengeId);
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification is invalid");
+        }
+        if (!matchesLoginChallengeAnswer(challenge.answer(), answer)) {
+            LOGIN_CHALLENGES.remove(normalizedChallengeId);
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification is invalid");
+        }
+        LOGIN_CHALLENGES.remove(normalizedChallengeId);
+    }
+
+    private String normalizeChallengePurpose(String purpose) {
+        String normalized = blankToNull(purpose);
+        if (normalized == null || CHALLENGE_PURPOSE_API_LOGIN.equals(normalized)) {
+            return CHALLENGE_PURPOSE_API_LOGIN;
+        }
+        if (CHALLENGE_PURPOSE_API_REGISTER.equals(normalized)) {
+            return CHALLENGE_PURPOSE_API_REGISTER;
+        }
+        throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification purpose is invalid");
+    }
+
+    private String contextFingerprint(LoginRequestContext context) {
+        String clientIp = context == null ? null : blankToNull(context.clientIp());
+        String userAgent = context == null ? null : blankToNull(context.userAgent());
+        return (clientIp == null ? "" : clientIp) + "|" + (userAgent == null ? "" : userAgent);
+    }
+
+    private boolean matchesLoginChallengeAnswer(String expectedAnswer, String answer) {
+        List<String> expected = Arrays.stream(expectedAnswer.split(",")).sorted().toList();
+        List<String> actual = Arrays.stream(answer.split(",")).filter(value -> !value.isBlank()).sorted().toList();
+        return expected.equals(actual);
+    }
+
+    private String randomChallengeOptionValue() {
+        return UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private String buildQuestionImage(List<LoginChallengeOption> targets) {
+        StringBuilder svg = new StringBuilder();
+        String antiForgeryCode = randomAntiForgeryCode();
+        svg.append("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"214\" height=\"42\" viewBox=\"0 0 214 42\">");
+        svg.append("<rect width=\"214\" height=\"42\" rx=\"8\" fill=\"#f7f9ff\"/>");
+        appendQuestionImageNoise(svg, antiForgeryCode);
+        svg.append("<text x=\"10\" y=\"25\" font-size=\"14\" font-weight=\"700\" fill=\"#245bff\">请选择:</text>");
+        int x = 78;
+        for (LoginChallengeOption target : targets) {
+            appendSvgShape(svg, target.shape(), target.color(), x, 21, 9);
+            x += 28;
+        }
+        svg.append("<text x=\"158\" y=\"26\" font-size=\"11\" font-weight=\"700\" fill=\"#7f8da8\" opacity=\"0.62\" transform=\"rotate(-8 158 26)\">")
+                .append(antiForgeryCode)
+                .append("</text>");
+        svg.append("</svg>");
+        return "data:image/svg+xml;base64," + Base64.getEncoder().encodeToString(svg.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String randomAntiForgeryCode() {
+        String alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        StringBuilder code = new StringBuilder(5);
+        for (int i = 0; i < 5; i++) {
+            code.append(alphabet.charAt(random.nextInt(alphabet.length())));
+        }
+        return code.toString();
+    }
+
+    private void appendQuestionImageNoise(StringBuilder svg, String antiForgeryCode) {
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        for (int i = 0; i < 6; i++) {
+            svg.append("<line x1=\"").append(random.nextInt(4, 210))
+                    .append("\" y1=\"").append(random.nextInt(5, 38))
+                    .append("\" x2=\"").append(random.nextInt(4, 210))
+                    .append("\" y2=\"").append(random.nextInt(5, 38))
+                    .append("\" stroke=\"#9fb0cc\" stroke-width=\"")
+                    .append(random.nextBoolean() ? "0.7" : "0.45")
+                    .append("\" opacity=\"0.26\"/>");
+        }
+        for (int i = 0; i < 18; i++) {
+            svg.append("<circle cx=\"").append(random.nextInt(4, 210))
+                    .append("\" cy=\"").append(random.nextInt(4, 38))
+                    .append("\" r=\"").append(random.nextBoolean() ? "0.9" : "0.55")
+                    .append("\" fill=\"#8da0bf\" opacity=\"0.26\"/>");
+        }
+        svg.append("<text x=\"20\" y=\"37\" font-size=\"8\" font-weight=\"700\" fill=\"#9fb0cc\" opacity=\"0.18\" transform=\"rotate(-6 20 37)\">")
+                .append(antiForgeryCode)
+                .append("</text>");
+    }
+
+    private void appendSvgShape(StringBuilder svg, String shape, String color, int cx, int cy, int size) {
+        String safeColor = color == null ? "#245bff" : color;
+        String points = switch (shape) {
+            case "shape-01" -> "50% 0%,75% 7%,93% 25%,100% 50%,93% 75%,75% 93%,50% 100%,25% 93%,7% 75%,0% 50%,7% 25%,25% 7%";
+            case "shape-02" -> "0% 0%,100% 0%,100% 100%,0% 100%";
+            case "shape-03" -> "50% 4%,96% 94%,4% 94%";
+            case "shape-04" -> "50% 0%,100% 50%,50% 100%,0% 50%";
+            case "shape-05" -> "50% 0%,98% 36%,80% 100%,20% 100%,2% 36%";
+            case "shape-06" -> "25% 6%,75% 6%,100% 50%,75% 94%,25% 94%,0% 50%";
+            case "shape-07" -> "30% 0%,70% 0%,100% 30%,100% 70%,70% 100%,30% 100%,0% 70%,0% 30%";
+            case "shape-08" -> "50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%";
+            case "shape-09" -> "36% 0%,64% 0%,64% 36%,100% 36%,100% 64%,64% 64%,64% 100%,36% 100%,36% 64%,0% 64%,0% 36%,36% 36%";
+            case "shape-10" -> "50% 0%,92% 18%,86% 66%,50% 100%,14% 66%,8% 18%";
+            case "shape-11" -> "18% 8%,82% 8%,100% 92%,0% 92%";
+            case "shape-12" -> "25% 0%,100% 0%,75% 100%,0% 100%";
+            case "shape-14" -> "50% 3%,88% 18%,78% 55%,95% 86%,55% 78%,23% 96%,6% 58%,20% 18%";
+            case "shape-15" -> "44% 0%,74% 12%,95% 44%,76% 72%,40% 96%,8% 78%,16% 42%,4% 12%";
+            case "shape-16" -> "26% 10%,62% 0%,92% 24%,82% 62%,98% 92%,54% 86%,20% 100%,0% 54%";
+            case "shape-17" -> "52% 6%,94% 10%,82% 42%,100% 72%,65% 92%,30% 84%,0% 96%,12% 48%,2% 18%";
+            case "shape-18" -> "38% 2%,70% 16%,96% 8%,88% 48%,100% 86%,58% 96%,24% 78%,2% 88%,14% 42%,0% 12%";
+            case "shape-19" -> "48% 4%,90% 0%,78% 32%,96% 58%,68% 94%,34% 86%,8% 100%,0% 54%,18% 20%";
+            case "shape-20" -> "20% 4%,58% 12%,92% 2%,100% 40%,76% 64%,84% 100%,44% 88%,8% 96%,0% 42%";
+            case "shape-21" -> "42% 0%,84% 16%,100% 52%,70% 68%,76% 98%,36% 86%,2% 100%,12% 56%,0% 22%";
+            case "shape-22" -> "56% 0%,98% 20%,84% 46%,100% 82%,62% 88%,28% 100%,0% 70%,18% 38%,6% 8%";
+            case "shape-23" -> "32% 0%,66% 8%,88% 0%,100% 44%,82% 78%,46% 100%,14% 86%,0% 48%,12% 18%";
+            case "shape-24" -> "52% 0%,82% 24%,100% 18%,90% 64%,56% 78%,42% 100%,8% 82%,0% 38%,24% 28%";
+            case "shape-25" -> "40% 4%,80% 0%,96% 34%,82% 58%,100% 94%,54% 86%,22% 100%,0% 62%,8% 18%";
+            case "shape-26" -> "58% 2%,92% 12%,86% 46%,100% 74%,72% 100%,38% 82%,0% 94%,12% 48%,4% 18%";
+            case "shape-27" -> "44% 8%,76% 0%,100% 32%,88% 70%,60% 66%,44% 100%,16% 80%,0% 46%,18% 20%";
+            case "shape-28" -> "30% 2%,70% 8%,96% 24%,78% 50%,100% 78%,62% 94%,20% 100%,0% 66%,12% 30%";
+            case "shape-29" -> "50% 0%,86% 8%,78% 36%,100% 58%,84% 94%,48% 82%,12% 100%,0% 54%,20% 24%";
+            case "shape-30" -> "24% 0%,62% 10%,96% 0%,84% 36%,100% 70%,64% 76%,36% 100%,6% 86%,0% 38%";
+            default -> "50% 0%,84% 12%,100% 48%,78% 82%,42% 100%,10% 78%,0% 34%,24% 8%";
+        };
+        svg.append("<polygon points=\"")
+                .append(scalePolygonPoints(points, cx, cy, size))
+                .append("\" fill=\"").append(safeColor).append("\"/>");
+    }
+
+    private String scalePolygonPoints(String points, int cx, int cy, int size) {
+        return Arrays.stream(points.split(","))
+                .map(point -> {
+                    String[] xy = point.trim().split("% ");
+                    double px = Double.parseDouble(xy[0]) / 100d;
+                    double py = Double.parseDouble(xy[1].replace("%", "")) / 100d;
+                    int x = (int) Math.round(cx + ((px - 0.5d) * size * 2));
+                    int y = (int) Math.round(cy + ((py - 0.5d) * size * 2));
+                    return x + "," + y;
+                })
+                .reduce((first, second) -> first + " " + second)
+                .orElse("");
+    }
+
+    private void pruneExpiredLoginChallenges() {
+        Instant now = Instant.now();
+        LOGIN_CHALLENGES.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(now));
+    }
+
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
@@ -1048,5 +1307,35 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private record LoginAttempt(int failedCount, LocalDateTime lockedUntil) {
+    }
+
+    private record LoginChallenge(String answer, String purpose, String contextFingerprint, Instant expiresAt) {
+    }
+
+    private List<PatternOption> buildPatternOptions() {
+        List<PatternOption> options = new ArrayList<>();
+        for (PatternColor color : LOGIN_PATTERN_COLORS) {
+            for (PatternShape shape : LOGIN_PATTERN_SHAPES) {
+                options.add(new PatternOption(
+                        color.value() + "-" + shape.value(),
+                        color.label() + shape.label(),
+                        shape.value(),
+                        color.hex()
+                ));
+            }
+        }
+        return options;
+    }
+
+    private record PatternOption(String value, String label, String shape, String color) {
+    }
+
+    private record LoginChallengeOption(String value, String label, String shape, String color) {
+    }
+
+    private record PatternShape(String value, String label) {
+    }
+
+    private record PatternColor(String value, String label, String hex) {
     }
 }

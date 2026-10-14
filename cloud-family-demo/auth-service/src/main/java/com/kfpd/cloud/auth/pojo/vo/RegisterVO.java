@@ -11,6 +11,8 @@ public record RegisterVO(
         @NotBlank String displayName,
         String email,
         String phoneCountryCode,
-        String phone
+        String phone,
+        String antiAbuseChallengeId,
+        String antiAbuseAnswer
 ) {
 }

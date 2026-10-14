@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { KeyRound, LockKeyhole, LogIn, Network, ServerCog, ShieldCheck, UserRound } from 'lucide-react';
+import { Activity, Cpu, KeyRound, LockKeyhole, LogIn, Network, ServerCog, ShieldCheck, UserRound, Zap } from 'lucide-react';
 import type { LoginMode } from '../types/api';
 
 type LoginPanelProps = {
@@ -21,6 +21,11 @@ export function LoginPanel({ loading, error, onLogin }: LoginPanelProps) {
     <main className="login-surface">
       <section className="login-panel" aria-label="登录">
         <div className="login-visual" aria-hidden="true">
+          <div className="tech-orbit one" />
+          <div className="tech-orbit two" />
+          <div className="tech-node node-a" />
+          <div className="tech-node node-b" />
+          <div className="tech-node node-c" />
           <div className="login-brand">
             <div className="icon-box login-logo">
               <KeyRound size={24} />
@@ -34,6 +39,11 @@ export function LoginPanel({ loading, error, onLogin }: LoginPanelProps) {
             <p className="login-kicker">Secure access console</p>
             <h1>统一管理端业务入口</h1>
             <p>面向管理端的轻量控制台，集中呈现认证、网关转发、系统菜单和业务管理能力。</p>
+            <div className="login-signal-row">
+              <span><Activity size={15} /> Live telemetry</span>
+              <span><Cpu size={15} /> 24 services online</span>
+              <span><Zap size={15} /> 12ms gateway</span>
+            </div>
           </div>
           <div className="login-status-grid">
             <div>

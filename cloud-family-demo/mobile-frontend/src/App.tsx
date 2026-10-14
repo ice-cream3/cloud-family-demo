@@ -31,11 +31,17 @@ export default function App() {
     return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
   }, []);
 
-  async function handleLogin(username: string, password: string, remember: boolean) {
+  async function handleLogin(
+    username: string,
+    password: string,
+    remember: boolean,
+    antiAbuseChallengeId?: string,
+    antiAbuseAnswer?: string,
+  ) {
     setLoading(true);
     setError(null);
     try {
-      setSession(await loginPartner(username, password, remember));
+      setSession(await loginPartner(username, password, remember, antiAbuseChallengeId, antiAbuseAnswer));
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -121,6 +127,15 @@ function formatApiErrorMessage(message: string) {
   }
   if (message === 'phone already exists') {
     return '该手机号已被占用，请联系客服处理';
+  }
+  if (message === 'anti abuse verification is required') {
+    return '请先完成人机验证';
+  }
+  if (message === 'anti abuse verification expired') {
+    return '人机验证已过期，请重新验证';
+  }
+  if (message === 'anti abuse verification is invalid') {
+    return '人机验证答案不正确';
   }
   return message;
 }

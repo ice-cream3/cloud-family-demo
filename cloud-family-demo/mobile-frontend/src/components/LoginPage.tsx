@@ -1,12 +1,19 @@
-import { FocusEvent, FormEvent, useState } from 'react';
+import { FocusEvent, FormEvent, useEffect, useState } from 'react';
 import { Check, ChevronLeft, Eye, EyeOff, KeyRound, LockKeyhole, Mail, MessageCircle } from 'lucide-react';
-import type { RegisterRequest } from '../types/api';
+import type { AntiAbuseChallenge, RegisterRequest } from '../types/api';
 import { COUNTRY_CALLING_CODE_OPTIONS } from '../constants/countryCallingCodes';
+import { createLoginChallenge } from '../services/partnerService';
 
 type LoginPageProps = {
   loading: boolean;
   error: string | null;
-  onLogin: (username: string, password: string, remember: boolean) => Promise<void>;
+  onLogin: (
+    username: string,
+    password: string,
+    remember: boolean,
+    antiAbuseChallengeId?: string,
+    antiAbuseAnswer?: string,
+  ) => Promise<void>;
   onRegister: (request: RegisterRequest) => Promise<void>;
 };
 
@@ -25,9 +32,34 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [code, setCode] = useState('');
+  const [antiAbuseChallenge, setAntiAbuseChallenge] = useState<AntiAbuseChallenge | null>(null);
+  const [antiAbuseAnswer, setAntiAbuseAnswer] = useState('');
+  const [antiAbuseLoading, setAntiAbuseLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [agreed, setAgreed] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void reloadLoginChallenge(mode === 'register' ? 'api_register' : 'api_login');
+  }, [mode]);
+
+  useEffect(() => {
+    if (error) {
+      void reloadLoginChallenge(mode === 'register' ? 'api_register' : 'api_login');
+    }
+  }, [error, mode]);
+
+  async function reloadLoginChallenge(purpose: 'api_login' | 'api_register' = mode === 'register' ? 'api_register' : 'api_login') {
+    setAntiAbuseLoading(true);
+    try {
+      setAntiAbuseChallenge(await createLoginChallenge(purpose));
+      setAntiAbuseAnswer('');
+    } catch (err) {
+      setFormError(readAuthFormError(err));
+    } finally {
+      setAntiAbuseLoading(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,6 +71,10 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
       return;
     }
     setFormError(null);
+    if (!antiAbuseChallenge?.challengeId || selectedPatternValues.length !== 3) {
+      setFormError('请先完成人机验证。');
+      return;
+    }
     if (mode === 'register') {
       const request: RegisterRequest = {
         username: account,
@@ -47,11 +83,27 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
         email: method === 'email' ? account : undefined,
         phoneCountryCode: method === 'phone' ? normalizedCountryCode : undefined,
         phone: method === 'phone' ? account : undefined,
+        antiAbuseChallengeId: antiAbuseChallenge.challengeId,
+        antiAbuseAnswer: antiAbuseAnswer.trim(),
       };
-      await onRegister(request);
+      try {
+        await onRegister(request);
+      } catch {
+        void reloadLoginChallenge('api_register');
+      }
       return;
     }
-    await onLogin(method === 'phone' ? `${normalizedCountryCode}${account}` : account, password, rememberMe);
+    try {
+      await onLogin(
+        method === 'phone' ? `${normalizedCountryCode}${account}` : account,
+        password,
+        rememberMe,
+        antiAbuseChallenge.challengeId,
+        antiAbuseAnswer.trim(),
+      );
+    } catch {
+      void reloadLoginChallenge();
+    }
     if (!rememberMe) {
       setPassword('');
     }
@@ -64,6 +116,8 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
     setPasswordVisible(false);
     setConfirmPasswordVisible(false);
     setCode('');
+    setAntiAbuseAnswer('');
+    setAntiAbuseChallenge(null);
     setFormError(null);
   }
 
@@ -88,11 +142,22 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
       return option.code.includes(keyword) || option.label.toLowerCase().includes(keyword);
     })
     .slice(0, 40);
+  const selectedPatternValues = antiAbuseAnswer ? antiAbuseAnswer.split(',').filter(Boolean) : [];
   const submitDisabled = loading
     || !username.trim()
     || !password
     || !agreed
-    || (isRegister && (!code.trim() || password !== confirmPassword));
+    || (isRegister && (!code.trim() || password !== confirmPassword))
+    || !antiAbuseChallenge
+    || selectedPatternValues.length !== 3;
+
+  function selectPatternOption(value: string) {
+    const nextValues = selectedPatternValues.includes(value)
+      ? selectedPatternValues.filter((selectedValue) => selectedValue !== value)
+      : [...selectedPatternValues, value].slice(0, 3);
+    setAntiAbuseAnswer(nextValues.join(','));
+    setFormError(null);
+  }
 
   return (
     <main className="mobile-login-shell">
@@ -238,6 +303,37 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
           </label>
           <p className="mobile-auth-hint">密码需为 6-20 位，包含数字、大小写字母和特殊字符。</p>
 
+          <div className="mobile-auth-pattern">
+            <div className="auth-pattern-head">
+              <span>
+                {antiAbuseChallenge?.questionImage ? (
+                  <img className="auth-pattern-question-image" src={antiAbuseChallenge.questionImage} alt="请选择目标图形" />
+                ) : (antiAbuseChallenge?.question || '加载中')}
+              </span>
+              <button className="code-button" type="button" onClick={() => reloadLoginChallenge()} disabled={antiAbuseLoading}>
+                {antiAbuseLoading ? '刷新中' : '换一组'}
+              </button>
+            </div>
+            <div className="auth-pattern-options" role="group" aria-label="人机验证图案">
+              {(antiAbuseChallenge?.options || []).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={selectedPatternValues.includes(option.value) ? 'active' : ''}
+                  onClick={() => selectPatternOption(option.value)}
+                  disabled={antiAbuseLoading}
+                  role="checkbox"
+                  aria-checked={selectedPatternValues.includes(option.value)}
+                  aria-label="验证选项"
+                >
+                  <span
+                    className={`auth-pattern-shape shape-${option.shape}`}
+                    style={{ backgroundColor: option.color }}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
           {isRegister ? (
             <label className="mobile-auth-input">
               <LockKeyhole size={17} />
@@ -369,6 +465,22 @@ function validateAuthForm(method: AuthMethod, account: string, password: string,
     return '两次输入的密码不一致。';
   }
   return null;
+}
+
+function readAuthFormError(error: unknown) {
+  if (error instanceof Error) {
+    if (error.message === 'anti abuse verification is required') {
+      return '请先完成人机验证。';
+    }
+    if (error.message === 'anti abuse verification expired') {
+      return '人机验证已过期，请重新验证。';
+    }
+    if (error.message === 'anti abuse verification is invalid') {
+      return '人机验证答案不正确。';
+    }
+    return error.message;
+  }
+  return '操作失败。';
 }
 
 function isValidPhone(phoneCountryCode: string, phone: string) {

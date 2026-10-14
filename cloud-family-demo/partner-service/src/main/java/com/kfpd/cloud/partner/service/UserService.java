@@ -2,6 +2,7 @@ package com.kfpd.cloud.partner.service;
 
 import com.kfpd.cloud.partner.pojo.vo.AccountSecurityUpdateVO;
 import com.kfpd.cloud.partner.pojo.vo.AccountSecurityVO;
+import com.kfpd.cloud.partner.pojo.vo.AntiAbuseChallengeVO;
 import com.kfpd.cloud.partner.pojo.vo.AppDocumentVO;
 import com.kfpd.cloud.partner.pojo.vo.AppVersionVO;
 import com.kfpd.cloud.partner.pojo.vo.EmailVerificationCodeVO;
@@ -39,6 +40,8 @@ public interface UserService {
     AccountSecurityVO accountSecurity(String username);
 
     AccountSecurityVO updateAccountSecurity(String username, AccountSecurityUpdateVO request);
+
+    AntiAbuseChallengeVO createAccountSecurityChallenge(String username);
 
     PhoneVerificationCodeVO sendPhoneVerificationCode(String username, PhoneVerificationSendVO request);
 

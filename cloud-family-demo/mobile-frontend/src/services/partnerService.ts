@@ -1,6 +1,7 @@
 import type {
   AccountSecurity,
   AccountSecurityUpdateRequest,
+  AntiAbuseChallenge,
   AppDocument,
   AppVersion,
   EmailVerificationCodeResponse,
@@ -24,10 +25,16 @@ import type {
 import { post } from './apiClient';
 import { clearSession, saveSession } from './tokenStore';
 
-export async function loginPartner(username: string, password: string, remember = true) {
+export async function loginPartner(
+  username: string,
+  password: string,
+  remember = true,
+  antiAbuseChallengeId?: string,
+  antiAbuseAnswer?: string,
+) {
   const response = await post<LoginResponse>('/auth/api/login', {
     auth: false,
-    body: { username, password },
+    body: { username, password, antiAbuseChallengeId, antiAbuseAnswer },
   });
   return saveSession(response, remember);
 }
@@ -38,6 +45,13 @@ export async function registerPartner(request: RegisterRequest) {
     body: request,
   });
   return saveSession(response);
+}
+
+export function createLoginChallenge(purpose: 'api_login' | 'api_register' = 'api_login') {
+  return post<AntiAbuseChallenge>('/auth/api/login/challenge', {
+    auth: false,
+    body: { purpose },
+  });
 }
 
 export async function logoutPartner() {
@@ -60,6 +74,10 @@ export function updateAccountSecurity(request: AccountSecurityUpdateRequest) {
   return post<AccountSecurity>('/api/users/security/update', {
     body: request,
   });
+}
+
+export function createAccountSecurityChallenge() {
+  return post<AntiAbuseChallenge>('/api/users/security/challenge');
 }
 
 export function sendPhoneVerificationCode(phoneCountryCode: string, phone: string) {

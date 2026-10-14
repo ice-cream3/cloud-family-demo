@@ -24,6 +24,8 @@ export type RegisterRequest = {
   email?: string;
   phoneCountryCode?: string;
   phone?: string;
+  antiAbuseChallengeId?: string;
+  antiAbuseAnswer?: string;
 };
 
 export type UserProfile = {
@@ -56,6 +58,22 @@ export type AccountSecurityUpdateRequest = {
   newPhoneVerificationCode?: string | null;
   currentEmailVerificationCode?: string | null;
   newEmailVerificationCode?: string | null;
+  antiAbuseChallengeId?: string | null;
+  antiAbuseAnswer?: string | null;
+};
+
+export type AntiAbuseChallenge = {
+  challengeId: string;
+  question: string;
+  questionImage?: string;
+  expiresInSeconds: number;
+  options?: AntiAbuseChallengeOption[];
+};
+
+export type AntiAbuseChallengeOption = {
+  value: string;
+  shape: string;
+  color?: string;
 };
 
 export type PasswordChangeRequest = {

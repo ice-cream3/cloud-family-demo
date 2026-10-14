@@ -3429,6 +3429,38 @@ img {
   background: #f3f6fb;
 }
 
+.settings-anti-abuse-field {
+  display: grid;
+  grid-template-columns: minmax(74px, auto) minmax(0, 1fr) 72px;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-anti-abuse-field span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  color: #245bff;
+  background: #f5f8ff;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.settings-anti-abuse-field button {
+  height: 42px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  color: #475569;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 850;
+}
+
 .settings-message {
   padding: 11px 12px;
   border-radius: 8px;
@@ -3446,6 +3478,13 @@ img {
   border-color: #fecaca;
   color: #b42318;
   background: #fff1f0;
+}
+
+.settings-field-error {
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
 }
 
 .settings-switch-row {
@@ -4035,6 +4074,164 @@ img {
   font-weight: 850;
 }
 
+.mobile-auth-challenge {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.auth-challenge-question {
+  min-width: 68px;
+  color: #245bff;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.mobile-auth-pattern {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e1e7ff;
+  border-radius: 18px;
+  background: #f7f9ff;
+}
+
+.auth-pattern-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 22px;
+}
+
+.auth-pattern-head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: #245bff;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.auth-pattern-inline-targets {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.auth-pattern-inline-targets i {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.auth-pattern-question-image {
+  display: block;
+  width: 214px;
+  max-width: 100%;
+  height: 42px;
+  object-fit: contain;
+}
+
+.auth-pattern-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.auth-pattern-options button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 1px solid #dbe3ff;
+  border-radius: 14px;
+  color: #111827;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(36, 91, 255, 0.08);
+}
+
+.auth-pattern-options button.active {
+  color: #245bff;
+  border-color: #245bff;
+  background: #eef3ff;
+  box-shadow: 0 0 0 3px rgba(36, 91, 255, 0.14);
+}
+
+.auth-pattern-shape {
+  display: block;
+  width: 32px;
+  height: 32px;
+}
+
+.auth-pattern-shape.shape-shape-01 { clip-path: polygon(50% 0%, 75% 7%, 93% 25%, 100% 50%, 93% 75%, 75% 93%, 50% 100%, 25% 93%, 7% 75%, 0% 50%, 7% 25%, 25% 7%); }
+
+.auth-pattern-shape.shape-shape-02 { clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%); }
+
+.auth-pattern-shape.shape-shape-03 { clip-path: polygon(50% 4%, 96% 94%, 4% 94%); }
+
+.auth-pattern-shape.shape-shape-04 { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+
+.auth-pattern-shape.shape-shape-05 { clip-path: polygon(50% 0%, 98% 36%, 80% 100%, 20% 100%, 2% 36%); }
+
+.auth-pattern-shape.shape-shape-06 { clip-path: polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0% 50%); }
+
+.auth-pattern-shape.shape-shape-07 { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
+
+.auth-pattern-shape.shape-shape-08 { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+
+.auth-pattern-shape.shape-shape-09 { clip-path: polygon(36% 0%, 64% 0%, 64% 36%, 100% 36%, 100% 64%, 64% 64%, 64% 100%, 36% 100%, 36% 64%, 0% 64%, 0% 36%, 36% 36%); }
+
+.auth-pattern-shape.shape-shape-10 { clip-path: polygon(50% 0%, 92% 18%, 86% 66%, 50% 100%, 14% 66%, 8% 18%); }
+
+.auth-pattern-shape.shape-shape-11 { clip-path: polygon(18% 8%, 82% 8%, 100% 92%, 0% 92%); }
+
+.auth-pattern-shape.shape-shape-12 { clip-path: polygon(25% 0%, 100% 0%, 75% 100%, 0% 100%); }
+
+.auth-pattern-shape.shape-shape-13 { clip-path: polygon(50% 0%, 84% 12%, 100% 48%, 78% 82%, 42% 100%, 10% 78%, 0% 34%, 24% 8%); }
+
+.auth-pattern-shape.shape-shape-14 { clip-path: polygon(50% 3%, 88% 18%, 78% 55%, 95% 86%, 55% 78%, 23% 96%, 6% 58%, 20% 18%); }
+
+.auth-pattern-shape.shape-shape-15 { clip-path: polygon(44% 0%, 74% 12%, 95% 44%, 76% 72%, 40% 96%, 8% 78%, 16% 42%, 4% 12%); }
+
+.auth-pattern-shape.shape-shape-16 { clip-path: polygon(26% 10%, 62% 0%, 92% 24%, 82% 62%, 98% 92%, 54% 86%, 20% 100%, 0% 54%); }
+
+.auth-pattern-shape.shape-shape-17 { clip-path: polygon(52% 6%, 94% 10%, 82% 42%, 100% 72%, 65% 92%, 30% 84%, 0% 96%, 12% 48%, 2% 18%); }
+
+.auth-pattern-shape.shape-shape-18 { clip-path: polygon(38% 2%, 70% 16%, 96% 8%, 88% 48%, 100% 86%, 58% 96%, 24% 78%, 2% 88%, 14% 42%, 0% 12%); }
+
+.auth-pattern-shape.shape-shape-19 { clip-path: polygon(48% 4%, 90% 0%, 78% 32%, 96% 58%, 68% 94%, 34% 86%, 8% 100%, 0% 54%, 18% 20%); }
+
+.auth-pattern-shape.shape-shape-20 { clip-path: polygon(20% 4%, 58% 12%, 92% 2%, 100% 40%, 76% 64%, 84% 100%, 44% 88%, 8% 96%, 0% 42%); }
+
+.auth-pattern-shape.shape-shape-21 { clip-path: polygon(42% 0%, 84% 16%, 100% 52%, 70% 68%, 76% 98%, 36% 86%, 2% 100%, 12% 56%, 0% 22%); }
+
+.auth-pattern-shape.shape-shape-22 { clip-path: polygon(56% 0%, 98% 20%, 84% 46%, 100% 82%, 62% 88%, 28% 100%, 0% 70%, 18% 38%, 6% 8%); }
+
+.auth-pattern-shape.shape-shape-23 { clip-path: polygon(32% 0%, 66% 8%, 88% 0%, 100% 44%, 82% 78%, 46% 100%, 14% 86%, 0% 48%, 12% 18%); }
+
+.auth-pattern-shape.shape-shape-24 { clip-path: polygon(52% 0%, 82% 24%, 100% 18%, 90% 64%, 56% 78%, 42% 100%, 8% 82%, 0% 38%, 24% 28%); }
+
+.auth-pattern-shape.shape-shape-25 { clip-path: polygon(40% 4%, 80% 0%, 96% 34%, 82% 58%, 100% 94%, 54% 86%, 22% 100%, 0% 62%, 8% 18%); }
+
+.auth-pattern-shape.shape-shape-26 { clip-path: polygon(58% 2%, 92% 12%, 86% 46%, 100% 74%, 72% 100%, 38% 82%, 0% 94%, 12% 48%, 4% 18%); }
+
+.auth-pattern-shape.shape-shape-27 { clip-path: polygon(44% 8%, 76% 0%, 100% 32%, 88% 70%, 60% 66%, 44% 100%, 16% 80%, 0% 46%, 18% 20%); }
+
+.auth-pattern-shape.shape-shape-28 { clip-path: polygon(30% 2%, 70% 8%, 96% 24%, 78% 50%, 100% 78%, 62% 94%, 20% 100%, 0% 66%, 12% 30%); }
+
+.auth-pattern-shape.shape-shape-29 { clip-path: polygon(50% 0%, 86% 8%, 78% 36%, 100% 58%, 84% 94%, 48% 82%, 12% 100%, 0% 54%, 20% 24%); }
+
+.auth-pattern-shape.shape-shape-30 { clip-path: polygon(24% 0%, 62% 10%, 96% 0%, 84% 36%, 100% 70%, 64% 76%, 36% 100%, 6% 86%, 0% 38%); }
+
 .mobile-auth-options,
 .mobile-auth-agreement {
   display: flex;
@@ -4159,7 +4356,7 @@ img {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
   max-width: 240px;
-  margin: 0 auto;
+  margin: 0 auto 24px;
 }
 
 .social-login-row button {
@@ -4215,10 +4412,9 @@ img {
 }
 
 .mobile-auth-footer {
-  position: absolute;
-  right: 22px;
-  bottom: calc(26px + env(safe-area-inset-bottom));
-  left: 22px;
+  position: static;
+  margin-top: 10px;
+  padding-bottom: env(safe-area-inset-bottom);
   color: #7b8495;
   font-size: 14px;
   text-align: center;

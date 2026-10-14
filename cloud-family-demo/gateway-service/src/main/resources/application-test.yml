@@ -33,6 +33,7 @@ demo:
       max-requests: ${GATEWAY_TEST_RATE_LIMIT_MAX_REQUESTS:120}
       window-seconds: ${GATEWAY_TEST_RATE_LIMIT_WINDOW_SECONDS:60}
   redisson:
+    enabled: ${GATEWAY_TEST_REDISSON_ENABLED:false}
     lock:
       key-prefix: ${REDIS_TEST_LOCK_KEY_PREFIX:cloud-family-demo:test:lock}
       wait-time-seconds: ${REDIS_TEST_LOCK_WAIT_TIME_SECONDS:5}

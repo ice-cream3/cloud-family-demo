@@ -7,6 +7,7 @@ import com.kfpd.cloud.common.web.ApiResponse;
 import com.kfpd.cloud.common.web.GatewayHeaders;
 import com.kfpd.cloud.partner.pojo.vo.AccountSecurityUpdateVO;
 import com.kfpd.cloud.partner.pojo.vo.AccountSecurityVO;
+import com.kfpd.cloud.partner.pojo.vo.AntiAbuseChallengeVO;
 import com.kfpd.cloud.partner.pojo.vo.AppDocumentVO;
 import com.kfpd.cloud.partner.pojo.vo.AppVersionVO;
 import com.kfpd.cloud.partner.pojo.vo.EmailVerificationCodeVO;
@@ -75,6 +76,13 @@ public class UserController {
             @RequestBody AccountSecurityUpdateVO request
     ) {
         return ApiResponse.success(userService.updateAccountSecurity(username, request));
+    }
+
+    @PostMapping("/security/challenge")
+    public ApiResponse<AntiAbuseChallengeVO> createAccountSecurityChallenge(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username
+    ) {
+        return ApiResponse.success(userService.createAccountSecurityChallenge(username));
     }
 
     @PostMapping("/security/phone/code")

@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.kfpd.cloud.common.config.datasource.MultiDataSourceNames;
@@ -21,6 +22,7 @@ import com.kfpd.cloud.partner.dao.cloud.VipUserDao;
 import com.kfpd.cloud.partner.pojo.entity.VipUser;
 import com.kfpd.cloud.partner.pojo.vo.AccountSecurityUpdateVO;
 import com.kfpd.cloud.partner.pojo.vo.AccountSecurityVO;
+import com.kfpd.cloud.partner.pojo.vo.AntiAbuseChallengeVO;
 import com.kfpd.cloud.partner.pojo.vo.AppDocumentVO;
 import com.kfpd.cloud.partner.pojo.vo.AppVersionVO;
 import com.kfpd.cloud.partner.pojo.vo.EmailVerificationCodeVO;
@@ -69,6 +71,9 @@ public class UserServiceImpl implements UserService {
     private static final Duration EMAIL_CODE_TTL = Duration.ofMinutes(5);
     private static final SecureRandom EMAIL_CODE_RANDOM = new SecureRandom();
     private static final Map<String, EmailVerificationCode> EMAIL_CODES = new ConcurrentHashMap<>();
+    private static final Duration ANTI_ABUSE_CHALLENGE_TTL = Duration.ofMinutes(3);
+    private static final SecureRandom ANTI_ABUSE_RANDOM = new SecureRandom();
+    private static final Map<String, AntiAbuseChallenge> ANTI_ABUSE_CHALLENGES = new ConcurrentHashMap<>();
 
     private final VipUserDao vipUserDao;
     private final UserProfileFeatureDao userProfileFeatureDao;
@@ -119,6 +124,7 @@ public class UserServiceImpl implements UserService {
         if (request == null) {
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "request is required");
         }
+        verifyAntiAbuseChallenge(username, request.antiAbuseChallengeId(), request.antiAbuseAnswer());
         requireText(request.displayName(), "displayName is required");
         String email = blankToNull(request.email());
         if (email != null && !isValidEmail(email)) {
@@ -163,6 +169,19 @@ public class UserServiceImpl implements UserService {
             throw notFound("Vip user not found");
         }
         return toAccountSecurityVO(findCurrentVipUser(username));
+    }
+
+    @Override
+    public AntiAbuseChallengeVO createAccountSecurityChallenge(String username) {
+        findCurrentVipUser(username);
+        int first = ANTI_ABUSE_RANDOM.nextInt(8, 36);
+        int second = ANTI_ABUSE_RANDOM.nextInt(3, 24);
+        boolean subtract = ANTI_ABUSE_RANDOM.nextBoolean();
+        int answer = subtract ? first - second : first + second;
+        String question = subtract ? first + " - " + second + " = ?" : first + " + " + second + " = ?";
+        String challengeId = UUID.randomUUID().toString();
+        ANTI_ABUSE_CHALLENGES.put(antiAbuseChallengeKey(username, challengeId), new AntiAbuseChallenge(String.valueOf(answer), Instant.now().plus(ANTI_ABUSE_CHALLENGE_TTL)));
+        return new AntiAbuseChallengeVO(challengeId, question, (int) ANTI_ABUSE_CHALLENGE_TTL.toSeconds());
     }
 
     @Override
@@ -683,12 +702,34 @@ public class UserServiceImpl implements UserService {
         EMAIL_CODES.remove(key);
     }
 
+    private void verifyAntiAbuseChallenge(String username, String challengeId, String rawAnswer) {
+        String normalizedChallengeId = blankToNull(challengeId);
+        String answer = blankToNull(rawAnswer);
+        if (normalizedChallengeId == null || answer == null) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification is required");
+        }
+        String key = antiAbuseChallengeKey(username, normalizedChallengeId);
+        AntiAbuseChallenge challenge = ANTI_ABUSE_CHALLENGES.get(key);
+        if (challenge == null || challenge.expiresAt().isBefore(Instant.now())) {
+            ANTI_ABUSE_CHALLENGES.remove(key);
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification expired");
+        }
+        if (!challenge.answer().equals(answer)) {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification is invalid");
+        }
+        ANTI_ABUSE_CHALLENGES.remove(key);
+    }
+
     private String phoneCodeKey(String username, String phoneCountryCode, String phone) {
         return username + ":" + phoneCountryCode + phone;
     }
 
     private String emailCodeKey(String username, String email) {
         return username + ":" + email;
+    }
+
+    private String antiAbuseChallengeKey(String username, String challengeId) {
+        return username + ":" + challengeId;
     }
 
     private String maskPhone(String phoneCountryCode, String phone) {
@@ -835,5 +876,8 @@ public class UserServiceImpl implements UserService {
     }
 
     private record EmailVerificationCode(String code, Instant expiresAt) {
+    }
+
+    private record AntiAbuseChallenge(String answer, Instant expiresAt) {
     }
 }

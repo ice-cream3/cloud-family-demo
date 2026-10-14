@@ -4,6 +4,8 @@ import com.kfpd.cloud.auth.pojo.vo.LoginVO;
 import com.kfpd.cloud.auth.pojo.dto.LoginRequestContext;
 import com.kfpd.cloud.auth.pojo.dto.LoginResponse;
 import com.kfpd.cloud.auth.pojo.dto.SessionStatusVO;
+import com.kfpd.cloud.auth.pojo.vo.AntiAbuseChallengeRequestVO;
+import com.kfpd.cloud.auth.pojo.vo.AntiAbuseChallengeVO;
 import com.kfpd.cloud.auth.pojo.vo.KickOutVO;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
 import com.kfpd.cloud.auth.pojo.vo.RegisterVO;
@@ -42,6 +44,15 @@ public class AuthController {
     @PostMapping("/api/register")
     public ApiResponse<LoginResponse> apiRegister(@Valid @RequestBody RegisterVO request, HttpServletRequest servletRequest) {
         return ApiResponse.success(authService.apiRegister(request, resolveLoginRequestContext(servletRequest)));
+    }
+
+    @PostMapping("/api/login/challenge")
+    public ApiResponse<AntiAbuseChallengeVO> createLoginChallenge(@RequestBody(required = false) AntiAbuseChallengeRequestVO request,
+                                                                  HttpServletRequest servletRequest) {
+        return ApiResponse.success(authService.createLoginChallenge(
+                request == null ? null : request.purpose(),
+                resolveLoginRequestContext(servletRequest)
+        ));
     }
 
     @PostMapping("/manager/login")
