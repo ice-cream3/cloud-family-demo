@@ -11,8 +11,15 @@ public record AntiAbuseChallengeVO(
 ) {
     public record ChallengeOptionVO(
             String value,
-            String shape,
-            String color
+            ChallengeShapeVO shape,
+            String color,
+            String fillMode
+    ) {
+    }
+
+    public record ChallengeShapeVO(
+            String value,
+            String clipPath
     ) {
     }
 }

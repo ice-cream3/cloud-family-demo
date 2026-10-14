@@ -4167,9 +4167,22 @@ img {
 }
 
 .auth-pattern-shape {
+  position: relative;
   display: block;
   width: 32px;
   height: 32px;
+}
+
+.auth-pattern-shape.outline::after {
+  position: absolute;
+  inset: 5px;
+  background: #ffffff;
+  clip-path: inherit;
+  content: "";
+}
+
+.auth-pattern-options button.active .auth-pattern-shape.outline::after {
+  background: #eef3ff;
 }
 
 .auth-pattern-shape.shape-shape-01 { clip-path: polygon(50% 0%, 75% 7%, 93% 25%, 100% 50%, 93% 75%, 75% 93%, 50% 100%, 25% 93%, 7% 75%, 0% 50%, 7% 25%, 25% 7%); }

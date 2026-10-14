@@ -72,8 +72,14 @@ export type AntiAbuseChallenge = {
 
 export type AntiAbuseChallengeOption = {
   value: string;
-  shape: string;
+  shape: AntiAbuseChallengeShape;
   color?: string;
+  fillMode?: 'solid' | 'outline';
+};
+
+export type AntiAbuseChallengeShape = {
+  value: string;
+  clipPath: string;
 };
 
 export type PasswordChangeRequest = {

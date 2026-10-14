@@ -35,6 +35,7 @@ import com.kfpd.cloud.auth.pojo.dto.LoginResponse;
 import com.kfpd.cloud.auth.pojo.dto.RedisLoginSession;
 import com.kfpd.cloud.auth.pojo.vo.AntiAbuseChallengeVO;
 import com.kfpd.cloud.auth.pojo.vo.AntiAbuseChallengeVO.ChallengeOptionVO;
+import com.kfpd.cloud.auth.pojo.vo.AntiAbuseChallengeVO.ChallengeShapeVO;
 import com.kfpd.cloud.auth.pojo.vo.KickOutVO;
 import com.kfpd.cloud.auth.pojo.vo.RefreshTokenVO;
 import com.kfpd.cloud.auth.pojo.vo.RegisterVO;
@@ -84,37 +85,37 @@ public class AuthServiceImpl implements AuthService {
     private static final String CHALLENGE_PURPOSE_API_REGISTER = "api_register";
     private static final Duration LOGIN_CHALLENGE_TTL = Duration.ofMinutes(3);
     private static final Map<String, LoginChallenge> LOGIN_CHALLENGES = new ConcurrentHashMap<>();
-    private static final List<PatternShape> LOGIN_PATTERN_SHAPES = List.of(
-            new PatternShape("shape-01", "圆形"),
-            new PatternShape("shape-02", "方形"),
-            new PatternShape("shape-03", "三角形"),
-            new PatternShape("shape-04", "菱形"),
-            new PatternShape("shape-05", "五边形"),
-            new PatternShape("shape-06", "六边形"),
-            new PatternShape("shape-07", "八边形"),
-            new PatternShape("shape-08", "星形"),
-            new PatternShape("shape-09", "十字形"),
-            new PatternShape("shape-10", "盾形"),
-            new PatternShape("shape-11", "梯形"),
-            new PatternShape("shape-12", "平行四边形"),
-            new PatternShape("shape-13", "不规则图案A"),
-            new PatternShape("shape-14", "不规则图案B"),
-            new PatternShape("shape-15", "不规则图案C"),
-            new PatternShape("shape-16", "不规则图案D"),
-            new PatternShape("shape-17", "不规则图案E"),
-            new PatternShape("shape-18", "不规则图案F"),
-            new PatternShape("shape-19", "不规则图案G"),
-            new PatternShape("shape-20", "不规则图案H"),
-            new PatternShape("shape-21", "不规则图案I"),
-            new PatternShape("shape-22", "不规则图案J"),
-            new PatternShape("shape-23", "不规则图案K"),
-            new PatternShape("shape-24", "不规则图案L"),
-            new PatternShape("shape-25", "不规则图案M"),
-            new PatternShape("shape-26", "不规则图案N"),
-            new PatternShape("shape-27", "不规则图案O"),
-            new PatternShape("shape-28", "不规则图案P"),
-            new PatternShape("shape-29", "不规则图案Q"),
-            new PatternShape("shape-30", "不规则图案R")
+    private static final List<String> READABLE_SHAPE_CLIP_PATHS = List.of(
+            "50% 0%,75% 7%,93% 25%,100% 50%,93% 75%,75% 93%,50% 100%,25% 93%,7% 75%,0% 50%,7% 25%,25% 7%",
+            "0% 0%,100% 0%,100% 100%,0% 100%",
+            "50% 4%,96% 94%,4% 94%",
+            "50% 0%,100% 50%,50% 100%,0% 50%",
+            "50% 0%,98% 36%,80% 100%,20% 100%,2% 36%",
+            "25% 6%,75% 6%,100% 50%,75% 94%,25% 94%,0% 50%",
+            "30% 0%,70% 0%,100% 30%,100% 70%,70% 100%,30% 100%,0% 70%,0% 30%",
+            "50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%",
+            "36% 0%,64% 0%,64% 36%,100% 36%,100% 64%,64% 64%,64% 100%,36% 100%,36% 64%,0% 64%,0% 36%,36% 36%",
+            "50% 0%,92% 18%,86% 66%,50% 100%,14% 66%,8% 18%",
+            "18% 8%,82% 8%,100% 92%,0% 92%",
+            "25% 0%,100% 0%,75% 100%,0% 100%",
+            "50% 0%,84% 12%,100% 48%,78% 82%,42% 100%,10% 78%,0% 34%,24% 8%",
+            "50% 3%,88% 18%,78% 55%,95% 86%,55% 78%,23% 96%,6% 58%,20% 18%",
+            "44% 0%,74% 12%,95% 44%,76% 72%,40% 96%,8% 78%,16% 42%,4% 12%",
+            "26% 10%,62% 0%,92% 24%,82% 62%,98% 92%,54% 86%,20% 100%,0% 54%",
+            "52% 6%,94% 10%,82% 42%,100% 72%,65% 92%,30% 84%,0% 96%,12% 48%,2% 18%",
+            "38% 2%,70% 16%,96% 8%,88% 48%,100% 86%,58% 96%,24% 78%,2% 88%,14% 42%,0% 12%",
+            "48% 4%,90% 0%,78% 32%,96% 58%,68% 94%,34% 86%,8% 100%,0% 54%,18% 20%",
+            "20% 4%,58% 12%,92% 2%,100% 40%,76% 64%,84% 100%,44% 88%,8% 96%,0% 42%",
+            "42% 0%,84% 16%,100% 52%,70% 68%,76% 98%,36% 86%,2% 100%,12% 56%,0% 22%",
+            "56% 0%,98% 20%,84% 46%,100% 82%,62% 88%,28% 100%,0% 70%,18% 38%,6% 8%",
+            "32% 0%,66% 8%,88% 0%,100% 44%,82% 78%,46% 100%,14% 86%,0% 48%,12% 18%",
+            "52% 0%,82% 24%,100% 18%,90% 64%,56% 78%,42% 100%,8% 82%,0% 38%,24% 28%",
+            "40% 4%,80% 0%,96% 34%,82% 58%,100% 94%,54% 86%,22% 100%,0% 62%,8% 18%",
+            "58% 2%,92% 12%,86% 46%,100% 74%,72% 100%,38% 82%,0% 94%,12% 48%,4% 18%",
+            "44% 8%,76% 0%,100% 32%,88% 70%,60% 66%,44% 100%,16% 80%,0% 46%,18% 20%",
+            "30% 2%,70% 8%,96% 24%,78% 50%,100% 78%,62% 94%,20% 100%,0% 66%,12% 30%",
+            "50% 0%,86% 8%,78% 36%,100% 58%,84% 94%,48% 82%,12% 100%,0% 54%,20% 24%",
+            "24% 0%,62% 10%,96% 0%,84% 36%,100% 70%,64% 76%,36% 100%,6% 86%,0% 38%"
     );
     private static final List<PatternColor> LOGIN_PATTERN_COLORS = List.of(
             new PatternColor("blue", "蓝色", "#2563eb"),
@@ -230,16 +231,7 @@ public class AuthServiceImpl implements AuthService {
     public AntiAbuseChallengeVO createLoginChallenge(String purpose, LoginRequestContext context) {
         String normalizedPurpose = normalizeChallengePurpose(purpose);
         pruneExpiredLoginChallenges();
-        List<PatternOption> candidates = buildPatternOptions();
-        Collections.shuffle(candidates);
-        List<LoginChallengeOption> options = candidates.subList(0, 9).stream()
-                .map(option -> new LoginChallengeOption(
-                        randomChallengeOptionValue(),
-                        option.label(),
-                        option.shape(),
-                        option.color()
-                ))
-                .toList();
+        List<LoginChallengeOption> options = buildChallengeOptions();
         List<LoginChallengeOption> targets = new ArrayList<>(options);
         Collections.shuffle(targets);
         targets = targets.subList(0, 3);
@@ -256,7 +248,12 @@ public class AuthServiceImpl implements AuthService {
                 Instant.now().plus(LOGIN_CHALLENGE_TTL)
         ));
         List<ChallengeOptionVO> challengeOptions = options.stream()
-                .map(option -> new ChallengeOptionVO(option.value(), option.shape(), option.color()))
+                .map(option -> new ChallengeOptionVO(
+                        option.value(),
+                        new ChallengeShapeVO(option.shapeValue(), option.shapeClipPath()),
+                        option.color(),
+                        option.fillMode()
+                ))
                 .toList();
         return new AntiAbuseChallengeVO(
                 challengeId,
@@ -1063,6 +1060,10 @@ public class AuthServiceImpl implements AuthService {
         return UUID.randomUUID().toString().replace("-", "");
     }
 
+    private String randomFillMode() {
+        return ThreadLocalRandom.current().nextBoolean() ? "solid" : "outline";
+    }
+
     private String buildQuestionImage(List<LoginChallengeOption> targets) {
         StringBuilder svg = new StringBuilder();
         String antiForgeryCode = randomAntiForgeryCode();
@@ -1072,7 +1073,7 @@ public class AuthServiceImpl implements AuthService {
         svg.append("<text x=\"10\" y=\"25\" font-size=\"14\" font-weight=\"700\" fill=\"#245bff\">请选择:</text>");
         int x = 78;
         for (LoginChallengeOption target : targets) {
-            appendSvgShape(svg, target.shape(), target.color(), x, 21, 9);
+            appendSvgShape(svg, target.shapeClipPath(), target.color(), target.fillMode(), x, 21, 9);
             x += 28;
         }
         svg.append("<text x=\"158\" y=\"26\" font-size=\"11\" font-weight=\"700\" fill=\"#7f8da8\" opacity=\"0.62\" transform=\"rotate(-8 158 26)\">")
@@ -1114,43 +1115,14 @@ public class AuthServiceImpl implements AuthService {
                 .append("</text>");
     }
 
-    private void appendSvgShape(StringBuilder svg, String shape, String color, int cx, int cy, int size) {
+    private void appendSvgShape(StringBuilder svg, String clipPath, String color, String fillMode, int cx, int cy, int size) {
         String safeColor = color == null ? "#245bff" : color;
-        String points = switch (shape) {
-            case "shape-01" -> "50% 0%,75% 7%,93% 25%,100% 50%,93% 75%,75% 93%,50% 100%,25% 93%,7% 75%,0% 50%,7% 25%,25% 7%";
-            case "shape-02" -> "0% 0%,100% 0%,100% 100%,0% 100%";
-            case "shape-03" -> "50% 4%,96% 94%,4% 94%";
-            case "shape-04" -> "50% 0%,100% 50%,50% 100%,0% 50%";
-            case "shape-05" -> "50% 0%,98% 36%,80% 100%,20% 100%,2% 36%";
-            case "shape-06" -> "25% 6%,75% 6%,100% 50%,75% 94%,25% 94%,0% 50%";
-            case "shape-07" -> "30% 0%,70% 0%,100% 30%,100% 70%,70% 100%,30% 100%,0% 70%,0% 30%";
-            case "shape-08" -> "50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%";
-            case "shape-09" -> "36% 0%,64% 0%,64% 36%,100% 36%,100% 64%,64% 64%,64% 100%,36% 100%,36% 64%,0% 64%,0% 36%,36% 36%";
-            case "shape-10" -> "50% 0%,92% 18%,86% 66%,50% 100%,14% 66%,8% 18%";
-            case "shape-11" -> "18% 8%,82% 8%,100% 92%,0% 92%";
-            case "shape-12" -> "25% 0%,100% 0%,75% 100%,0% 100%";
-            case "shape-14" -> "50% 3%,88% 18%,78% 55%,95% 86%,55% 78%,23% 96%,6% 58%,20% 18%";
-            case "shape-15" -> "44% 0%,74% 12%,95% 44%,76% 72%,40% 96%,8% 78%,16% 42%,4% 12%";
-            case "shape-16" -> "26% 10%,62% 0%,92% 24%,82% 62%,98% 92%,54% 86%,20% 100%,0% 54%";
-            case "shape-17" -> "52% 6%,94% 10%,82% 42%,100% 72%,65% 92%,30% 84%,0% 96%,12% 48%,2% 18%";
-            case "shape-18" -> "38% 2%,70% 16%,96% 8%,88% 48%,100% 86%,58% 96%,24% 78%,2% 88%,14% 42%,0% 12%";
-            case "shape-19" -> "48% 4%,90% 0%,78% 32%,96% 58%,68% 94%,34% 86%,8% 100%,0% 54%,18% 20%";
-            case "shape-20" -> "20% 4%,58% 12%,92% 2%,100% 40%,76% 64%,84% 100%,44% 88%,8% 96%,0% 42%";
-            case "shape-21" -> "42% 0%,84% 16%,100% 52%,70% 68%,76% 98%,36% 86%,2% 100%,12% 56%,0% 22%";
-            case "shape-22" -> "56% 0%,98% 20%,84% 46%,100% 82%,62% 88%,28% 100%,0% 70%,18% 38%,6% 8%";
-            case "shape-23" -> "32% 0%,66% 8%,88% 0%,100% 44%,82% 78%,46% 100%,14% 86%,0% 48%,12% 18%";
-            case "shape-24" -> "52% 0%,82% 24%,100% 18%,90% 64%,56% 78%,42% 100%,8% 82%,0% 38%,24% 28%";
-            case "shape-25" -> "40% 4%,80% 0%,96% 34%,82% 58%,100% 94%,54% 86%,22% 100%,0% 62%,8% 18%";
-            case "shape-26" -> "58% 2%,92% 12%,86% 46%,100% 74%,72% 100%,38% 82%,0% 94%,12% 48%,4% 18%";
-            case "shape-27" -> "44% 8%,76% 0%,100% 32%,88% 70%,60% 66%,44% 100%,16% 80%,0% 46%,18% 20%";
-            case "shape-28" -> "30% 2%,70% 8%,96% 24%,78% 50%,100% 78%,62% 94%,20% 100%,0% 66%,12% 30%";
-            case "shape-29" -> "50% 0%,86% 8%,78% 36%,100% 58%,84% 94%,48% 82%,12% 100%,0% 54%,20% 24%";
-            case "shape-30" -> "24% 0%,62% 10%,96% 0%,84% 36%,100% 70%,64% 76%,36% 100%,6% 86%,0% 38%";
-            default -> "50% 0%,84% 12%,100% 48%,78% 82%,42% 100%,10% 78%,0% 34%,24% 8%";
-        };
         svg.append("<polygon points=\"")
-                .append(scalePolygonPoints(points, cx, cy, size))
-                .append("\" fill=\"").append(safeColor).append("\"/>");
+                .append(scalePolygonPoints(clipPath, cx, cy, size))
+                .append("\" fill=\"").append("outline".equals(fillMode) ? "none" : safeColor)
+                .append("\" stroke=\"").append(safeColor)
+                .append("\" stroke-width=\"").append("outline".equals(fillMode) ? "2.4" : "0")
+                .append("\" stroke-linejoin=\"round\"/>");
     }
 
     private String scalePolygonPoints(String points, int cx, int cy, int size) {
@@ -1312,28 +1284,47 @@ public class AuthServiceImpl implements AuthService {
     private record LoginChallenge(String answer, String purpose, String contextFingerprint, Instant expiresAt) {
     }
 
-    private List<PatternOption> buildPatternOptions() {
-        List<PatternOption> options = new ArrayList<>();
-        for (PatternColor color : LOGIN_PATTERN_COLORS) {
-            for (PatternShape shape : LOGIN_PATTERN_SHAPES) {
-                options.add(new PatternOption(
-                        color.value() + "-" + shape.value(),
-                        color.label() + shape.label(),
-                        shape.value(),
-                        color.hex()
-                ));
-            }
+    private List<LoginChallengeOption> buildChallengeOptions() {
+        List<LoginChallengeOption> options = new ArrayList<>();
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        List<String> shapeTemplates = new ArrayList<>(READABLE_SHAPE_CLIP_PATHS);
+        Collections.shuffle(shapeTemplates);
+        for (int i = 0; i < 9; i++) {
+            PatternColor color = LOGIN_PATTERN_COLORS.get(random.nextInt(LOGIN_PATTERN_COLORS.size()));
+            options.add(new LoginChallengeOption(
+                    randomChallengeOptionValue(),
+                    "随机图形",
+                    randomChallengeOptionValue(),
+                    lightlyJitterShapeClipPath(shapeTemplates.get(i)),
+                    color.hex(),
+                    randomFillMode()
+            ));
         }
         return options;
     }
 
-    private record PatternOption(String value, String label, String shape, String color) {
+    private String lightlyJitterShapeClipPath(String template) {
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        StringBuilder points = new StringBuilder();
+        String[] templatePoints = template.split(",");
+        for (int i = 0; i < templatePoints.length; i++) {
+            String[] xy = templatePoints[i].trim().split("% ");
+            double x = Double.parseDouble(xy[0]) + random.nextDouble(-2.5d, 2.5d);
+            double y = Double.parseDouble(xy[1].replace("%", "")) + random.nextDouble(-2.5d, 2.5d);
+            if (i > 0) {
+                points.append(",");
+            }
+            points.append(Math.round(clampPercent(x))).append("% ")
+                    .append(Math.round(clampPercent(y))).append("%");
+        }
+        return points.toString();
     }
 
-    private record LoginChallengeOption(String value, String label, String shape, String color) {
+    private double clampPercent(double value) {
+        return Math.max(2d, Math.min(98d, value));
     }
 
-    private record PatternShape(String value, String label) {
+    private record LoginChallengeOption(String value, String label, String shapeValue, String shapeClipPath, String color, String fillMode) {
     }
 
     private record PatternColor(String value, String label, String hex) {

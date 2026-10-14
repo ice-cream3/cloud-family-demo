@@ -327,8 +327,11 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
                   aria-label="验证选项"
                 >
                   <span
-                    className={`auth-pattern-shape shape-${option.shape}`}
-                    style={{ backgroundColor: option.color }}
+                    className={`auth-pattern-shape ${option.fillMode === 'outline' ? 'outline' : 'solid'}`}
+                    style={{
+                      backgroundColor: option.color,
+                      clipPath: `polygon(${option.shape.clipPath})`,
+                    }}
                   />
                 </button>
               ))}
