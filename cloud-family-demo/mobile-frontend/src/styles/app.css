@@ -4140,10 +4140,26 @@ img {
   object-fit: contain;
 }
 
+.auth-pattern-question-image.puzzle {
+  height: 98px;
+}
+
 .auth-pattern-options {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.auth-pattern-options.puzzle-board {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(168px, 100%);
+  margin: 0 auto;
+  gap: 0;
+  padding: 6px;
+  border: 1px solid #dbe3ff;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(36, 91, 255, 0.06);
 }
 
 .auth-pattern-options button {
@@ -4157,6 +4173,27 @@ img {
   color: #111827;
   background: #ffffff;
   box-shadow: 0 8px 18px rgba(36, 91, 255, 0.08);
+}
+
+.auth-pattern-options.puzzle-board button {
+  aspect-ratio: 1;
+  border-color: #eef2ff;
+  border-radius: 8px;
+  background: #f8fbff;
+  box-shadow: none;
+  touch-action: none;
+  cursor: grab;
+}
+
+.auth-pattern-options.puzzle-board button:active {
+  cursor: grabbing;
+}
+
+.auth-pattern-options.puzzle-board button.dragging {
+  z-index: 2;
+  border-color: #245bff;
+  opacity: 0.58;
+  box-shadow: 0 0 0 3px rgba(36, 91, 255, 0.14);
 }
 
 .auth-pattern-options button.active {
@@ -4183,6 +4220,16 @@ img {
 
 .auth-pattern-options button.active .auth-pattern-shape.outline::after {
   background: #eef3ff;
+}
+
+.auth-puzzle-tile {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
 }
 
 .auth-pattern-shape.shape-shape-01 { clip-path: polygon(50% 0%, 75% 7%, 93% 25%, 100% 50%, 93% 75%, 75% 93%, 50% 100%, 25% 93%, 7% 75%, 0% 50%, 7% 25%, 25% 7%); }

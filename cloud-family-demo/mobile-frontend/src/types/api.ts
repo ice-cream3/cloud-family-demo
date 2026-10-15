@@ -74,9 +74,10 @@ export type AntiAbuseChallenge = {
 
 export type AntiAbuseChallengeOption = {
   value: string;
-  shape: AntiAbuseChallengeShape;
+  shape?: AntiAbuseChallengeShape | null;
   color?: string;
   fillMode?: 'solid' | 'outline';
+  image?: string | null;
 };
 
 export type AntiAbuseChallengeShape = {

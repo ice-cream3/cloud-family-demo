@@ -1,12 +1,26 @@
 package com.kfpd.cloud.auth.util;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.springframework.core.io.ClassPathResource;
+
 public final class GraphicChallengeUtil {
+
+    private static final List<String> PUZZLE_IMAGE_RESOURCES = List.of(
+            "static/challenge-images/network-bridge.svg",
+            "static/challenge-images/network-mesh.svg",
+            "static/challenge-images/network-signal.svg",
+            "static/challenge-images/dw-diamond.jpg",
+            "static/challenge-images/gpt-dog.png",
+            "static/challenge-images/gpt-girl.png"
+    );
 
     private static final List<String> READABLE_SHAPE_CLIP_PATHS = List.of(
             "50% 0%,75% 7%,93% 25%,100% 50%,93% 75%,75% 93%,50% 100%,25% 93%,7% 75%,0% 50%,7% 25%,25% 7%",
@@ -90,7 +104,96 @@ public final class GraphicChallengeUtil {
                 .append(antiForgeryCode)
                 .append("</text>");
         svg.append("</svg>");
-        return "data:image/svg+xml;base64," + Base64.getEncoder().encodeToString(svg.toString().getBytes(StandardCharsets.UTF_8));
+        return svgDataUrl(svg.toString());
+    }
+
+    public static PuzzleChallenge buildPuzzleChallenge(List<String> orderedValues, String prompt) {
+        String content = buildPuzzleContent();
+        String questionImage = buildPuzzleQuestionImage(content, prompt);
+        List<PuzzleTile> tiles = new ArrayList<>();
+        tiles.add(new PuzzleTile(orderedValues.get(0), buildPuzzleTileImage(content, 0, 0)));
+        tiles.add(new PuzzleTile(orderedValues.get(1), buildPuzzleTileImage(content, 60, 0)));
+        tiles.add(new PuzzleTile(orderedValues.get(2), buildPuzzleTileImage(content, 0, 60)));
+        tiles.add(new PuzzleTile(orderedValues.get(3), buildPuzzleTileImage(content, 60, 60)));
+        Collections.shuffle(tiles);
+        return new PuzzleChallenge(questionImage, tiles);
+    }
+
+    private static String buildPuzzleQuestionImage(String content, String prompt) {
+        StringBuilder svg = new StringBuilder();
+        String antiForgeryCode = randomAntiForgeryCode();
+        svg.append("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"240\" height=\"98\" viewBox=\"0 0 240 98\">");
+        svg.append("<rect width=\"240\" height=\"98\" rx=\"10\" fill=\"#f7f9ff\"/>");
+        appendQuestionImageNoise(svg, antiForgeryCode);
+        svg.append("<text x=\"10\" y=\"23\" font-size=\"14\" font-weight=\"700\" fill=\"#245bff\">")
+                .append(prompt)
+                .append("</text>");
+        svg.append("<g transform=\"translate(82 8) scale(0.62)\">").append(content).append("</g>");
+        svg.append("<text x=\"190\" y=\"24\" font-size=\"11\" font-weight=\"700\" fill=\"#7f8da8\" opacity=\"0.62\" transform=\"rotate(-8 190 24)\">")
+                .append(antiForgeryCode)
+                .append("</text>");
+        svg.append("</svg>");
+        return svgDataUrl(svg.toString());
+    }
+
+    private static String buildPuzzleTileImage(String content, int x, int y) {
+        StringBuilder svg = new StringBuilder();
+        svg.append("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"72\" height=\"72\" viewBox=\"")
+                .append(x).append(" ").append(y).append(" 60 60\">");
+        svg.append(content);
+        svg.append("</svg>");
+        return svgDataUrl(svg.toString());
+    }
+
+    private static String buildPuzzleContent() {
+        return readRandomPuzzleImage().orElseGet(GraphicChallengeUtil::buildGeneratedPuzzleContent);
+    }
+
+    private static java.util.Optional<String> readRandomPuzzleImage() {
+        List<String> resources = new ArrayList<>(PUZZLE_IMAGE_RESOURCES);
+        Collections.shuffle(resources);
+        for (String resource : resources) {
+            ClassPathResource image = new ClassPathResource(resource);
+            if (!image.exists()) {
+                continue;
+            }
+            try {
+                return java.util.Optional.of(new String(image.getInputStream().readAllBytes(), StandardCharsets.UTF_8));
+            } catch (IOException ignored) {
+                // Fall back to generated artwork when packaged resources are unavailable.
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
+    private static String buildGeneratedPuzzleContent() {
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        String c1 = randomColor(random);
+        String c2 = randomColor(random);
+        String c3 = randomColor(random);
+        String c4 = randomColor(random);
+        StringBuilder svg = new StringBuilder();
+        svg.append("<rect width=\"120\" height=\"120\" fill=\"#ffffff\"/>");
+        svg.append("<rect x=\"0\" y=\"0\" width=\"60\" height=\"60\" fill=\"#eef4ff\"/>");
+        svg.append("<rect x=\"60\" y=\"0\" width=\"60\" height=\"60\" fill=\"#fff7ed\"/>");
+        svg.append("<rect x=\"0\" y=\"60\" width=\"60\" height=\"60\" fill=\"#f0fdf4\"/>");
+        svg.append("<rect x=\"60\" y=\"60\" width=\"60\" height=\"60\" fill=\"#fdf2f8\"/>");
+        svg.append("<path d=\"M8 72 C28 24,84 18,112 44\" fill=\"none\" stroke=\"").append(c1).append("\" stroke-width=\"12\" stroke-linecap=\"round\" opacity=\"0.9\"/>");
+        svg.append("<path d=\"M22 12 L98 92\" fill=\"none\" stroke=\"").append(c2).append("\" stroke-width=\"10\" stroke-linecap=\"round\" opacity=\"0.82\"/>");
+        svg.append("<circle cx=\"78\" cy=\"46\" r=\"22\" fill=\"").append(c3).append("\" opacity=\"0.88\"/>");
+        svg.append("<polygon points=\"28,36 48,18 70,34 64,62 34,66\" fill=\"").append(c4).append("\" opacity=\"0.86\"/>");
+        svg.append("<line x1=\"60\" y1=\"0\" x2=\"60\" y2=\"120\" stroke=\"#ffffff\" stroke-width=\"3\"/>");
+        svg.append("<line x1=\"0\" y1=\"60\" x2=\"120\" y2=\"60\" stroke=\"#ffffff\" stroke-width=\"3\"/>");
+        return svg.toString();
+    }
+
+    private static String randomColor(ThreadLocalRandom random) {
+        List<String> colors = List.of("#2563eb", "#059669", "#ea580c", "#7c3aed", "#dc2626", "#0891b2");
+        return colors.get(random.nextInt(colors.size()));
+    }
+
+    private static String svgDataUrl(String svg) {
+        return "data:image/svg+xml;base64," + Base64.getEncoder().encodeToString(svg.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String randomAntiForgeryCode() {
@@ -159,5 +262,11 @@ public final class GraphicChallengeUtil {
         String color();
 
         String fillMode();
+    }
+
+    public record PuzzleChallenge(String questionImage, List<PuzzleTile> tiles) {
+    }
+
+    public record PuzzleTile(String value, String image) {
     }
 }

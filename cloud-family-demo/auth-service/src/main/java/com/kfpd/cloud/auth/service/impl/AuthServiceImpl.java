@@ -85,7 +85,8 @@ public class AuthServiceImpl implements AuthService {
     private static final List<ChallengeScheme> CHALLENGE_SCHEMES = List.of(
             new ChallengeScheme("graphic_set", 3, false, "请选择:"),
             new ChallengeScheme("graphic_sequence", 3, true, "按顺序选择:"),
-            new ChallengeScheme("graphic_pair", 2, false, "请选择:")
+            new ChallengeScheme("graphic_pair", 2, false, "请选择:"),
+            new ChallengeScheme("image_reassemble", 4, true, "按图重组:")
     );
     private static final Duration LOGIN_CHALLENGE_TTL = Duration.ofMinutes(3);
     private static final Map<String, LoginChallenge> LOGIN_CHALLENGES = new ConcurrentHashMap<>();
@@ -204,6 +205,9 @@ public class AuthServiceImpl implements AuthService {
         String normalizedPurpose = normalizeChallengePurpose(purpose);
         pruneExpiredLoginChallenges();
         ChallengeScheme scheme = randomChallengeScheme();
+        if ("image_reassemble".equals(scheme.value())) {
+            return createImageReassembleChallenge(normalizedPurpose, scheme, context);
+        }
         List<LoginChallengeOption> options = buildChallengeOptions();
         List<LoginChallengeOption> targets = new ArrayList<>(options);
         Collections.shuffle(targets);
@@ -226,13 +230,49 @@ public class AuthServiceImpl implements AuthService {
                         option.value(),
                         new ChallengeShapeVO(option.shapeValue(), option.shapeClipPath()),
                         option.color(),
-                        option.fillMode()
+                        option.fillMode(),
+                        null
                 ))
                 .toList();
         return new AntiAbuseChallengeVO(
                 challengeId,
                 question,
                 GraphicChallengeUtil.buildQuestionImage(targets, scheme.prompt(), scheme.ordered()),
+                (int) LOGIN_CHALLENGE_TTL.toSeconds(),
+                scheme.value(),
+                scheme.requiredSelectionCount(),
+                challengeOptions
+        );
+    }
+
+    private AntiAbuseChallengeVO createImageReassembleChallenge(String normalizedPurpose,
+                                                                ChallengeScheme scheme,
+                                                                LoginRequestContext context) {
+        List<String> orderedValues = List.of(
+                randomChallengeOptionValue(),
+                randomChallengeOptionValue(),
+                randomChallengeOptionValue(),
+                randomChallengeOptionValue()
+        );
+        GraphicChallengeUtil.PuzzleChallenge puzzle = GraphicChallengeUtil.buildPuzzleChallenge(orderedValues, scheme.prompt());
+        String answer = orderedValues.stream()
+                .reduce((first, second) -> first + "," + second)
+                .orElse("");
+        String challengeId = UUID.randomUUID().toString();
+        LOGIN_CHALLENGES.put(challengeId, new LoginChallenge(
+                answer,
+                normalizedPurpose,
+                contextFingerprint(context),
+                scheme.ordered(),
+                Instant.now().plus(LOGIN_CHALLENGE_TTL)
+        ));
+        List<ChallengeOptionVO> challengeOptions = puzzle.tiles().stream()
+                .map(tile -> new ChallengeOptionVO(tile.value(), null, null, null, tile.image()))
+                .toList();
+        return new AntiAbuseChallengeVO(
+                challengeId,
+                scheme.prompt(),
+                puzzle.questionImage(),
                 (int) LOGIN_CHALLENGE_TTL.toSeconds(),
                 scheme.value(),
                 scheme.requiredSelectionCount(),

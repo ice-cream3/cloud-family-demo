@@ -15,7 +15,8 @@ public record AntiAbuseChallengeVO(
             String value,
             ChallengeShapeVO shape,
             String color,
-            String fillMode
+            String fillMode,
+            String image
     ) {
     }
 

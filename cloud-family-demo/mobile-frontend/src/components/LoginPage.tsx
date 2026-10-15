@@ -1,4 +1,5 @@
 import { FocusEvent, FormEvent, useEffect, useState } from 'react';
+import type { DragEvent, PointerEvent } from 'react';
 import { Check, ChevronLeft, Eye, EyeOff, KeyRound, LockKeyhole, Mail, MessageCircle } from 'lucide-react';
 import type { AntiAbuseChallenge, RegisterRequest } from '../types/api';
 import { COUNTRY_CALLING_CODE_OPTIONS } from '../constants/countryCallingCodes';
@@ -35,6 +36,7 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
   const [antiAbuseChallenge, setAntiAbuseChallenge] = useState<AntiAbuseChallenge | null>(null);
   const [antiAbuseAnswer, setAntiAbuseAnswer] = useState('');
   const [antiAbuseLoading, setAntiAbuseLoading] = useState(false);
+  const [draggedPuzzleValue, setDraggedPuzzleValue] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(true);
   const [agreed, setAgreed] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
@@ -52,8 +54,10 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
   async function reloadLoginChallenge(purpose: 'api_login' | 'api_register' = mode === 'register' ? 'api_register' : 'api_login') {
     setAntiAbuseLoading(true);
     try {
-      setAntiAbuseChallenge(await createLoginChallenge(purpose));
-      setAntiAbuseAnswer('');
+      const challenge = await createLoginChallenge(purpose);
+      setAntiAbuseChallenge(challenge);
+      setAntiAbuseAnswer(buildInitialAntiAbuseAnswer(challenge));
+      setDraggedPuzzleValue(null);
     } catch (err) {
       setFormError(readAuthFormError(err));
     } finally {
@@ -118,6 +122,7 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
     setCode('');
     setAntiAbuseAnswer('');
     setAntiAbuseChallenge(null);
+    setDraggedPuzzleValue(null);
     setFormError(null);
   }
 
@@ -144,6 +149,7 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
     .slice(0, 40);
   const selectedPatternValues = antiAbuseAnswer ? antiAbuseAnswer.split(',').filter(Boolean) : [];
   const requiredPatternSelections = antiAbuseChallenge?.requiredSelectionCount || 3;
+  const isPuzzleChallenge = antiAbuseChallenge?.scheme === 'image_reassemble';
   const submitDisabled = loading
     || !username.trim()
     || !password
@@ -153,12 +159,76 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
     || selectedPatternValues.length !== requiredPatternSelections;
 
   function selectPatternOption(value: string) {
+    if (isPuzzleChallenge) {
+      return;
+    }
     const nextValues = selectedPatternValues.includes(value)
       ? selectedPatternValues.filter((selectedValue) => selectedValue !== value)
       : [...selectedPatternValues, value].slice(0, requiredPatternSelections);
     setAntiAbuseAnswer(nextValues.join(','));
     setFormError(null);
   }
+
+  function movePuzzleTile(fromValue: string, toValue: string) {
+    if (!antiAbuseChallenge || !isPuzzleChallenge || fromValue === toValue) {
+      return;
+    }
+    const orderedValues = selectedPatternValues.length
+      ? selectedPatternValues
+      : (antiAbuseChallenge.options || []).map((option) => option.value);
+    const fromIndex = orderedValues.indexOf(fromValue);
+    const toIndex = orderedValues.indexOf(toValue);
+    if (fromIndex < 0 || toIndex < 0) {
+      return;
+    }
+    const nextValues = [...orderedValues];
+    const [movedValue] = nextValues.splice(fromIndex, 1);
+    nextValues.splice(toIndex, 0, movedValue);
+    setAntiAbuseAnswer(nextValues.join(','));
+    setFormError(null);
+  }
+
+  function handlePuzzleDragStart(event: DragEvent<HTMLButtonElement>, value: string) {
+    setDraggedPuzzleValue(value);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', value);
+  }
+
+  function handlePuzzleDrop(event: DragEvent<HTMLButtonElement>, toValue: string) {
+    event.preventDefault();
+    const fromValue = event.dataTransfer.getData('text/plain') || draggedPuzzleValue;
+    if (fromValue) {
+      movePuzzleTile(fromValue, toValue);
+    }
+    setDraggedPuzzleValue(null);
+  }
+
+  function handlePuzzlePointerDown(event: PointerEvent<HTMLButtonElement>, value: string) {
+    if (!isPuzzleChallenge || event.pointerType === 'mouse') {
+      return;
+    }
+    setDraggedPuzzleValue(value);
+  }
+
+  function handlePuzzlePointerUp(event: PointerEvent<HTMLButtonElement>) {
+    if (!isPuzzleChallenge || event.pointerType === 'mouse' || !draggedPuzzleValue) {
+      return;
+    }
+    const target = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLButtonElement>('[data-puzzle-value]');
+    const toValue = target?.dataset.puzzleValue;
+    if (toValue) {
+      movePuzzleTile(draggedPuzzleValue, toValue);
+    }
+    setDraggedPuzzleValue(null);
+  }
+
+  const puzzleOptions = isPuzzleChallenge
+    ? selectedPatternValues
+        .map((value) => (antiAbuseChallenge?.options || []).find((option) => option.value === value))
+        .filter((option): option is NonNullable<typeof option> => Boolean(option))
+    : (antiAbuseChallenge?.options || []);
 
   return (
     <main className="mobile-login-shell">
@@ -308,32 +378,58 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
             <div className="auth-pattern-head">
               <span>
                 {antiAbuseChallenge?.questionImage ? (
-                  <img className="auth-pattern-question-image" src={antiAbuseChallenge.questionImage} alt="请选择目标图形" />
+                  <img
+                    className={`auth-pattern-question-image ${antiAbuseChallenge.scheme === 'image_reassemble' ? 'puzzle' : ''}`}
+                    src={antiAbuseChallenge.questionImage}
+                    alt={antiAbuseChallenge.scheme === 'image_reassemble' ? '请按目标图片重组' : '请选择目标图形'}
+                  />
                 ) : (antiAbuseChallenge?.question || '加载中')}
               </span>
               <button className="code-button" type="button" onClick={() => reloadLoginChallenge()} disabled={antiAbuseLoading}>
                 {antiAbuseLoading ? '刷新中' : '换一组'}
               </button>
             </div>
-            <div className="auth-pattern-options" role="group" aria-label="人机验证图案">
-              {(antiAbuseChallenge?.options || []).map((option) => (
+            <div
+              className={`auth-pattern-options ${isPuzzleChallenge ? 'puzzle-board' : ''}`}
+              role="group"
+              aria-label={isPuzzleChallenge ? '拖拽图片碎片完成重组' : '人机验证图案'}
+            >
+              {puzzleOptions.map((option) => (
                 <button
                   key={option.value}
                   type="button"
-                  className={selectedPatternValues.includes(option.value) ? 'active' : ''}
+                  className={`${selectedPatternValues.includes(option.value) && !isPuzzleChallenge ? 'active' : ''} ${draggedPuzzleValue === option.value ? 'dragging' : ''}`}
                   onClick={() => selectPatternOption(option.value)}
                   disabled={antiAbuseLoading}
-                  role="checkbox"
-                  aria-checked={selectedPatternValues.includes(option.value)}
-                  aria-label="验证选项"
+                  draggable={isPuzzleChallenge && !antiAbuseLoading}
+                  onDragStart={(event) => handlePuzzleDragStart(event, option.value)}
+                  onDragEnd={() => setDraggedPuzzleValue(null)}
+                  onDragOver={(event) => {
+                    if (isPuzzleChallenge) {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = 'move';
+                    }
+                  }}
+                  onDrop={(event) => handlePuzzleDrop(event, option.value)}
+                  onPointerDown={(event) => handlePuzzlePointerDown(event, option.value)}
+                  onPointerUp={handlePuzzlePointerUp}
+                  onPointerCancel={() => setDraggedPuzzleValue(null)}
+                  data-puzzle-value={isPuzzleChallenge ? option.value : undefined}
+                  role={isPuzzleChallenge ? undefined : 'checkbox'}
+                  aria-checked={isPuzzleChallenge ? undefined : selectedPatternValues.includes(option.value)}
+                  aria-label={isPuzzleChallenge ? '可拖拽图片碎片' : '验证选项'}
                 >
-                  <span
-                    className={`auth-pattern-shape ${option.fillMode === 'outline' ? 'outline' : 'solid'}`}
-                    style={{
-                      backgroundColor: option.color,
-                      clipPath: `polygon(${option.shape.clipPath})`,
-                    }}
-                  />
+                  {option.image ? (
+                    <img className="auth-puzzle-tile" src={option.image} alt="图片碎片" />
+                  ) : (
+                    <span
+                      className={`auth-pattern-shape ${option.fillMode === 'outline' ? 'outline' : 'solid'}`}
+                      style={{
+                        backgroundColor: option.color,
+                        clipPath: option.shape ? `polygon(${option.shape.clipPath})` : undefined,
+                      }}
+                    />
+                  )}
                 </button>
               ))}
             </div>
@@ -485,6 +581,13 @@ function readAuthFormError(error: unknown) {
     return error.message;
   }
   return '操作失败。';
+}
+
+function buildInitialAntiAbuseAnswer(challenge: AntiAbuseChallenge) {
+  if (challenge.scheme !== 'image_reassemble') {
+    return '';
+  }
+  return (challenge.options || []).map((option) => option.value).join(',');
 }
 
 function isValidPhone(phoneCountryCode: string, phone: string) {
