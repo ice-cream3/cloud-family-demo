@@ -182,8 +182,7 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
       return;
     }
     const nextValues = [...orderedValues];
-    const [movedValue] = nextValues.splice(fromIndex, 1);
-    nextValues.splice(toIndex, 0, movedValue);
+    [nextValues[fromIndex], nextValues[toIndex]] = [nextValues[toIndex], nextValues[fromIndex]];
     setAntiAbuseAnswer(nextValues.join(','));
     setFormError(null);
   }

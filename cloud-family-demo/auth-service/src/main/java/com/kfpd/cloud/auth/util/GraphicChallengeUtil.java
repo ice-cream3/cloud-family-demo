@@ -1,26 +1,25 @@
 package com.kfpd.cloud.auth.util;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
+/**
+ * @author july
+ */
 public final class GraphicChallengeUtil {
 
-    private static final List<String> PUZZLE_IMAGE_RESOURCES = List.of(
-            "static/challenge-images/network-bridge.svg",
-            "static/challenge-images/network-mesh.svg",
-            "static/challenge-images/network-signal.svg",
-            "static/challenge-images/dw-diamond.jpg",
-            "static/challenge-images/gpt-dog.png",
-            "static/challenge-images/gpt-girl.png"
-    );
+    private static final String PUZZLE_IMAGE_PATTERN = "classpath*:static/challenge-images/*";
 
     private static final List<String> READABLE_SHAPE_CLIP_PATHS = List.of(
             "50% 0%,75% 7%,93% 25%,100% 50%,93% 75%,75% 93%,50% 100%,25% 93%,7% 75%,0% 50%,7% 25%,25% 7%",
@@ -150,15 +149,41 @@ public final class GraphicChallengeUtil {
     }
 
     private static java.util.Optional<String> readRandomPuzzleImage() {
-        List<String> resources = new ArrayList<>(PUZZLE_IMAGE_RESOURCES);
+        List<Resource> resources;
+        try {
+            resources = new ArrayList<>(Arrays.asList(
+                    new PathMatchingResourcePatternResolver().getResources(PUZZLE_IMAGE_PATTERN)));
+        } catch (IOException ignored) {
+            return java.util.Optional.empty();
+        }
         Collections.shuffle(resources);
-        for (String resource : resources) {
-            ClassPathResource image = new ClassPathResource(resource);
-            if (!image.exists()) {
+        for (Resource image : resources) {
+            String filename = image.getFilename();
+            if (filename == null) {
                 continue;
             }
-            try {
-                return java.util.Optional.of(new String(image.getInputStream().readAllBytes(), StandardCharsets.UTF_8));
+            filename = filename.toLowerCase(Locale.ROOT);
+            if (!filename.endsWith(".svg") && !filename.endsWith(".jpg")
+                    && !filename.endsWith(".jpeg") && !filename.endsWith(".png")) {
+                continue;
+            }
+            try (InputStream input = image.getInputStream()) {
+                byte[] bytes = input.readAllBytes();
+                if (filename.endsWith(".svg")) {
+                    return java.util.Optional.of(new String(bytes, StandardCharsets.UTF_8));
+                }
+                String mimeType;
+                if (filename.endsWith(".jpg") || filename.endsWith(".jpeg")) {
+                    mimeType = "image/jpeg";
+                } else if (filename.endsWith(".png")) {
+                    mimeType = "image/png";
+                } else {
+                    continue;
+                }
+                // Normalize raster artwork to the same canvas used by the four tile viewBoxes.
+                return java.util.Optional.of("<image x=\"0\" y=\"0\" width=\"120\" height=\"120\" "
+                        + "preserveAspectRatio=\"xMidYMid slice\" href=\"data:" + mimeType + ";base64,"
+                        + Base64.getEncoder().encodeToString(bytes) + "\"/>");
             } catch (IOException ignored) {
                 // Fall back to generated artwork when packaged resources are unavailable.
             }
