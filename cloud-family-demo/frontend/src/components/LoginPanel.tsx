@@ -1,20 +1,30 @@
 import { FormEvent, useState } from 'react';
 import { Activity, Cpu, KeyRound, LockKeyhole, LogIn, Network, ServerCog, ShieldCheck, UserRound, Zap } from 'lucide-react';
 import type { LoginMode } from '../types/api';
+import { LoginChallenge } from './LoginChallenge';
+import type { ChallengeAnswer } from './LoginChallenge';
 
 type LoginPanelProps = {
   loading: boolean;
   error: string | null;
-  onLogin: (mode: LoginMode, username: string, password: string) => Promise<void>;
+  onLogin: (mode: LoginMode, username: string, password: string, challengeId: string, answer: string) => Promise<void>;
 };
 
 export function LoginPanel({ loading, error, onLogin }: LoginPanelProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [verification, setVerification] = useState<ChallengeAnswer | null>(null);
+  const [challengeRevision, setChallengeRevision] = useState(0);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onLogin('manager', username.trim(), password);
+    if (loading || !verification || !username.trim() || !password) return;
+    try {
+      await onLogin('manager', username.trim(), password, verification.challengeId, verification.answer);
+    } finally {
+      setVerification(null);
+      setChallengeRevision((revision) => revision + 1);
+    }
   }
 
   return (
@@ -99,8 +109,9 @@ export function LoginPanel({ loading, error, onLogin }: LoginPanelProps) {
                 />
               </span>
             </label>
+            <LoginChallenge disabled={loading} revision={challengeRevision} onChange={setVerification} />
             {error ? <div className="error-banner">{error}</div> : null}
-            <button className="primary-button" type="submit" disabled={loading || !username.trim() || !password}>
+            <button className="primary-button" type="submit" disabled={loading || !username.trim() || !password || !verification}>
               <LogIn size={18} />
               {loading ? '登录中' : '登录'}
             </button>

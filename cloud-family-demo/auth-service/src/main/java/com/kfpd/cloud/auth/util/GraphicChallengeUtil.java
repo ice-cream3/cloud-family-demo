@@ -1,5 +1,15 @@
 package com.kfpd.cloud.auth.util;
 
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.GradientPaint;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.geom.Area;
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.Rectangle2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +21,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 
+import javax.imageio.ImageIO;
+
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
@@ -20,6 +32,9 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 public final class GraphicChallengeUtil {
 
     private static final String PUZZLE_IMAGE_PATTERN = "classpath*:static/challenge-images/*";
+    private static final int SLIDER_WIDTH = 320;
+    private static final int SLIDER_HEIGHT = 160;
+    private static final int SLIDER_PIECE_SIZE = 48;
 
     private static final List<String> READABLE_SHAPE_CLIP_PATHS = List.of(
             "50% 0%,75% 7%,93% 25%,100% 50%,93% 75%,75% 93%,50% 100%,25% 93%,7% 75%,0% 50%,7% 25%,25% 7%",
@@ -116,6 +131,119 @@ public final class GraphicChallengeUtil {
         tiles.add(new PuzzleTile(orderedValues.get(3), buildPuzzleTileImage(content, 60, 60)));
         Collections.shuffle(tiles);
         return new PuzzleChallenge(questionImage, tiles);
+    }
+
+    public static SliderChallenge buildSliderChallenge() {
+        int width = SLIDER_WIDTH;
+        int height = SLIDER_HEIGHT;
+        int pieceSize = SLIDER_PIECE_SIZE;
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        int targetX = random.nextInt(100, width - pieceSize - 12);
+        int pieceY = random.nextInt(16, height - pieceSize - 12);
+        BufferedImage artwork = readSliderArtwork(width, height);
+        Area shape = new Area(new Rectangle2D.Double(0, 8, 40, 40));
+        shape.add(new Area(new Ellipse2D.Double(14, 0, 16, 16)));
+        shape.add(new Area(new Ellipse2D.Double(32, 22, 16, 16)));
+        shape.subtract(new Area(new Ellipse2D.Double(-8, 22, 16, 16)));
+        shape.subtract(new Area(new Ellipse2D.Double(14, 40, 16, 16)));
+
+        BufferedImage piece = new BufferedImage(pieceSize, pieceSize, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = piece.createGraphics();
+        try {
+            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            graphics.setClip(shape);
+            graphics.drawImage(artwork, -targetX, -pieceY, null);
+            graphics.setClip(null);
+            graphics.setColor(new Color(255, 255, 255, 220));
+            graphics.setStroke(new BasicStroke(1.2f));
+            graphics.draw(shape);
+        } finally {
+            graphics.dispose();
+        }
+        graphics = artwork.createGraphics();
+        try {
+            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            graphics.translate(targetX, pieceY);
+            graphics.setColor(new Color(35, 43, 56));
+            graphics.fill(shape);
+            graphics.setColor(new Color(255, 255, 255, 210));
+            graphics.setStroke(new BasicStroke(1.2f));
+            graphics.draw(shape);
+        } finally {
+            graphics.dispose();
+        }
+        return new SliderChallenge(pngDataUrl(artwork), pngDataUrl(piece), width, height,
+                pieceSize, pieceY, targetX);
+    }
+
+    public static boolean matchesSliderAnswer(int targetX, String answer) {
+        if (answer == null || !answer.matches("\\d{1,3}")) {
+            return false;
+        }
+        int offset = Integer.parseInt(answer);
+        return offset >= 0 && offset <= SLIDER_WIDTH - SLIDER_PIECE_SIZE && Math.abs(offset - targetX) <= 5;
+    }
+
+    private static BufferedImage readSliderArtwork(int width, int height) {
+        try {
+            List<Resource> resources = new ArrayList<>(Arrays.asList(
+                    new PathMatchingResourcePatternResolver().getResources(PUZZLE_IMAGE_PATTERN)));
+            Collections.shuffle(resources);
+            for (Resource resource : resources) {
+                String filename = resource.getFilename();
+                if (filename == null || !filename.toLowerCase(Locale.ROOT).matches(".*\\.(png|jpe?g)")) {
+                    continue;
+                }
+                try (InputStream input = resource.getInputStream()) {
+                    BufferedImage source = ImageIO.read(input);
+                    if (source == null) {
+                        continue;
+                    }
+                    BufferedImage artwork = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+                    Graphics2D graphics = artwork.createGraphics();
+                    try {
+                        graphics.setColor(Color.WHITE);
+                        graphics.fillRect(0, 0, width, height);
+                        graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                        double scale = Math.max((double) width / source.getWidth(), (double) height / source.getHeight());
+                        int scaledWidth = (int) Math.ceil(source.getWidth() * scale);
+                        int scaledHeight = (int) Math.ceil(source.getHeight() * scale);
+                        graphics.drawImage(source, (width - scaledWidth) / 2, (height - scaledHeight) / 2,
+                                scaledWidth, scaledHeight, null);
+                    } finally {
+                        graphics.dispose();
+                    }
+                    return artwork;
+                } catch (IOException ignored) {
+                    // Try another image if this resource cannot be decoded.
+                }
+            }
+        } catch (IOException ignored) {
+            // Generate artwork when no raster resources are available.
+        }
+        BufferedImage artwork = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = artwork.createGraphics();
+        try {
+            graphics.setPaint(new GradientPaint(0, 0, new Color(191, 219, 254), width, height, new Color(240, 253, 244)));
+            graphics.fillRect(0, 0, width, height);
+            ThreadLocalRandom random = ThreadLocalRandom.current();
+            for (int i = 0; i < 24; i++) {
+                graphics.setColor(Color.decode(randomColor(random)));
+                graphics.fillOval(random.nextInt(width), random.nextInt(height), 20 + random.nextInt(60), 20 + random.nextInt(60));
+            }
+        } finally {
+            graphics.dispose();
+        }
+        return artwork;
+    }
+
+    private static String pngDataUrl(BufferedImage image) {
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            ImageIO.write(image, "png", output);
+            return "data:image/png;base64," + Base64.getEncoder().encodeToString(output.toByteArray());
+        } catch (IOException ex) {
+            throw new IllegalStateException("Cannot encode slider challenge image", ex);
+        }
     }
 
     private static String buildPuzzleQuestionImage(String content, String prompt) {
@@ -293,5 +421,9 @@ public final class GraphicChallengeUtil {
     }
 
     public record PuzzleTile(String value, String image) {
+    }
+
+    public record SliderChallenge(String backgroundImage, String pieceImage, int width, int height,
+                                  int pieceSize, int pieceY, int targetX) {
     }
 }

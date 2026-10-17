@@ -4,6 +4,7 @@ import { Check, ChevronLeft, Eye, EyeOff, KeyRound, LockKeyhole, Mail, MessageCi
 import type { AntiAbuseChallenge, RegisterRequest } from '../types/api';
 import { COUNTRY_CALLING_CODE_OPTIONS } from '../constants/countryCallingCodes';
 import { createLoginChallenge } from '../services/partnerService';
+import { SliderChallenge } from './SliderChallenge';
 
 type LoginPageProps = {
   loading: boolean;
@@ -376,7 +377,7 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
           <div className="mobile-auth-pattern">
             <div className="auth-pattern-head">
               <span>
-                {antiAbuseChallenge?.questionImage ? (
+                {antiAbuseChallenge?.scheme === 'image_slider' ? antiAbuseChallenge.question : antiAbuseChallenge?.questionImage ? (
                   <img
                     className={`auth-pattern-question-image ${antiAbuseChallenge.scheme === 'image_reassemble' ? 'puzzle' : ''}`}
                     src={antiAbuseChallenge.questionImage}
@@ -388,7 +389,17 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
                 {antiAbuseLoading ? '刷新中' : '换一组'}
               </button>
             </div>
-            <div
+            {antiAbuseChallenge?.scheme === 'image_slider' ? (
+              <SliderChallenge
+                key={antiAbuseChallenge.challengeId}
+                challenge={antiAbuseChallenge}
+                disabled={antiAbuseLoading || loading}
+                onAnswer={(answer) => {
+                  setAntiAbuseAnswer(answer);
+                  setFormError(null);
+                }}
+              />
+            ) : <div
               className={`auth-pattern-options ${isPuzzleChallenge ? 'puzzle-board' : ''}`}
               role="group"
               aria-label={isPuzzleChallenge ? '拖拽图片碎片完成重组' : '人机验证图案'}
@@ -431,7 +442,7 @@ export function LoginPage({ loading, error, onLogin, onRegister }: LoginPageProp
                   )}
                 </button>
               ))}
-            </div>
+            </div>}
           </div>
           {isRegister ? (
             <label className="mobile-auth-input">

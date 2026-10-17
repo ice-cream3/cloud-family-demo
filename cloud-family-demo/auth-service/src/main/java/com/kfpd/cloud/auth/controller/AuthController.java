@@ -55,6 +55,11 @@ public class AuthController {
         ));
     }
 
+    @PostMapping("/manager/login/challenge")
+    public ApiResponse<AntiAbuseChallengeVO> createManagerLoginChallenge(HttpServletRequest servletRequest) {
+        return ApiResponse.success(authService.createLoginChallenge("manager_login", resolveLoginRequestContext(servletRequest)));
+    }
+
     @PostMapping("/manager/login")
     public ApiResponse<LoginResponse> managerLogin(@Valid @RequestBody LoginVO request, HttpServletRequest servletRequest) {
         // Manager login has stricter checks, including IP allowlist and login permission.

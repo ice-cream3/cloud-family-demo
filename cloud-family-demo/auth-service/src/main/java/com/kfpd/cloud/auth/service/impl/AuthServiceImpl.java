@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -20,6 +21,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kfpd.cloud.auth.base.config.AuthOAuth2JdbcConfig;
 import com.kfpd.cloud.auth.base.config.AuthLoginProperties;
+import com.kfpd.cloud.auth.base.config.AuthLoginProperties.ChallengeType;
 import com.kfpd.cloud.auth.base.config.AuthSessionProperties;
 import com.kfpd.cloud.auth.dao.cloud.OAuth2AuthorizationDao;
 import com.kfpd.cloud.auth.dao.model.ManagerLoginLogDao;
@@ -82,11 +84,13 @@ public class AuthServiceImpl implements AuthService {
     private static final String LOGIN_RESULT_FAILURE = "FAILURE";
     private static final String CHALLENGE_PURPOSE_API_LOGIN = "api_login";
     private static final String CHALLENGE_PURPOSE_API_REGISTER = "api_register";
+    private static final String CHALLENGE_PURPOSE_MANAGER_LOGIN = "manager_login";
     private static final List<ChallengeScheme> CHALLENGE_SCHEMES = List.of(
-            new ChallengeScheme("graphic_set", 3, false, "请选择:"),
-            new ChallengeScheme("graphic_sequence", 3, true, "按顺序选择:"),
-            new ChallengeScheme("graphic_pair", 2, false, "请选择:"),
-            new ChallengeScheme("image_reassemble", 4, true, "按图重组:")
+            new ChallengeScheme(ChallengeType.GRAPHIC_SET, 3, false, "请选择:"),
+            new ChallengeScheme(ChallengeType.GRAPHIC_SEQUENCE, 3, true, "按顺序选择:"),
+            new ChallengeScheme(ChallengeType.GRAPHIC_PAIR, 2, false, "请选择:"),
+            new ChallengeScheme(ChallengeType.IMAGE_REASSEMBLE, 4, true, "按图重组:"),
+            new ChallengeScheme(ChallengeType.IMAGE_SLIDER, 1, true, "向右拖动滑块完成拼图")
     );
     private static final Duration LOGIN_CHALLENGE_TTL = Duration.ofMinutes(3);
     private static final Map<String, LoginChallenge> LOGIN_CHALLENGES = new ConcurrentHashMap<>();
@@ -204,7 +208,10 @@ public class AuthServiceImpl implements AuthService {
     public AntiAbuseChallengeVO createLoginChallenge(String purpose, LoginRequestContext context) {
         String normalizedPurpose = normalizeChallengePurpose(purpose);
         pruneExpiredLoginChallenges();
-        ChallengeScheme scheme = randomChallengeScheme();
+        ChallengeScheme scheme = randomChallengeScheme(normalizedPurpose);
+        if ("image_slider".equals(scheme.value())) {
+            return createSliderChallenge(normalizedPurpose, scheme, context);
+        }
         if ("image_reassemble".equals(scheme.value())) {
             return createImageReassembleChallenge(normalizedPurpose, scheme, context);
         }
@@ -241,7 +248,8 @@ public class AuthServiceImpl implements AuthService {
                 (int) LOGIN_CHALLENGE_TTL.toSeconds(),
                 scheme.value(),
                 scheme.requiredSelectionCount(),
-                challengeOptions
+                challengeOptions,
+                null
         );
     }
 
@@ -276,8 +284,20 @@ public class AuthServiceImpl implements AuthService {
                 (int) LOGIN_CHALLENGE_TTL.toSeconds(),
                 scheme.value(),
                 scheme.requiredSelectionCount(),
-                challengeOptions
+                challengeOptions,
+                null
         );
+    }
+
+    private AntiAbuseChallengeVO createSliderChallenge(String purpose, ChallengeScheme scheme, LoginRequestContext context) {
+        GraphicChallengeUtil.SliderChallenge slider = GraphicChallengeUtil.buildSliderChallenge();
+        String challengeId = UUID.randomUUID().toString();
+        LOGIN_CHALLENGES.put(challengeId, new LoginChallenge(
+                "", purpose, contextFingerprint(context), true, Instant.now().plus(LOGIN_CHALLENGE_TTL), slider.targetX()));
+        return new AntiAbuseChallengeVO(challengeId, scheme.prompt(), slider.backgroundImage(),
+                (int) LOGIN_CHALLENGE_TTL.toSeconds(), scheme.value(), 1, List.of(),
+                new AntiAbuseChallengeVO.SliderChallengeVO(slider.pieceImage(), slider.width(), slider.height(),
+                        slider.pieceSize(), slider.pieceY()));
     }
 
     @Override
@@ -293,6 +313,7 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.AUTH_MANAGER_IP_FORBIDDEN);
         }
 
+        verifyLoginChallenge(request.antiAbuseChallengeId(), request.antiAbuseAnswer(), CHALLENGE_PURPOSE_MANAGER_LOGIN, context);
         Optional<AuthLoginAccount> account = Optional.ofNullable(loginAccountDao.findManagerByUsername(request.username()));
         if (account.isEmpty() || !matches(account.get(), request)) {
             recordLoginFailure(request.username(), "MANAGER", AuthOAuth2JdbcConfig.MANAGER_CLIENT_ID,
@@ -1033,20 +1054,19 @@ public class AuthServiceImpl implements AuthService {
         if (normalizedChallengeId == null || answer == null) {
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification is required");
         }
-        LoginChallenge challenge = LOGIN_CHALLENGES.get(normalizedChallengeId);
+        LoginChallenge challenge = LOGIN_CHALLENGES.remove(normalizedChallengeId);
         if (challenge == null || challenge.expiresAt().isBefore(Instant.now())) {
-            LOGIN_CHALLENGES.remove(normalizedChallengeId);
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification expired");
         }
         if (!challenge.purpose().equals(purpose) || !challenge.contextFingerprint().equals(contextFingerprint(context))) {
-            LOGIN_CHALLENGES.remove(normalizedChallengeId);
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification is invalid");
         }
-        if (!matchesLoginChallengeAnswer(challenge.answer(), answer, challenge.ordered())) {
-            LOGIN_CHALLENGES.remove(normalizedChallengeId);
+        boolean matches = challenge.sliderTargetX() == null
+                ? matchesLoginChallengeAnswer(challenge.answer(), answer, challenge.ordered())
+                : GraphicChallengeUtil.matchesSliderAnswer(challenge.sliderTargetX(), answer);
+        if (!matches) {
             throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification is invalid");
         }
-        LOGIN_CHALLENGES.remove(normalizedChallengeId);
     }
 
     private String normalizeChallengePurpose(String purpose) {
@@ -1056,6 +1076,9 @@ public class AuthServiceImpl implements AuthService {
         }
         if (CHALLENGE_PURPOSE_API_REGISTER.equals(normalized)) {
             return CHALLENGE_PURPOSE_API_REGISTER;
+        }
+        if (CHALLENGE_PURPOSE_MANAGER_LOGIN.equals(normalized)) {
+            return CHALLENGE_PURPOSE_MANAGER_LOGIN;
         }
         throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "anti abuse verification purpose is invalid");
     }
@@ -1084,8 +1107,14 @@ public class AuthServiceImpl implements AuthService {
         return ThreadLocalRandom.current().nextBoolean() ? "solid" : "outline";
     }
 
-    private ChallengeScheme randomChallengeScheme() {
-        return CHALLENGE_SCHEMES.get(ThreadLocalRandom.current().nextInt(CHALLENGE_SCHEMES.size()));
+    private ChallengeScheme randomChallengeScheme(String purpose) {
+        Set<ChallengeType> enabled = CHALLENGE_PURPOSE_MANAGER_LOGIN.equals(purpose)
+                ? loginProperties.getManager().getEnabledChallengeSchemes()
+                : loginProperties.getApi().getEnabledChallengeSchemes();
+        List<ChallengeScheme> schemes = enabled.isEmpty() ? CHALLENGE_SCHEMES : CHALLENGE_SCHEMES.stream()
+                .filter(scheme -> enabled.contains(scheme.type()))
+                .toList();
+        return schemes.get(ThreadLocalRandom.current().nextInt(schemes.size()));
     }
 
     private void pruneExpiredLoginChallenges() {
@@ -1230,10 +1259,17 @@ public class AuthServiceImpl implements AuthService {
     private record LoginAttempt(int failedCount, LocalDateTime lockedUntil) {
     }
 
-    private record LoginChallenge(String answer, String purpose, String contextFingerprint, boolean ordered, Instant expiresAt) {
+    private record LoginChallenge(String answer, String purpose, String contextFingerprint, boolean ordered,
+                                  Instant expiresAt, Integer sliderTargetX) {
+        private LoginChallenge(String answer, String purpose, String contextFingerprint, boolean ordered, Instant expiresAt) {
+            this(answer, purpose, contextFingerprint, ordered, expiresAt, null);
+        }
     }
 
-    private record ChallengeScheme(String value, int requiredSelectionCount, boolean ordered, String prompt) {
+    private record ChallengeScheme(ChallengeType type, int requiredSelectionCount, boolean ordered, String prompt) {
+        private String value() {
+            return type.name().toLowerCase(Locale.ROOT);
+        }
     }
 
     private List<LoginChallengeOption> buildChallengeOptions() {

@@ -64,12 +64,13 @@ export default function App() {
     return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
   }, []);
 
-  async function handleLogin(mode: LoginMode, username: string, password: string) {
+  async function handleLogin(mode: LoginMode, username: string, password: string,
+                             antiAbuseChallengeId: string, antiAbuseAnswer: string) {
     setLoading(true);
     setError(null);
     setMenuError(null);
     try {
-      const nextSession = await login(mode, username, password);
+      const nextSession = await login(mode, username, password, antiAbuseChallengeId, antiAbuseAnswer);
       setSession(nextSession);
     } catch (err) {
       setError(readError(err));
@@ -347,6 +348,12 @@ function readError(error: unknown) {
 }
 
 function formatApiErrorMessage(message: string) {
+  const challengeMessages: Record<string, string> = {
+    'anti abuse verification is required': '请先完成人机验证',
+    'anti abuse verification expired': '人机验证已过期，请重新验证',
+    'anti abuse verification is invalid': '人机验证答案不正确，请重新验证',
+  };
+  if (challengeMessages[message]) return challengeMessages[message];
   if (message === 'email format is invalid') {
     return '请输入有效的邮箱地址';
   }

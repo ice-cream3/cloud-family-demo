@@ -9,8 +9,12 @@ public record AntiAbuseChallengeVO(
         Integer expiresInSeconds,
         String scheme,
         Integer requiredSelectionCount,
-        List<ChallengeOptionVO> options
+        List<ChallengeOptionVO> options,
+        SliderChallengeVO slider
 ) {
+    public record SliderChallengeVO(String pieceImage, int width, int height, int pieceSize, int pieceY) {
+    }
+
     public record ChallengeOptionVO(
             String value,
             ChallengeShapeVO shape,

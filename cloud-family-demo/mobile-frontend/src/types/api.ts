@@ -70,6 +70,13 @@ export type AntiAbuseChallenge = {
   scheme?: string;
   requiredSelectionCount?: number;
   options?: AntiAbuseChallengeOption[];
+  slider?: {
+    pieceImage: string;
+    width: number;
+    height: number;
+    pieceSize: number;
+    pieceY: number;
+  } | null;
 };
 
 export type AntiAbuseChallengeOption = {

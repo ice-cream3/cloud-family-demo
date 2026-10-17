@@ -151,3 +151,33 @@ export type SystemRecordPayload = {
 };
 
 export type LoginMode = 'partner' | 'manager';
+
+export type AntiAbuseChallenge = {
+  challengeId: string;
+  question: string;
+  questionImage?: string;
+  expiresInSeconds: number;
+  scheme?: string;
+  requiredSelectionCount?: number;
+  options?: AntiAbuseChallengeOption[];
+  slider?: {
+    pieceImage: string;
+    width: number;
+    height: number;
+    pieceSize: number;
+    pieceY: number;
+  } | null;
+};
+
+export type AntiAbuseChallengeOption = {
+  value: string;
+  shape?: AntiAbuseChallengeShape | null;
+  color?: string;
+  fillMode?: 'solid' | 'outline';
+  image?: string | null;
+};
+
+export type AntiAbuseChallengeShape = {
+  value: string;
+  clipPath: string;
+};

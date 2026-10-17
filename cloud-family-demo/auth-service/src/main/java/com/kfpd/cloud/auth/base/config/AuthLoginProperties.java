@@ -14,6 +14,13 @@ public class AuthLoginProperties {
     private Api api = new Api();
     // Bound from auth-service application.yml: demo.auth.login.manager.*
     private Manager manager = new Manager();
+    public enum ChallengeType {
+        GRAPHIC_SET,
+        GRAPHIC_SEQUENCE,
+        GRAPHIC_PAIR,
+        IMAGE_REASSEMBLE,
+        IMAGE_SLIDER
+    }
 
     public Api getApi() {
         return api;
@@ -32,6 +39,17 @@ public class AuthLoginProperties {
     }
 
     public static class Api {
+
+        // Empty enables all schemes for API login and registration.
+        private Set<ChallengeType> enabledChallengeSchemes = Set.of();
+
+        public Set<ChallengeType> getEnabledChallengeSchemes() {
+            return enabledChallengeSchemes;
+        }
+
+        public void setEnabledChallengeSchemes(Set<ChallengeType> enabledChallengeSchemes) {
+            this.enabledChallengeSchemes = enabledChallengeSchemes == null ? Set.of() : Set.copyOf(enabledChallengeSchemes);
+        }
 
         // Number of failed API login attempts allowed before temporary lock.
         private int maxFailedAttempts = 5;
@@ -56,6 +74,17 @@ public class AuthLoginProperties {
     }
 
     public static class Manager {
+
+        // Empty enables all schemes for manager login, independently of the API configuration.
+        private Set<ChallengeType> enabledChallengeSchemes = Set.of();
+
+        public Set<ChallengeType> getEnabledChallengeSchemes() {
+            return enabledChallengeSchemes;
+        }
+
+        public void setEnabledChallengeSchemes(Set<ChallengeType> enabledChallengeSchemes) {
+            this.enabledChallengeSchemes = enabledChallengeSchemes == null ? Set.of() : Set.copyOf(enabledChallengeSchemes);
+        }
 
         // Manager login is allowed only from these source IPs unless "*" is configured.
         private Set<String> allowedIps = new HashSet<>(Set.of("127.0.0.1", "0:0:0:0:0:0:0:1", "::1"));

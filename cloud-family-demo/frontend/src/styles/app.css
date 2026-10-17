@@ -389,6 +389,131 @@ button:disabled {
   font-weight: 600;
 }
 
+.manager-challenge {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dbe4f2;
+  border-radius: 12px;
+  background: #f7f9ff;
+}
+
+.manager-challenge-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #3f4a5a;
+  font-size: 14px;
+}
+
+.manager-challenge-heading button {
+  border: 0;
+  padding: 4px 0 4px 8px;
+  color: #245bff;
+  background: transparent;
+  font-size: 12px;
+}
+
+.manager-challenge-question {
+  display: block;
+  width: 240px;
+  max-width: 100%;
+  height: 42px;
+  object-fit: contain;
+}
+
+.manager-challenge-question.puzzle {
+  height: 98px;
+}
+
+.manager-challenge-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.manager-challenge-options button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  height: 52px;
+  padding: 8px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.manager-challenge-options button.selected {
+  border-color: #245bff;
+  background: #eef3ff;
+  box-shadow: 0 0 0 2px #245bff1a;
+}
+
+.manager-challenge-options button:focus-visible {
+  outline: 2px solid #245bff;
+  outline-offset: 2px;
+}
+
+.manager-challenge-options svg {
+  width: 32px;
+  height: 32px;
+  overflow: visible;
+}
+
+.manager-challenge-order {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  color: #245bff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.manager-challenge-options.puzzle-board {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(168px, 100%);
+  margin: 0 auto;
+  gap: 2px;
+}
+
+.manager-challenge-options.puzzle-board button {
+  height: auto;
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 4px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.manager-challenge-options.puzzle-board button.dragging {
+  opacity: 0.6;
+  cursor: grabbing;
+}
+
+.manager-challenge-options img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.manager-challenge-hint,
+.manager-challenge-error {
+  margin: 0;
+  color: #63728a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.manager-challenge-error {
+  color: #b91c1c;
+}
+
 .input-wrap {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
@@ -2140,4 +2265,91 @@ button:disabled {
   .diff-arrow {
     transform: rotate(90deg);
   }
+}
+
+.auth-slider-challenge {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.auth-slider-picture {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #e5eaf2;
+  user-select: none;
+}
+
+.auth-slider-background {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.auth-slider-piece {
+  position: absolute;
+  height: auto;
+  filter: drop-shadow(0 2px 3px #0006);
+  pointer-events: none;
+}
+
+.auth-slider-track {
+  position: relative;
+  height: 42px;
+  border: 1px solid #dbe3ef;
+  border-radius: 6px;
+  background: #edf1f7;
+}
+
+.auth-slider-track > span {
+  display: grid;
+  height: 100%;
+  padding-left: 32px;
+  place-items: center;
+  color: #63728a;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.auth-slider-handle {
+  position: absolute;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #ccd6e5;
+  border-radius: 5px;
+  color: #63728a;
+  background: #fff;
+  box-shadow: 0 1px 3px #15243b26;
+  font-size: 28px;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.auth-slider-handle.dragging {
+  cursor: grabbing;
+}
+
+.auth-slider-handle:focus-visible {
+  outline: 2px solid #245bff;
+  outline-offset: 3px;
+}
+
+.auth-slider-handle:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.auth-slider-hint {
+  margin: 0;
+  color: #63728a;
+  font-size: 11px;
+  text-align: center;
 }

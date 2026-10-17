@@ -2,6 +2,10 @@
 
 独立 React 前端工程，和 Spring Boot 后端 Maven 多模块分离。
 
+管理端登录需要完成人机验证，支持图形选择、顺序选择、拼图互换和滑块拼图。滑块需按住鼠标左键拖动；验证可手动刷新，过期或登录失败后自动换一组。
+
+验证码通过 `POST /auth/manager/login/challenge` 获取，登录请求携带 `antiAbuseChallengeId` 和 `antiAbuseAnswer`，由服务端校验。
+
 ## 环境版本
 
 已安装完成：
