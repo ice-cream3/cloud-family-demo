@@ -15,6 +15,12 @@
     <name>job-service</name>
 
     <dependencies>
+        <!-- Entity accessors follow the same Lombok convention as the other business services. -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
         <!-- Shared configuration and utility classes. -->
         <dependency>
             <groupId>com.example</groupId>
