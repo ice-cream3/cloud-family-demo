@@ -1582,10 +1582,22 @@ function TripSlotList({
   onAction?: (slot: TripSlot) => void;
   statusContext?: 'reservation';
 }) {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    if (statusContext !== 'reservation') return;
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, [statusContext]);
+
+  const visibleSlots = statusContext === 'reservation'
+    ? slots.filter((slot) => !isTripSlotExpired(slot, now))
+    : slots;
+
   return (
     <div className="trip-list">
-      {slots.length === 0 ? <article className="settings-info-card">{emptyText}</article> : null}
-      {slots.map((slot) => {
+      {visibleSlots.length === 0 ? <article className="settings-info-card">{emptyText}</article> : null}
+      {visibleSlots.map((slot) => {
         const resolvedActionLabel = typeof actionLabel === 'function' ? actionLabel(slot) : actionLabel;
         return (
           <article key={slot.id} className="trip-card">
