@@ -192,12 +192,40 @@ curl -s -X POST http://localhost:38080/auth/logout \
   -H 'Authorization: Bearer <accessToken>'
 ```
 
+Configure the enabled login challenge schemes:
+
+Configure `mobile-frontend` login/registration and `frontend` manager login independently. Each side randomly selects from all five schemes when its own setting is omitted or empty; configuring one side does not affect the other. Configure `auth-service/src/main/resources/application.yml`:
+
+```yaml
+demo:
+  auth:
+    login:
+      api: # mobile-frontend login and registration
+        enabled-challenge-schemes:
+          - image_slider
+          - image_reassemble
+      manager: # frontend manager login
+        enabled-challenge-schemes:
+          - graphic_sequence
+          - image_slider
+```
+
+You can also set the comma-separated environment variables `AUTH_API_LOGIN_CHALLENGE_SCHEMES` and `AUTH_MANAGER_LOGIN_CHALLENGE_SCHEMES` independently using the default configuration. These replace the previous shared `demo.auth.login.enabled-challenge-schemes` / `AUTH_LOGIN_CHALLENGE_SCHEMES` setting. A single value fixes the challenge type. Supported values are `graphic_set` (select three shapes), `graphic_sequence` (select three in order), `graphic_pair` (select two shapes), `image_reassemble` (swap four tiles), and `image_slider` (slider puzzle). Unknown values fail configuration binding at startup. Restart auth-service after changing the configuration.
+
+Request a manager login challenge first (the response expires after three minutes and can be used once):
+
+```bash
+curl -s -X POST http://localhost:38080/auth/manager/login/challenge
+```
+
+Complete the returned image challenge in the management login page, then submit its ID and answer with the credentials. Graphic/puzzle answers are comma-separated option values; slider answers are horizontal offsets in the original image's pixels. Manager challenges are bound to the client IP and User-Agent and cannot be replaced with API login or registration challenges.
+
 Login as a manager user:
 
 ```bash
 curl -s -X POST http://localhost:38080/auth/manager/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"manager","password":"demo"}'
+  -d '{"username":"manager","password":"demo","antiAbuseChallengeId":"<challengeId>","antiAbuseAnswer":"<answer>"}'
 ```
 
 Use the manager token to access manager APIs:
@@ -251,6 +279,7 @@ Auth service endpoints:
 | Method | Request URL | Description |
 | --- | --- | --- |
 | POST | `http://localhost:38080/auth/api/login` | API user login |
+| POST | `http://localhost:38080/auth/manager/login/challenge` | Create manager login image challenge |
 | POST | `http://localhost:38080/auth/manager/login` | Manager user login |
 | POST | `http://localhost:38080/auth/refresh` | Refresh access token |
 | POST | `http://localhost:38080/auth/logout` | Logout and revoke token |
