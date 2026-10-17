@@ -149,6 +149,9 @@ The sample handler names for XXL-JOB admin are:
 - `shardingDemoJobHandler`: sharding demo job, intended for the `SHARDING_BROADCAST` route strategy.
 - `managerLoginStats10mJobHandler`: aggregates successful manager login log records into `fa-model.manager_login_10m_stats` by 10-minute windows.
 - `partnerLoginStats5mJobHandler`: aggregates successful partner login log records into `fa-model.partner_login_5m_stats` by 5-minute windows.
+- `tripExpirationJobHandler`: changes ended `OPEN`, `PENDING`, and `BOOKED` trip slots in `fa-cloud.user_trip_slot` to `EXPIRED`, using the database date/time. Existing `NO_SHOW` records are preserved. The task is safe to retry; already expired rows are skipped.
+
+For `tripExpirationJobHandler`, create an XXL-JOB task with handler `tripExpirationJobHandler`, cron `0 * * * * ?` (every minute), no job parameters, and a single-executor route such as `FIRST` with serial blocking. Enable the task in XXL-JOB Admin after deploying job-service. The local lightweight admin supports manual triggering only. This job uses the existing `faCloudJdbcTemplate` and `faCloudTransactionManager`; no additional table or status-column migration is required. Applicant and review information remain available, including no-show reporting for previously approved bookings after expiration.
 
 For `managerLoginStats10mJobHandler`, use a 10-minute cron such as `0 0/10 * * * ?`.
 Without a job param it calculates the previous complete 10-minute window. To recalculate

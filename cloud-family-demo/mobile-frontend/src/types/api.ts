@@ -200,7 +200,7 @@ export type TripSlot = {
   tripDate: string;
   startTime: string;
   endTime: string;
-  status: 'OPEN' | 'PENDING' | 'BOOKED' | 'NO_SHOW';
+  status: 'OPEN' | 'PENDING' | 'BOOKED' | 'NO_SHOW' | 'EXPIRED';
   applicantUsername?: string | null;
   applicantDisplayName?: string | null;
   applyNote?: string | null;

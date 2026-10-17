@@ -2694,6 +2694,11 @@ img {
   background: #fff1f2;
 }
 
+.trip-status.EXPIRED {
+  color: #64748b;
+  background: #e9eef4;
+}
+
 .trip-meta {
   grid-column: 1 / -1;
   display: flex;

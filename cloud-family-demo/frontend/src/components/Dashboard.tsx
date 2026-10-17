@@ -3114,6 +3114,7 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
             { label: '待审核', value: 'PENDING' },
             { label: '已预约', value: 'BOOKED' },
             { label: '未履约', value: 'NO_SHOW' },
+            { label: '已过期', value: 'EXPIRED' },
           ],
         },
         { key: 'applicantUsername', label: '预约账号' },
@@ -3314,7 +3315,7 @@ function operationLogBusinessTypeOptions(businessModule?: string) {
 }
 
 function StatusValue({ value }: { value?: string }) {
-  return <span className={value === 'ENABLED' ? 'status-pill' : 'muted-pill'}>{value || '-'}</span>;
+  return <span className={value === 'ENABLED' ? 'status-pill' : 'muted-pill'}>{value === 'EXPIRED' ? '已过期' : value || '-'}</span>;
 }
 
 function OperationTypeValue({ value }: { value?: string }) {

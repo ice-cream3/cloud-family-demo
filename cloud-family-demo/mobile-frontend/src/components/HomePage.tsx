@@ -1223,7 +1223,8 @@ function TripScheduleScreen({
             emptyText={loading ? '加载中' : '暂无已发布行程'}
             slots={mySlots}
             currentUser={username}
-            actionLabel={(slot) => slot.status === 'BOOKED' && isTripSlotExpired(slot) ? '未履约' : null}
+            actionLabel={(slot) => (slot.status === 'BOOKED' || (slot.status === 'EXPIRED' && slot.reviewedAt))
+              && slot.applicantUsername && isTripSlotExpired(slot) ? '未履约' : null}
             onAction={markNoShow}
           />
         </>
@@ -1627,6 +1628,7 @@ function compareTripSlots(left: TripSlot, right: TripSlot) {
 }
 
 function isTripSlotExpired(slot: TripSlot, now = new Date()) {
+  if (slot.status === 'EXPIRED') return true;
   const endAt = new Date(`${slot.tripDate}T${formatTripClock(slot.endTime)}:00`);
   return !Number.isNaN(endAt.getTime()) && endAt.getTime() < now.getTime();
 }
@@ -2658,6 +2660,7 @@ function tripStatusLabel(status: TripSlot['status'], context?: 'reservation') {
     PENDING: context === 'reservation' ? '预约中' : '待审核',
     BOOKED: '已预约',
     NO_SHOW: '未履约',
+    EXPIRED: '已过期',
   };
   return labels[status];
 }

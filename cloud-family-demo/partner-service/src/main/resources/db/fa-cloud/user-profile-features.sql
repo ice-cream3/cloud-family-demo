@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS user_trip_slot (
     trip_date date NOT NULL COMMENT '行程日期',
     start_time time NOT NULL COMMENT '开始时间',
     end_time time NOT NULL COMMENT '结束时间',
-    status varchar(32) NOT NULL DEFAULT 'OPEN' COMMENT '行程状态：OPEN/PENDING/BOOKED/NO_SHOW',
+    status varchar(32) NOT NULL DEFAULT 'OPEN' COMMENT '行程状态：OPEN/PENDING/BOOKED/NO_SHOW/EXPIRED',
     applicant_username varchar(64) DEFAULT NULL COMMENT '预约人账号',
     applicant_display_name varchar(100) DEFAULT NULL COMMENT '预约人显示名称',
     apply_note varchar(255) DEFAULT NULL COMMENT '预约申请备注',

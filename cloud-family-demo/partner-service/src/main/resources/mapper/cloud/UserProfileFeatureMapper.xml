@@ -209,7 +209,7 @@
                applicant_username, applicant_display_name, apply_note, applied_at, reviewed_at, created_at, updated_at
         FROM user_trip_slot
         WHERE applicant_username = #{username}
-          AND status IN ('PENDING', 'BOOKED', 'NO_SHOW')
+          AND status IN ('PENDING', 'BOOKED', 'NO_SHOW', 'EXPIRED')
         ORDER BY trip_date ASC, start_time ASC, id DESC
     </select>
 
@@ -303,7 +303,7 @@
             reviewed_at = CURRENT_TIMESTAMP
         WHERE id = #{id}
           AND owner_username = #{ownerUsername}
-          AND status = 'BOOKED'
+          AND (status = 'BOOKED' OR (status = 'EXPIRED' AND reviewed_at IS NOT NULL))
           AND applicant_username IS NOT NULL
     </update>
 </mapper>
