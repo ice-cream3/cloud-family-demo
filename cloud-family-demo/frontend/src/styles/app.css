@@ -1178,6 +1178,7 @@ button:disabled {
   text-align: left;
   vertical-align: middle;
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .table-wrap th {
