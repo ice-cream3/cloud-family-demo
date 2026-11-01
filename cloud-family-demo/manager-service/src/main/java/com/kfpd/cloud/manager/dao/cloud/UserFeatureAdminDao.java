@@ -43,6 +43,8 @@ public interface UserFeatureAdminDao {
 
     int deleteVersion(@Param("id") Long id);
 
+    Map<String, Object> findMembershipDetail(@Param("id") Long id);
+
     long countMemberships(@Param("keyword") String keyword, @Param("status") String status);
 
     List<Map<String, Object>> findMembershipPage(@Param("keyword") String keyword,

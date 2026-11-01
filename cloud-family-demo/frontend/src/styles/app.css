@@ -1542,6 +1542,11 @@ button:disabled {
   padding: 18px;
 }
 
+.record-form .full-width-field {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
 .record-form.single-column {
   grid-template-columns: 1fr;
 }
@@ -1826,6 +1831,19 @@ button:disabled {
   justify-content: flex-end;
   gap: 10px;
   padding-top: 4px;
+}
+
+.dialog-actions > .primary-button,
+.dialog-actions > .ghost-button {
+  flex: 0 0 auto;
+  min-width: 80px;
+  height: 40px;
+  padding: 0 20px;
+  box-sizing: border-box;
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: none;
 }
 
 .menu-config {
@@ -2354,3 +2372,95 @@ button:disabled {
   font-size: 11px;
   text-align: center;
 }
+
+.membership-detail-modules {
+  display: grid;
+  gap: 16px;
+}
+
+.membership-detail-module {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e5ebf1;
+  border-radius: 8px;
+}
+
+.membership-detail-module h4 {
+  margin: 0 0 14px;
+  padding-left: 10px;
+  border-left: 3px solid #0f766e;
+  color: #273142;
+  font-size: 15px;
+}
+
+.membership-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.membership-detail-wide {
+  grid-column: 1 / -1;
+}
+
+.membership-detail-module .detail-item strong {
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .membership-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .membership-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.batch-delete-button {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.selection-column {
+  width: 44px;
+  text-align: center;
+}
+
+.selection-column input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #0f766e;
+  cursor: pointer;
+}
+
+.selection-column input:disabled {
+  cursor: not-allowed;
+}
+
+tbody tr.selected-row {
+  background: #f0fdfa;
+}
+
+.delete-confirm-backdrop { background: rgba(15, 23, 42, .42); backdrop-filter: blur(3px); }
+.delete-confirm-dialog { width: min(460px, 100%); border-radius: 16px; padding: 24px; }
+.delete-confirm-content { display: flex; align-items: flex-start; gap: 14px; }
+.delete-confirm-icon { display: grid; place-items: center; flex-shrink: 0; width: 48px; height: 48px; border-radius: 14px; color: #dc2626; background: #fef2f2; }
+.delete-confirm-copy { flex: 1; min-width: 0; }
+.delete-confirm-copy h3 { margin: 2px 0 8px; font-size: 18px; color: #172033; }
+.delete-confirm-copy p { margin: 0; color: #64748b; font-size: 14px; line-height: 1.6; }
+.delete-confirm-preview { margin-top: 20px; padding: 12px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; }
+.delete-confirm-preview > div { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0; font-size: 14px; }
+.delete-confirm-preview span { min-width: 0; overflow-wrap: anywhere; }
+.delete-confirm-preview small { flex-shrink: 0; color: #94a3b8; }
+.delete-confirm-preview p { margin: 6px 0 0; font-size: 12px; color: #64748b; }
+.delete-confirm-warning { margin: 14px 0 0; color: #b45309; font-size: 13px; line-height: 1.6; }
+.delete-confirm-error { margin-top: 12px; color: #b91c1c; font-size: 13px; overflow-wrap: anywhere; }
+.delete-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.delete-confirm-submit { padding: 9px 16px; border: 1px solid #dc2626; border-radius: 8px; background: #dc2626; color: white; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.delete-confirm-submit:hover:not(:disabled) { background: #b91c1c; }
+.delete-confirm-submit:disabled { opacity: .6; cursor: not-allowed; }

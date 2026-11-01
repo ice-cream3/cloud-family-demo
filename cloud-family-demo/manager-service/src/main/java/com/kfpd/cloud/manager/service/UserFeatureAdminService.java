@@ -9,6 +9,8 @@ public interface UserFeatureAdminService {
 
     PageVO<Map<String, Object>> findPage(String feature, PageQueryVO query);
 
+    Map<String, Object> membershipDetail(Long id);
+
     Map<String, Object> create(String feature, Map<String, Object> record);
 
     Map<String, Object> update(String feature, Long id, Map<String, Object> record);

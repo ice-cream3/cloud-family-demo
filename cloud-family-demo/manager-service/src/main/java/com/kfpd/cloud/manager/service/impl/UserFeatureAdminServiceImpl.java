@@ -80,6 +80,15 @@ public class UserFeatureAdminServiceImpl implements UserFeatureAdminService {
     }
 
     @Override
+    public Map<String, Object> membershipDetail(Long id) {
+        Map<String, Object> detail = userFeatureAdminDao.findMembershipDetail(id);
+        if (detail == null) {
+            throw SystemManagementSupport.notFound("Membership not found");
+        }
+        return detail;
+    }
+
+    @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public Map<String, Object> create(String feature, Map<String, Object> record) {
         Map<String, Object> normalized = normalize(record);
@@ -110,7 +119,7 @@ public class UserFeatureAdminServiceImpl implements UserFeatureAdminService {
             case "documents" -> userFeatureAdminDao.updateDocument(id, normalized);
             case "versions" -> userFeatureAdminDao.updateVersion(id, normalized);
             case "memberships" -> userFeatureAdminDao.updateMembership(id, normalized);
-            case "histories" -> userFeatureAdminDao.updateHistory(id, normalized);
+            case "histories" -> throw SystemManagementSupport.badRequest("历史记录不允许修改");
             case "favorites" -> userFeatureAdminDao.updateFavorite(id, normalized);
             case "trip-publishes", "trip-reviews" -> userFeatureAdminDao.updateTrip(id, normalized);
             case "trip-users" -> throw SystemManagementSupport.badRequest("trip user summary cannot be updated");

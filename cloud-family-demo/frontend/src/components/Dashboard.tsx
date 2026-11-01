@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ChevronRight, Eye, EyeOff, FolderTree, KeyRound, Layers3, ListTree, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
 import type { LoginTrendPoint, ManagerDashboard, MenuTreeNode, OperationLog, PageQuery, PageResult, SysMenu, SysPermission, SysRole, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
 import type { Session } from '../services/tokenStore';
-import { loadSystemMenuTree } from '../services/dashboardService';
+import { loadMembershipDetail, loadSystemMenuTree } from '../services/dashboardService';
 import { COUNTRY_CALLING_CODE_OPTIONS } from '../constants/countryCallingCodes';
 
 type DashboardProps = {
@@ -24,6 +24,7 @@ type DashboardProps = {
   onCreateSystemRecord: (payload: SystemRecordPayload) => Promise<void>;
   onUpdateSystemRecord: (id: number, payload: SystemRecordPayload) => Promise<void>;
   onDeleteSystemRecord: (id: number) => Promise<void>;
+  onDeleteSystemRecords: (ids: number[]) => Promise<{ id: number; error: string }[]>;
   onResetUserPassword: (id: number, password: string) => Promise<void>;
   onKickOutPartnerInfo: (id: number) => Promise<void>;
   onLoadMenuPermissionOptions: () => Promise<SysPermission[]>;
@@ -60,6 +61,7 @@ export function Dashboard({
   onCreateSystemRecord,
   onUpdateSystemRecord,
   onDeleteSystemRecord,
+  onDeleteSystemRecords,
   onResetUserPassword,
   onKickOutPartnerInfo,
   onLoadMenuPermissionOptions,
@@ -133,6 +135,7 @@ export function Dashboard({
             onCreate={onCreateSystemRecord}
             onUpdate={onUpdateSystemRecord}
             onDelete={onDeleteSystemRecord}
+            onDeleteMany={onDeleteSystemRecords}
             onResetPassword={onResetUserPassword}
             onKickOutPartnerInfo={onKickOutPartnerInfo}
             onLoadMenuPermissionOptions={onLoadMenuPermissionOptions}
@@ -472,6 +475,7 @@ function SystemPagePanel({
   onCreate,
   onUpdate,
   onDelete,
+  onDeleteMany,
   onResetPassword,
   onKickOutPartnerInfo,
   onLoadMenuPermissionOptions,
@@ -497,6 +501,7 @@ function SystemPagePanel({
   onCreate: (payload: SystemRecordPayload) => Promise<void>;
   onUpdate: (id: number, payload: SystemRecordPayload) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
+  onDeleteMany: (ids: number[]) => Promise<{ id: number; error: string }[]>;
   onResetPassword: (id: number, password: string) => Promise<void>;
   onKickOutPartnerInfo: (id: number) => Promise<void>;
   onLoadMenuPermissionOptions: () => Promise<SysPermission[]>;
@@ -521,7 +526,8 @@ function SystemPagePanel({
   const total = page?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const canCreate = hasAnyPermission(permissions, systemActionPermissions(menu, 'add')) || hasActionButton(menu, 'add');
-  const canEdit = hasAnyPermission(permissions, systemActionPermissions(menu, 'edit')) || hasActionButton(menu, 'edit');
+  const canEdit = menu?.path !== '/api/manager/partner/histories'
+    && (hasAnyPermission(permissions, systemActionPermissions(menu, 'edit')) || hasActionButton(menu, 'edit'));
   const canDelete = hasAnyPermission(permissions, systemActionPermissions(menu, 'delete')) || hasActionButton(menu, 'delete');
   const canResetPassword = hasPermission(permissions, 'system:user:reset-password');
   const canResetPartnerPassword = menu?.path === '/api/manager/partner/info'
@@ -532,9 +538,31 @@ function SystemPagePanel({
   const canAssignRolePermissions = hasPermission(permissions, 'system:role:edit');
   const canAssignRoleMenus = hasPermission(permissions, 'system:role:menu');
   const canAssignMenuPermissions = hasPermission(permissions, 'system:menu:button-permission');
-  const canShowOperationColumn = isOperationLogPage
+  const isMembershipPage = menu?.path === '/api/manager/partner/memberships';
+  const canShowOperationColumn = isMembershipPage || isOperationLogPage
     || (!readOnly && (canEdit || canDelete || canResetPassword || canResetPartnerPassword || canKickOutPartner || canAssignUserRoles || canAssignRolePermissions || canAssignRoleMenus || canAssignMenuPermissions));
   const [viewMode, setViewMode] = useState<'table' | 'tree'>('table');
+  const canBatchDelete = !readOnly && canDelete;
+  const [deleteTarget, setDeleteTarget] = useState<{ records: SystemPageRecord[]; batch: boolean } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const selectableRecords = records.filter((record) => !isMenuManagement || !isOperationLogMenuRecord(record));
+  const selectedRecords = selectableRecords.filter((record) => selectedIds.has(record.id));
+  const allSelected = selectableRecords.length > 0 && selectedRecords.length === selectableRecords.length;
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [menu?.path, pageNum, pageSize, query, viewMode]);
+
+  function toggleSelected(id: number) {
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   const [editorRecord, setEditorRecord] = useState<SystemPageRecord | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -556,6 +584,7 @@ function SystemPagePanel({
   const [roleMenuOptions, setRoleMenuOptions] = useState<MenuTreeNode[]>([]);
   const [selectedRoleMenuIds, setSelectedRoleMenuIds] = useState<Set<number>>(() => new Set());
   const [roleMenuError, setRoleMenuError] = useState<string | null>(null);
+  const [membershipDetailId, setMembershipDetailId] = useState<number | null>(null);
   const [logDetailRecord, setLogDetailRecord] = useState<OperationLog | null>(null);
   const [operationMessage, setOperationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [treeNodes, setTreeNodes] = useState<MenuTreeNode[]>([]);
@@ -583,6 +612,9 @@ function SystemPagePanel({
     setRoleMenuRecord(null);
     setRoleMenuError(null);
     setLogDetailRecord(null);
+    setMembershipDetailId(null);
+    setDeleteTarget(null);
+    setDeleteError(null);
     setOperationMessage(null);
   }, [menu?.path]);
 
@@ -622,6 +654,7 @@ function SystemPagePanel({
   }
 
   function openEdit(record: SystemPageRecord) {
+    if (!canEdit) return;
     if (isMenuManagement) {
       if (isOperationLogMenuRecord(record)) {
         setOperationMessage({ type: 'error', text: '操作日志菜单仅允许查询，不允许修改' });
@@ -676,12 +709,33 @@ function SystemPagePanel({
     }
   }
 
+  async function deleteSelectedRecords() {
+    if (!canBatchDelete || saving || !deleteTarget) return;
+    const ids = deleteTarget.records.map((record) => record.id);
+    setSaving(true);
+    setOperationMessage(null);
+    try {
+      const failures = await onDeleteMany(ids);
+      setSelectedIds(new Set(failures.map((failure) => failure.id)));
+      setDeleteTarget(null);
+      setOperationMessage({
+        type: failures.length ? 'error' : 'success',
+        text: failures.length
+          ? `已删除 ${ids.length - failures.length} 条，失败 ${failures.length} 条。${failures.map((failure) => `ID ${failure.id}：${failure.error}`).join('；')}`
+          : `成功删除 ${ids.length} 条记录`,
+      });
+      if (isMenuManagement) await reloadMenuTree();
+    } catch (err) {
+      setDeleteError(readErrorMessage(err));
+      setOperationMessage({ type: 'error', text: readErrorMessage(err) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function deleteRecord(record: SystemPageRecord) {
     if (isMenuManagement && isOperationLogMenuRecord(record)) {
       setOperationMessage({ type: 'error', text: '操作日志菜单仅允许查询，不允许修改' });
-      return;
-    }
-    if (!window.confirm(`确认删除 ${recordLabel(record)}？`)) {
       return;
     }
     setSaving(true);
@@ -692,12 +746,11 @@ function SystemPagePanel({
         await reloadMenuTree();
       }
       setOperationMessage({ type: 'success', text: '删除成功' });
+      setDeleteTarget(null);
     } catch (err) {
       const message = readErrorMessage(err);
-      setEditorError(message);
+      setDeleteError(message);
       setOperationMessage({ type: 'error', text: message });
-      setEditorOpen(true);
-      setEditorRecord(record);
     } finally {
       setSaving(false);
     }
@@ -896,11 +949,11 @@ function SystemPagePanel({
         <div className="section-actions">
           {isMenuManagement ? (
             <div className="view-switch" aria-label="菜单展示模式">
-              <button type="button" className={viewMode === 'table' ? 'active' : ''} onClick={() => setViewMode('table')}>
+              <button type="button" className={viewMode === 'table' ? 'active' : ''} disabled={saving} onClick={() => setViewMode('table')}>
                 <ListTree size={15} />
                 列表
               </button>
-              <button type="button" className={viewMode === 'tree' ? 'active' : ''} onClick={() => setViewMode('tree')}>
+              <button type="button" className={viewMode === 'tree' ? 'active' : ''} disabled={saving} onClick={() => setViewMode('tree')}>
                 <Layers3 size={15} />
                 树形配置
               </button>
@@ -912,24 +965,30 @@ function SystemPagePanel({
               新增
             </button>
           ) : null}
+          {canBatchDelete && !(isMenuManagement && viewMode === 'tree') ? (
+            <button className="ghost-button small batch-delete-button" type="button" onClick={() => { setDeleteError(null); setDeleteTarget({ records: selectedRecords, batch: true }); }} disabled={loading || saving || selectedRecords.length === 0}>
+              <Trash2 size={16} />
+              批量删除{selectedRecords.length ? `（${selectedRecords.length}）` : ''}
+            </button>
+          ) : null}
           {!(isMenuManagement && viewMode === 'tree') ? (
             <div className="pager-actions">
               <label>
                 每页
-                <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))} disabled={loading}>
+                <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))} disabled={loading || saving}>
                   <option value={10}>10</option>
                   <option value={20}>20</option>
                   <option value={50}>50</option>
                   <option value={100}>100</option>
                 </select>
               </label>
-              <button type="button" disabled={loading || pageNum <= 1} onClick={() => onPageChange(pageNum - 1)}>
+              <button type="button" disabled={loading || saving || pageNum <= 1} onClick={() => onPageChange(pageNum - 1)}>
                 上一页
               </button>
               <span>
                 {pageNum} / {totalPages}
               </span>
-              <button type="button" disabled={loading || pageNum >= totalPages} onClick={() => onPageChange(pageNum + 1)}>
+              <button type="button" disabled={loading || saving || pageNum >= totalPages} onClick={() => onPageChange(pageNum + 1)}>
                 下一页
               </button>
             </div>
@@ -939,13 +998,13 @@ function SystemPagePanel({
       {isOperationLogPage ? (
         <OperationLogQueryBar
           query={query}
-          loading={loading}
+          loading={loading || saving}
           onSearch={onSearch}
         />
       ) : isMenuManagement && viewMode === 'table' ? (
         <MenuQueryBar
           query={query}
-          loading={loading}
+          loading={loading || saving}
           keywordPlaceholder="菜单编码 / 名称 / 路径 / 组件"
           statusLabel="状态"
           statusOptions={[
@@ -957,14 +1016,14 @@ function SystemPagePanel({
       ) : menu?.path === '/api/manager/partner/info' ? (
         <PartnerInfoQueryBar
           query={query}
-          loading={loading}
+          loading={loading || saving}
           onSearch={onSearch}
         />
       ) : isPartnerFeaturePage(menu?.path) ? (
         <PartnerFeatureQueryBar
           path={menu?.path}
           query={query}
-          loading={loading}
+          loading={loading || saving}
           onSearch={onSearch}
         />
       ) : null}
@@ -1015,6 +1074,12 @@ function SystemPagePanel({
           <table>
             <thead>
               <tr>
+                {canBatchDelete ? <th className="selection-column">
+                  <input type="checkbox" aria-label="全选当前页可删除记录" checked={allSelected}
+                    ref={(input) => { if (input) input.indeterminate = selectedRecords.length > 0 && !allSelected; }}
+                    disabled={loading || saving || selectableRecords.length === 0}
+                    onChange={() => setSelectedIds(allSelected ? new Set() : new Set(selectableRecords.map((record) => record.id)))} />
+                </th> : null}
                 {config.columns.map((column) => (
                   <th key={column.key}>{column.title}</th>
                 ))}
@@ -1024,7 +1089,12 @@ function SystemPagePanel({
             </thead>
             <tbody>
               {records.map((record) => (
-                <tr key={record.id}>
+                <tr key={record.id} className={canBatchDelete && selectedIds.has(record.id) ? 'selected-row' : undefined}>
+                  {canBatchDelete ? <td className="selection-column">
+                    <input type="checkbox" aria-label={`选择 ${recordLabel(record)}`} checked={selectedIds.has(record.id)}
+                      disabled={loading || saving || (isMenuManagement && isOperationLogMenuRecord(record))}
+                      onChange={() => toggleSelected(record.id)} />
+                  </td> : null}
                   {config.columns.map((column) => (
                     <td key={column.key}>{column.render(record)}</td>
                   ))}
@@ -1041,6 +1111,11 @@ function SystemPagePanel({
                   {canShowOperationColumn && !isOperationLogPage ? (
                     <td>
                       <div className="row-actions">
+                        {isMembershipPage ? (
+                          <button type="button" onClick={() => setMembershipDetailId(record.id)}>
+                            <Search size={14} />详情
+                          </button>
+                        ) : null}
                         {canEdit && (!isMenuManagement || !isOperationLogMenuRecord(record)) ? (
                           <button type="button" onClick={() => openEdit(record)} disabled={saving}>
                             <Pencil size={14} />
@@ -1098,7 +1173,7 @@ function SystemPagePanel({
                           </button>
                         ) : null}
                         {canDelete && (!isMenuManagement || !isOperationLogMenuRecord(record)) ? (
-                          <button className="danger" type="button" onClick={() => deleteRecord(record)} disabled={saving}>
+                          <button className="danger" type="button" onClick={() => { setDeleteError(null); setDeleteTarget({ records: [record], batch: false }); }} disabled={saving}>
                             <Trash2 size={14} />
                             删除
                           </button>
@@ -1116,6 +1191,19 @@ function SystemPagePanel({
       ) : (
         <div className="empty-state compact">{loading ? '数据加载中。' : '暂无分页数据。'}</div>
       )}
+      {deleteTarget ? <DeleteConfirmDialog
+        records={deleteTarget.records}
+        batch={deleteTarget.batch}
+        saving={saving}
+        error={deleteError}
+        onClose={() => { if (!saving) setDeleteTarget(null); }}
+        onConfirm={() => {
+          if (saving) return;
+          setDeleteError(null);
+          if (deleteTarget.batch) void deleteSelectedRecords();
+          else void deleteRecord(deleteTarget.records[0]);
+        }}
+      /> : null}
       {editorOpen ? (
         <RecordEditorDialog
           config={withMenuParentOptions(config, menuParentOptions)}
@@ -1205,6 +1293,9 @@ function SystemPagePanel({
           }}
           onSave={saveRoleMenus}
         />
+      ) : null}
+      {membershipDetailId !== null ? (
+        <MembershipDetailDialog id={membershipDetailId} onClose={() => setMembershipDetailId(null)} />
       ) : null}
       {logDetailRecord ? (
         <OperationLogDetailDialog
@@ -1889,7 +1980,11 @@ function RecordEditorDialog({
   onClose: () => void;
   onSave: (payload: SystemRecordPayload) => Promise<void>;
 }) {
-  const fields = config.fields.filter((field) => !field.createOnly || !record);
+  const visibleFields = config.fields.filter((field) => !field.createOnly || !record);
+  const fields = [
+    ...visibleFields.filter((field) => field.type !== 'textarea'),
+    ...visibleFields.filter((field) => field.type === 'textarea'),
+  ];
   const [values, setValues] = useState<Record<string, string | boolean>>(() => initialEditorValues(fields, initialRecord || record));
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -1918,7 +2013,7 @@ function RecordEditorDialog({
         </div>
         <form className="record-form" onSubmit={submit}>
           {fields.map((field) => (
-            <label key={field.key} className={field.type === 'checkbox' ? 'checkbox-field' : ''}>
+            <label key={field.key} className={field.type === 'checkbox' ? 'checkbox-field' : field.type === 'textarea' ? 'full-width-field' : ''}>
               <span>{field.label}</span>
               {renderEditorControl(
                 field,
@@ -2453,6 +2548,136 @@ function RoleMenuTreeOption({
   );
 }
 
+function DeleteConfirmDialog({ records, batch, saving, error, onClose, onConfirm }: {
+  records: SystemPageRecord[];
+  batch: boolean;
+  saving: boolean;
+  error: string | null;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    cancelRef.current?.focus();
+    return () => previous?.focus();
+  }, []);
+
+  return (
+    <div className="modal-backdrop delete-confirm-backdrop" onClick={(event) => { if (event.target === event.currentTarget && !saving) onClose(); }}>
+      <section ref={dialogRef} className="record-dialog delete-confirm-dialog" role="alertdialog" aria-modal="true"
+        aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-description" aria-busy={saving}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && !saving) { event.stopPropagation(); onClose(); }
+          if (event.key === 'Tab') {
+            const buttons = dialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
+            if (!buttons?.length) { event.preventDefault(); return; }
+            const first = buttons[0];
+            const last = buttons[buttons.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+          }
+        }}>
+        <div className="delete-confirm-content">
+          <div className="delete-confirm-icon"><Trash2 size={24} /></div>
+          <div className="delete-confirm-copy">
+            <h3 id="delete-confirm-title">{batch ? '批量删除记录' : '删除记录'}</h3>
+            <p id="delete-confirm-description">{batch ? <>即将删除选中的 <strong>{records.length}</strong> 条记录。</> : <>确认删除这条记录？</>}</p>
+          </div>
+          <button className="icon-button" type="button" aria-label="关闭" onClick={onClose} disabled={saving}><X size={18} /></button>
+        </div>
+        <div className="delete-confirm-preview">
+          {records.slice(0, 3).map((record) => <div key={record.id}><span>{deleteRecordLabel(record)}</span><small>ID {record.id}</small></div>)}
+          {records.length > 3 ? <p>另有 {records.length - 3} 条记录</p> : null}
+        </div>
+        <p className="delete-confirm-warning">删除后无法恢复，请确认后继续。</p>
+        {error ? <div className="delete-confirm-error" role="alert">{error}</div> : null}
+        <div className="delete-confirm-actions">
+          <button ref={cancelRef} className="ghost-button small" type="button" onClick={onClose} disabled={saving}>取消</button>
+          <button className="delete-confirm-submit" type="button" onClick={onConfirm} disabled={saving}>{saving ? '正在删除…' : batch ? `确认删除 ${records.length} 条` : '确认删除'}</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function MembershipDetailDialog({ id, onClose }: { id: number; onClose: () => void }) {
+  const [record, setRecord] = useState<SystemPageRecord | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setRecord(null);
+    setError(null);
+    loadMembershipDetail(id).then((detail) => {
+      if (active) setRecord(detail);
+    }).catch((err: unknown) => {
+      if (active) setError(err instanceof Error ? err.message : '加载会员详情失败');
+    });
+    return () => { active = false; };
+  }, [id, retry]);
+
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="record-dialog log-detail-dialog" role="dialog" aria-modal="true" aria-label="会员详情">
+        <div className="dialog-heading">
+          <div><h3>会员详情</h3><p>会员基础信息与会员方案</p></div>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="关闭"><X size={18} /></button>
+        </div>
+        <div className="log-detail-body">
+          {error ? <div role="alert">{error} <button type="button" onClick={() => setRetry(retry + 1)}>重试</button></div> : null}
+          {!record && !error ? <p role="status">加载中…</p> : null}
+          {record ? <div className="membership-detail-modules">
+            <section className="membership-detail-module" aria-labelledby="membership-basic-title">
+              <h4 id="membership-basic-title">基础信息</h4>
+              <div className="membership-detail-grid">
+                <DetailItem label="会员记录 ID" value={record.id} />
+                {[
+                  ['username', '账号'], ['displayName', '显示名称'], ['email', '邮箱'],
+                  ['phoneCountryCode', '手机区号'], ['phone', '手机号'],
+                ].map(([key, label]) => <DetailItem key={key} label={label} value={readField(record, key)} />)}
+              </div>
+            </section>
+            <section className="membership-detail-module" aria-labelledby="membership-account-title">
+              <h4 id="membership-account-title">账号与信用</h4>
+              <div className="membership-detail-grid">
+                <div className="detail-item"><span>账号状态</span><StatusValue value={readField(record, 'accountStatus')} /></div>
+                <DetailItem label="会员等级" value={readField(record, 'vipLevel')} />
+                <DetailItem label="信用积分" value={readField(record, 'creditScore')} />
+              </div>
+            </section>
+            <section className="membership-detail-module" aria-labelledby="membership-plan-title">
+              <h4 id="membership-plan-title">会员方案</h4>
+              <div className="membership-detail-grid">
+                <DetailItem label="会员方案" value={readField(record, 'planName')} />
+                <div className="detail-item"><span>会员状态</span><StatusValue value={readField(record, 'status')} /></div>
+                <DetailItem label="到期时间" value={readField(record, 'expireAt') ? formatDate(readField(record, 'expireAt')) : '未设置'} />
+                <div className="membership-detail-wide"><DetailItem label="会员权益" value={readField(record, 'benefits')} /></div>
+              </div>
+            </section>
+            <section className="membership-detail-module" aria-labelledby="membership-time-title">
+              <h4 id="membership-time-title">时间信息</h4>
+              <div className="membership-detail-grid">
+                {[
+                  ['registeredAt', '注册时间'], ['updatedAt', '更新时间'],
+                ].map(([key, label]) => <DetailItem key={key} label={label} value={formatDate(readField(record, key))} />)}
+              </div>
+            </section>
+          </div> : null}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function OperationLogDetailDialog({ record, onClose }: { record: OperationLog; onClose: () => void }) {
   const before = parseLogData(readLogPayload(record, 'beforeData', 'before_data'));
   const after = parseLogData(readLogPayload(record, 'afterData', 'after_data'));
@@ -2680,6 +2905,8 @@ function initialEditorValues(fields: EditorField[], record: SystemPageRecord | n
     const raw = record ? (record as Record<string, unknown>)[field.key] : undefined;
     if (field.type === 'checkbox') {
       values[field.key] = raw === undefined ? true : Boolean(raw);
+    } else if (field.key === 'occurredAt') {
+      values[field.key] = raw === null || raw === undefined || raw === '' ? '' : formatDate(String(raw));
     } else if (field.key === 'status') {
       values[field.key] = typeof raw === 'string' ? raw : 'ENABLED';
     } else {
@@ -3023,7 +3250,7 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
         { key: 'title', title: '标题', render: (record) => textValue(readField(record, 'title')) },
         { key: 'description', title: '描述', render: (record) => truncateText(readField(record, 'description'), 40) },
         { key: 'iconTone', title: '色调', render: (record) => textValue(readField(record, 'iconTone')) },
-        { key: 'occurredAt', title: '发生时间', render: (record) => formatDate(readField(record, 'occurredAt')) },
+        { key: 'occurredAt', title: '操作时间', render: (record) => formatDate(readField(record, 'occurredAt')) },
       ],
       fields: [
         { key: 'username', label: '账号', required: true },
@@ -3031,7 +3258,7 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
         { key: 'title', label: '标题', required: true },
         { key: 'description', label: '描述', type: 'textarea' },
         { key: 'iconTone', label: '色调', placeholder: 'green / orange / blue' },
-        { key: 'occurredAt', label: '发生时间', placeholder: 'yyyy-MM-dd HH:mm:SS' },
+        { key: 'occurredAt', label: '操作时间', placeholder: 'yyyy-MM-dd HH:mm:ss' },
       ],
     };
   }
@@ -3800,6 +4027,15 @@ function formatLogValue(value: unknown) {
     return String(value);
   }
   return JSON.stringify(value, null, 2);
+}
+
+function deleteRecordLabel(record: SystemPageRecord) {
+  const keys = ['title', 'menuName', 'roleName', 'permissionName', 'displayName', 'username', 'planName', 'versionName'];
+  for (const key of keys) {
+    const value = readField(record, key)?.trim();
+    if (value) return value;
+  }
+  return '未命名记录';
 }
 
 function recordLabel(record: SystemPageRecord) {

@@ -24,6 +24,11 @@ public class UserFeatureAdminController {
         this.userFeatureAdminService = userFeatureAdminService;
     }
 
+    @PostMapping("/memberships/detail/{id}")
+    public ApiResponse<Map<String, Object>> membershipDetail(@PathVariable Long id) {
+        return ApiResponse.success(userFeatureAdminService.membershipDetail(id));
+    }
+
     @PostMapping("/{feature}/page")
     public ApiResponse<PageVO<Map<String, Object>>> page(@PathVariable String feature, @ModelAttribute PageQueryVO query) {
         return ApiResponse.success(userFeatureAdminService.findPage(feature, query));

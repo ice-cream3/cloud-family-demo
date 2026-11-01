@@ -169,6 +169,24 @@ export default function App() {
     }
   }
 
+  async function handleDeleteSystemRecords(ids: number[]) {
+    if (!activeMenu?.path) throw new Error('请选择要操作的页面');
+    const failures: { id: number; error: string }[] = [];
+    // Reuse each resource's delete endpoint to preserve permissions and business checks.
+    for (const id of ids) {
+      try {
+        await deleteSystemRecord(activeMenu.path, id);
+      } catch (err) {
+        failures.push({ id, error: err instanceof Error ? err.message : '删除失败' });
+      }
+    }
+    const remainingTotal = Math.max(0, (systemPage?.total || 0) - (ids.length - failures.length));
+    const lastPage = Math.max(1, Math.ceil(remainingTotal / (systemPage?.pageSize || 10)));
+    await reloadCurrentSystemPage(Math.min(systemPage?.pageNum || 1, lastPage));
+    if (activeMenu.path === '/api/manager/system/menus') await refreshMenus();
+    return failures;
+  }
+
   async function handleResetUserPassword(id: number, password: string) {
     if (activeMenu?.path === '/api/manager/partner/info') {
       await resetPartnerInfoPassword(id, password);
@@ -288,6 +306,7 @@ export default function App() {
       onCreateSystemRecord={handleCreateSystemRecord}
       onUpdateSystemRecord={handleUpdateSystemRecord}
       onDeleteSystemRecord={handleDeleteSystemRecord}
+      onDeleteSystemRecords={handleDeleteSystemRecords}
       onResetUserPassword={handleResetUserPassword}
       onKickOutPartnerInfo={handleKickOutPartnerInfo}
       onLoadMenuPermissionOptions={handleLoadMenuPermissionOptions}

@@ -217,3 +217,7 @@ function getSystemEndpoint(path: string) {
   }
   return endpoint;
 }
+
+export function loadMembershipDetail(id: number) {
+  return post<SystemPageRecord>(`/api/manager/partner/features/memberships/detail/${id}`);
+}

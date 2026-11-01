@@ -135,6 +135,17 @@
         </where>
     </select>
 
+    <select id="findMembershipDetail" resultType="map">
+        SELECT m.id, m.username, m.plan_name planName, m.status, m.expire_at expireAt,
+               m.benefits, m.updated_at updatedAt,
+               u.display_name displayName, u.email, u.phone_country_code phoneCountryCode,
+               u.phone, u.vip_level vipLevel, u.credit_score creditScore,
+               u.status accountStatus, u.created_at registeredAt
+        FROM user_membership m
+        LEFT JOIN vip_user u ON u.username = m.username
+        WHERE m.id = #{id}
+    </select>
+
     <select id="findMembershipPage" resultType="map">
         SELECT id, username, plan_name planName, status, expire_at expireAt, benefits, updated_at updatedAt
         FROM user_membership
