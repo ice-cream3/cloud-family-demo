@@ -10,6 +10,20 @@ gateway-service/auth-service/partner-service/manager-service/job-service -> comm
 
 `common-service` 不应依赖任何业务服务模块，也不承载具体业务流程。
 
+本文中的 Maven、MySQL 命令均在仓库根目录执行。当前构建目标为 JDK 21，依赖版本由[根 pom.xml](../pom.xml)管理；本模块没有启动类、独立端口或 `application.yml`，运行配置由引用它的服务提供。
+
+## 快速验证
+
+```bash
+# 编译公共模块并运行现有单元测试，无需启动 MySQL、Redis 或 RocketMQ
+mvn -pl common-service -am test
+
+# 安装到本地 Maven 仓库，供单独构建的业务模块使用
+mvn -pl common-service -am install
+```
+
+接入业务服务时，先配置 `demo.datasource.cloud` 和 `demo.datasource.model` 两组数据源。需要缓存、锁时配置 Redis Cluster；需要消息收发时显式启用 RocketMQ。完整服务启动顺序和地址见[项目说明](../README.md)。
+
 ## 核心能力
 
 - 统一响应结构：`ApiResponse`
@@ -51,6 +65,17 @@ com.kfpd.cloud.common.config.json.JacksonAutoConfiguration
 com.kfpd.cloud.common.config.rocketmq.RocketMqAutoConfiguration
 com.kfpd.cloud.common.config.redis.RedissonAutoConfiguration
 ```
+
+自动装配条件与覆盖方式：
+
+| 自动配置 | 启用条件 | 自定义方式 |
+| --- | --- | --- |
+| `MultiDataSourceAutoConfiguration` | classpath 存在 JDBC、DataSource 和 HikariCP。 | 按 `MultiDataSourceNames` 中的 Bean 名分别替换数据源、JdbcTemplate 或事务管理器。 |
+| `JacksonAutoConfiguration` | 容器缺少 `com.fasterxml.jackson.databind.ObjectMapper`。 | 声明自己的同类型 Bean。 |
+| `RedissonAutoConfiguration` | 存在 Redisson 类、配置了集群节点，且 `demo.redisson.enabled` 为 `true` 或未设置。 | 按类型替换客户端或 `RedissonService`；模板按 `redisTemplate` 名称替换。 |
+| `RocketMqAutoConfiguration` | 存在 RocketMQ producer 类；producer 和 service Bean 还要求 `demo.rocketmq.enabled=true`。 | 分别声明自己的 `DefaultMQProducer` 或 `RocketMqService`。 |
+
+`CommonJwtProperties` 由使用 JWT 的业务配置通过 `@EnableConfigurationProperties(CommonJwtProperties.class)` 注册，当前接入点为 auth 和 gateway；它不在上述公共自动装配清单中。MyBatis 的 Mapper 扫描、SqlSessionFactory 和业务异常处理器也由各业务服务声明。
 
 ## 包结构
 
@@ -145,6 +170,8 @@ throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "username is required"
 
 各 Servlet 服务通过自己的异常处理器把 `BusinessException` 转成 `ApiResponse`。
 
+`BusinessException` 提供 `getErrorCode()`、`getCode()` 和 `getHttpStatus()`。`ApiResponse.error(...)` 只构造响应体，HTTP 状态码需要由异常处理器或调用方设置。
+
 ## 网关透传 Header
 
 类：`com.kfpd.cloud.common.web.GatewayHeaders`
@@ -155,8 +182,9 @@ throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "username is required"
 | `USER_TYPE` | `X-User-Type` | 用户类型，例如 `API`、`MANAGER`。 |
 | `USER_ROLES` | `X-User-Roles` | 逗号分隔的角色列表。 |
 | `USER_PERMISSIONS` | `X-User-Permissions` | 逗号分隔的权限列表。 |
+| `INTERNAL_TOKEN` | `X-Gateway-Internal-Token` | 网关调用下游服务时携带的内部校验令牌。 |
 
-这些 Header 由 `gateway-service` 在 JWT 验签成功后注入。生产环境应限制业务服务只能被网关访问，避免外部调用方伪造 `X-User-*`。
+这些 Header 由 `gateway-service` 在 JWT 验签及授权有效性校验后注入。partner 和 manager 的网关访问过滤器会校验内部令牌；各服务的 `demo.gateway.internal-token` 应保持一致。公共模块提供常量，具体校验逻辑由各服务负责。
 
 ## JWT 公共配置
 
@@ -187,6 +215,8 @@ demo:
 SecretKey key = JwtSecretKeys.hmacSha256Key(secret);
 ```
 
+该方法直接把 secret 的 UTF-8 字节构造成 `HmacSHA256` 密钥，不做 Base64 解码或哈希派生。auth 签发与 gateway 验签须使用相同的原始 secret。实际 token 签发、校验及有效期使用逻辑位于业务模块。
+
 ## Jackson 自动配置
 
 类：`com.kfpd.cloud.common.config.json.JacksonAutoConfiguration`
@@ -195,6 +225,7 @@ SecretKey key = JwtSecretKeys.hmacSha256Key(secret);
 
 - 当 Spring 容器中没有自定义 `ObjectMapper` 时，提供一个默认 `ObjectMapper` Bean。
 - 当业务服务已经声明自己的 `ObjectMapper` 时，本配置不会覆盖业务服务配置。
+- 默认 Mapper 注册 `JavaTimeModule`、发现其他可用模块，并关闭 `WRITE_DATES_AS_TIMESTAMPS`，支持 `Instant`、`LocalDateTime` 等时间类型的字符串序列化。
 
 这个配置主要用于 `RedisTemplate` JSON 序列化等公共基础设施，避免服务没有显式声明 `ObjectMapper` 时启动失败。
 
@@ -223,9 +254,10 @@ demo:
     crypto:
       secret: ${DATASOURCE_CRYPTO_SECRET:cloud-family-demo-datasource-crypto-secret}
     cloud:
-      url: ${FA_CLOUD_DB_URL:jdbc:mysql://localhost:3306/fa-cloud?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=utf8}
-      username: ${FA_CLOUD_DB_USERNAME:ENC(...)}
-      password: ${FA_CLOUD_DB_PASSWORD:ENC(...)}
+      url: ${FA_CLOUD_DB_URL:jdbc:mysql://localhost:3306/fa-cloud?useSSL=false&allowPublicKeyRetrieval=true&preserveInstants=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
+      username: ${FA_CLOUD_DB_USERNAME:root}
+      password: ${FA_CLOUD_DB_PASSWORD:}
+      driver-class-name: com.mysql.cj.jdbc.Driver
       maximum-pool-size: ${FA_CLOUD_DB_MAX_POOL_SIZE:10}
       minimum-idle: ${FA_CLOUD_DB_MIN_IDLE:2}
       connection-timeout: ${FA_CLOUD_DB_CONNECTION_TIMEOUT:30000}
@@ -235,9 +267,10 @@ demo:
       leak-detection-threshold: ${FA_CLOUD_DB_LEAK_DETECTION_THRESHOLD:0}
       pool-name: fa-cloud
     model:
-      url: ${FA_MODEL_DB_URL:jdbc:mysql://localhost:3306/fa-model?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=utf8}
-      username: ${FA_MODEL_DB_USERNAME:ENC(...)}
-      password: ${FA_MODEL_DB_PASSWORD:ENC(...)}
+      url: ${FA_MODEL_DB_URL:jdbc:mysql://localhost:3306/fa-model?useSSL=false&allowPublicKeyRetrieval=true&preserveInstants=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
+      username: ${FA_MODEL_DB_USERNAME:root}
+      password: ${FA_MODEL_DB_PASSWORD:}
+      driver-class-name: com.mysql.cj.jdbc.Driver
       maximum-pool-size: ${FA_MODEL_DB_MAX_POOL_SIZE:10}
       minimum-idle: ${FA_MODEL_DB_MIN_IDLE:2}
       connection-timeout: ${FA_MODEL_DB_CONNECTION_TIMEOUT:30000}
@@ -247,6 +280,26 @@ demo:
       leak-detection-threshold: ${FA_MODEL_DB_LEAK_DETECTION_THRESHOLD:0}
       pool-name: fa-model
 ```
+
+示例中的账号密码可以通过环境变量传入明文或完整的 `ENC(...)` 密文。`ENC(...)` 中的省略号不是有效密文，不可直接作为配置使用。
+
+`cloud`、`model` 各自支持的完整连接池参数：
+
+| 字段 | Java 默认值 | 说明 |
+| --- | --- | --- |
+| `url` | 无 | JDBC URL，需指定实际数据库。 |
+| `username` / `password` | 无 | 连接账号、密码，可使用 `ENC(...)`。 |
+| `driver-class-name` | `com.mysql.cj.jdbc.Driver` | JDBC 驱动类。 |
+| `maximum-pool-size` | `10` | 最大连接数。 |
+| `minimum-idle` | `2` | 最小空闲连接数。 |
+| `connection-timeout` | `30000` | 等待获取连接的超时，毫秒。 |
+| `idle-timeout` | `600000` | 空闲连接超时，毫秒。 |
+| `max-lifetime` | `1800000` | 连接最大存活时间，毫秒。 |
+| `validation-timeout` | `5000` | 连接验证超时，毫秒。 |
+| `leak-detection-threshold` | `0` | 连接泄漏检测阈值，毫秒，`0` 表示关闭。 |
+| `pool-name` | 按库回退 | 未填写时分别使用 `fa-cloud`、`fa-model`。 |
+
+公共配置没有 `demo.datasource.enabled` 开关；即使服务不直接执行 SQL，引入后仍会按自动装配条件创建两组数据源。使用自定义数据源时，需保持 Bean 名和事务管理器的绑定一致。
 
 自动创建的 Bean：
 
@@ -282,6 +335,8 @@ public void updateModelData() {
     // 使用 fa-model 数据源的 DAO/JdbcTemplate。
 }
 ```
+
+两个事务管理器各自管理一个数据源。选择 `FA_MODEL_TRANSACTION_MANAGER` 不会使 `fa-cloud` 的操作自动加入同一个事务；跨库操作需要由业务代码明确设计事务边界。
 
 ## 数据源密文
 
@@ -321,11 +376,17 @@ String encrypted = EncryptedDataSourceValues.encrypt(
 
 - classpath 中存在 `org.redisson.api.RedissonClient`
 - 配置了 `spring.data.redis.cluster.nodes`
-- 当前容器中没有自定义 `RedissonClient`
+- `demo.redisson.enabled=true`，或没有显式设置该开关
+
+配置满足后，每个 Bean 再分别按缺失条件创建。例如已有自定义 `RedissonClient` 时，会复用该客户端创建其他尚未声明的 Bean。
 
 配置示例：
 
 ```yaml
+demo:
+  redisson:
+    enabled: true
+
 spring:
   data:
     redis:
@@ -340,11 +401,12 @@ spring:
 | --- | --- |
 | `RedissonClient` | 阻塞式 Redisson 客户端。 |
 | `RedissonReactiveClient` | Reactive Redisson 客户端。 |
-| `ObjectMapper` | 如果容器中没有自定义 `ObjectMapper`，自动提供默认实例。 |
 | `redisTemplate` | key/hash key 使用 String，value/hash value 使用 Jackson JSON。 |
 | `RedissonService` | 基于 Redisson 和 RedisTemplate 的常用操作封装。 |
 
 `nodes` 可以写 `host:port`，自动补成 `redis://host:port`；也可以显式写 `redis://` 或 `rediss://`。
+
+当前节点配置按逗号分隔的属性值读取。`RedisTemplate` 还依赖 Spring 提供的 `RedisConnectionFactory` 和公共 Jackson Mapper。`demo.redisson.enabled=false` 会关闭本模块的整组 Redisson 自动配置，但不等同于关闭 Spring 自身的 Redis 自动配置。gateway 的 dev 配置默认将此开关设为 `false`；其他服务以各自配置为准。
 
 ## RedissonService
 
@@ -356,7 +418,12 @@ spring:
 | --- | --- |
 | `get` / `set` | 读写普通 key/value。 |
 | `set(key, value, time)` | 写入普通 key/value 并设置秒级 TTL。 |
+| `setIfAbsent(key, value, time, unit)` | 仅 key 不存在时写入，同时设置 TTL。 |
+| `get(key, TypeReference<T>)` | 读取并转换为指定类型，适用于泛型集合等。 |
+| `setBytes` / `getBytes` | 使用 `ByteArrayCodec` 写入和读取原始字节。 |
 | `hasKey` / `del` / `expire` | 判断、删除、设置过期时间。 |
+| `getKeys` / `delByPattern` | 按 Redis key 模式查询、删除。 |
+| `getExpire` / `getMillisecondExpire` | 获取剩余 TTL，分别返回秒、毫秒。 |
 | `hGet` / `hSet` / `hGetAll` / `hDel` | Hash 常用操作。 |
 | `sAdd` / `sMembers` / `sRemove` | Set 常用操作。 |
 | `lAdd` / `lReadAll` / `lRemove` | List 常用操作。 |
@@ -391,7 +458,35 @@ redissonService.execute("rebuild-stats:" + userId, () -> {
 });
 ```
 
-如果不希望获取锁失败时抛异常，可以使用 `tryExecute`。
+缓存示例：
+
+```java
+redissonService.set("demo:user:42", Map.of("username", "alice"), 5, TimeUnit.MINUTES);
+Map<String, String> user = redissonService.get(
+        "demo:user:42", new TypeReference<Map<String, String>>() {});
+
+redissonService.setBytes("demo:payload:42", new byte[] {1, 2, 3}, 60);
+byte[] payload = redissonService.getBytes("demo:payload:42");
+```
+
+示例中的 `Map`、`TimeUnit`、`TypeReference` 分别来自 `java.util`、`java.util.concurrent`、`com.fasterxml.jackson.core.type`。
+
+缓存与锁的具体行为：
+
+- `set`、`expire` 等未指定单位的 TTL 重载默认使用秒；`expire` 的时间小于等于 `0` 时删除 key。
+- TTL 查询对不存在或没有有效过期时间的 key 返回 `0`，不直接返回 Redis 的负数标记。
+- 普通单 key `get` / `set` 走 Redisson 默认 codec；`get(List<String>)` 走 `RedisTemplate` 的 JSON 序列化路径。同一组 key 应使用一致的读写路径；`setByte` 也是默认 codec 的对象存储，原始字节应使用 `setBytes` / `getBytes`。
+- `execute` / `tryExecute` 自动拼接 `key-prefix` 并在 `finally` 中解锁；`lock` / `tryLock` / `unlock` 直接使用传入的完整 key。
+- `execute` 获取锁失败时抛出 `IllegalStateException`；`tryExecute` 获取失败时返回 `Optional.empty()`，业务回调自身抛出的异常仍会向外传播。回调返回 `null` 时也会得到空 Optional。
+- `execute` / `tryExecute` 默认显式设置 30 秒租约；业务执行时间需要匹配租约。原始 `lock(key)` 不指定租约，续期行为与显式租约重载不同。
+
+带显式等待时间和租约的示例：
+
+```java
+Optional<String> result = redissonService.tryExecute(
+        "rebuild-stats:42", 2, 60, TimeUnit.SECONDS,
+        () -> "done");
+```
 
 ## RocketMQ 自动配置
 
@@ -437,7 +532,7 @@ demo:
 | `retry-times-when-send-failed` | `2` | 同步发送失败重试次数。 |
 | `consume-thread-min` | `1` | push consumer 最小消费线程数。 |
 | `consume-thread-max` | `4` | push consumer 最大消费线程数。 |
-| `consume-message-batch-max-size` | `1` | 单次拉取消费批大小。 |
+| `consume-message-batch-max-size` | `1` | 消费监听器一次处理的最大消息条数。 |
 
 `RocketMqService` 支持：
 
@@ -446,6 +541,24 @@ demo:
 - `oneWaySend(...)`
 - `subscribe(...)`
 - `shutdown()`
+
+收发示例（`rocketMqService` 通过构造器注入）：
+
+```java
+// 同步发送：topic、tag、业务 key、消息正文
+rocketMqService.syncSend("demo-topic", "created", "order-42", "{\"id\":42}");
+
+// 使用指定 consumer group 订阅；启动时注册一次
+rocketMqService.subscribe("demo-created-consumer", "demo-topic", "created", (messages, context) -> {
+    for (var message : messages) {
+        String body = new String(message.getBody(), java.nio.charset.StandardCharsets.UTF_8);
+        // 在此处理 body；处理失败时按业务需要返回 RECONSUME_LATER。
+    }
+    return org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
+});
+```
+
+发送方法默认使用 UTF-8，也提供 `Charset` 重载；异步发送要求传入非空 `SendCallback`。启用自动配置只启动 producer，consumer 在业务代码调用 `subscribe` 时创建和启动；关闭容器时，`RocketMqService.shutdown()` 关闭已登记的 consumers，producer 由自己的 Bean 销毁回调关闭。发送及订阅涉及的检查异常由业务调用方处理。
 
 ## Redis Key 工具
 
@@ -463,7 +576,13 @@ demo:
 
 ```java
 String key = RedisKeyUtil.redisKeyDemo(1);
+// DEMO:KEY:1
+
+String orderKey = RedisKeyConsts.getGeneratorOrderKey("demo:order", "42");
+// DEMO:ORDER:42
 ```
+
+工具方法会将结果转为大写。`getJoinKey(String... keys)` 跳过空白片段并直接连接，不会自动添加分隔符；`getJoinKey(separator, keys)` 的当前实现适用于非空有效片段和单字符分隔符。
 
 ## OAuth2 授权表
 
@@ -476,7 +595,7 @@ common-service/src/main/resources/db/fa-cloud/spring-security-oauth2-authorizati
 执行示例：
 
 ```bash
-mysql -h127.0.0.1 -P3306 -uroot -proot < common-service/src/main/resources/db/fa-cloud/spring-security-oauth2-authorization-schema.sql
+mysql -h127.0.0.1 -P3306 -uroot -p < common-service/src/main/resources/db/fa-cloud/spring-security-oauth2-authorization-schema.sql
 ```
 
 脚本创建：
@@ -489,7 +608,11 @@ mysql -h127.0.0.1 -P3306 -uroot -proot < common-service/src/main/resources/db/fa
 
 `auth-service` 启动时会初始化 demo client。
 
+此脚本由运维或开发者手动执行，公共自动配置不会自动建表。OAuth2 表对应的 Entity 位于 `auth-service`；其他业务表的实体由实际使用该表的服务维护，`common-service` 本身没有业务 DAO 或 Entity。
+
 ## 环境变量
+
+本模块直接绑定的是 `demo.*`、`spring.data.redis.*` 配置属性。下面的简写环境变量通过各服务 `application-dev.yml`、`application-test.yml` 或本文示例中的 `${...}` 映射；复制配置时须保留对应占位符。仅定义一个任意名称的环境变量不会自动建立这种映射。
 
 常用数据源变量：
 
@@ -517,6 +640,7 @@ Redis 变量：
 | `REDIS_LOCK_KEY_PREFIX` | dev Redisson 锁 key 前缀。 |
 | `REDIS_LOCK_WAIT_TIME_SECONDS` | dev Redisson 锁默认等待时间。 |
 | `REDIS_LOCK_LEASE_TIME_SECONDS` | dev Redisson 锁默认租约时间。 |
+| `GATEWAY_REDISSON_ENABLED` | gateway dev 配置中的 Redisson 开关，默认 `false`。 |
 
 RocketMQ 变量：
 
@@ -526,6 +650,8 @@ RocketMQ 变量：
 | `ROCKETMQ_NAMESRV_ADDR` | NameServer 地址。 |
 | `ROCKETMQ_PRODUCER_GROUP` | producer group。 |
 | `ROCKETMQ_CONSUMER_GROUP` | consumer group。 |
+
+发送超时、重试次数和消费线程数可按 RocketMQ 配置示例增加环境变量占位符；未配置时使用 `RocketMqProperties` 的默认值。
 
 JWT 变量：
 
@@ -542,33 +668,44 @@ JWT 变量：
 | `auth-service` | JWT 配置、双数据源、OAuth2 JDBC、Redis 会话、统一异常。 |
 | `partner-service` | `fa-cloud` 数据源、Redis、统一响应和异常。 |
 | `manager-service` | `fa-cloud` / `fa-model` 双数据源、Redis、RocketMQ、统一响应和异常。 |
-| `job-service` | `fa-cloud` 读取、`fa-model` 写入、双事务管理器。 |
+| `job-service` | `fa-cloud` 过期行程更新、`fa-model` 登录日志读取和统计写入、双事务管理器。 |
 
 ## 本地初始化
 
 初始化 OAuth2 授权表：
 
 ```bash
-mysql -h127.0.0.1 -P3306 -uroot -proot < common-service/src/main/resources/db/fa-cloud/spring-security-oauth2-authorization-schema.sql
+mysql -h127.0.0.1 -P3306 -uroot -p < common-service/src/main/resources/db/fa-cloud/spring-security-oauth2-authorization-schema.sql
 ```
 
 初始化 partner VIP 用户表：
 
 ```bash
-mysql -h127.0.0.1 -P3306 -uroot -proot < partner-service/src/main/resources/db/fa-cloud/vip-user-schema.sql
+mysql -h127.0.0.1 -P3306 -uroot -p < partner-service/src/main/resources/db/fa-cloud/vip-user-schema.sql
 ```
 
 初始化 manager 系统管理表：
 
 ```bash
-mysql -h127.0.0.1 -P3306 -uroot -proot < manager-service/src/main/resources/db/fa-cloud/system-management-schema.sql
+mysql -h127.0.0.1 -P3306 -uroot -p < manager-service/src/main/resources/db/fa-cloud/system-management-schema.sql
 ```
 
-初始化 manager 操作日志表：
+初始化个人中心功能表、登录日志和操作日志表（登录日志脚本先创建 `fa-model` 数据库）：
 
 ```bash
-mysql -h127.0.0.1 -P3306 -uroot -proot < manager-service/src/main/resources/db/fa-model/operation-log-schema.sql
+mysql -h127.0.0.1 -P3306 -uroot -p < partner-service/src/main/resources/db/fa-cloud/user-profile-features.sql
+mysql -h127.0.0.1 -P3306 -uroot -p < auth-service/src/main/resources/db/fa-model/auth-login-log-schema.sql
+mysql -h127.0.0.1 -P3306 -uroot -p fa-model < manager-service/src/main/resources/db/fa-model/operation-log-schema.sql
 ```
+
+启用登录统计任务时，继续初始化对应统计表：
+
+```bash
+mysql -h127.0.0.1 -P3306 -uroot -p < job-service/src/main/resources/db/fa-model/manager-login-stats-schema.sql
+mysql -h127.0.0.1 -P3306 -uroot -p < job-service/src/main/resources/db/fa-model/partner-login-stats-schema.sql
+```
+
+脚本中的库名是 `fa-cloud`、`fa-model`。如使用 test 环境的 `fa-cloud-test`、`fa-model-test`，应将脚本内的建库及 `USE` 语句和连接目标同步调整。数据库脚本执行顺序及菜单增量脚本另见[项目说明](../README.md)。
 
 ## 验证命令
 
@@ -595,6 +732,28 @@ mvn test
 | 测试类 | 覆盖点 |
 | --- | --- |
 | `EncryptedDataSourceValuesTests` | `ENC(...)` 密文解密、明文透传、加密后可解密。 |
+
+这些单元测试不验证 MySQL、Redis 或 RocketMQ 的连接。基础设施联调需要启动相应组件和业务服务，并核对当前激活的 profile。
+
+## 常见问题
+
+| 现象 | 核查位置与处理方式 |
+| --- | --- |
+| `Failed to decrypt datasource value` | 核对 `demo.datasource.crypto.secret` 与生成密文时的密钥一致，并确认配置中是完整 `ENC(...)`。 |
+| JDBC URL、数据库或数据表不可用 | 核对两组 `demo.datasource.*` 连接属性、当前 profile 和初始化脚本执行结果。公共模块不负责自动执行 SQL。 |
+| 找不到 `RedissonService` | 核对 `demo.redisson.enabled`、`spring.data.redis.cluster.nodes` 和业务模块是否加载公共自动配置。gateway 默认关闭该组配置。 |
+| Redis 已有 key 无法按预期反序列化 | 核对写入和读取是否使用同一 codec，尤其是 Redisson 单 key 路径与 RedisTemplate 批量读取路径。 |
+| `Failed to acquire redis lock` | `execute` 未在等待时间内获得锁；核对业务锁名、持有者及等待/租约配置，也可按业务需要使用 `tryExecute` 处理获取失败。 |
+| 没有 `RocketMqService` Bean | 默认关闭；检查 `demo.rocketmq.enabled=true`、NameServer 连接和自定义 producer Bean。 |
+| RocketMQ producer 已启动但未消费消息 | 核对业务代码是否调用 `subscribe`，以及 consumer group、topic、tag 是否与发送端匹配。 |
+
+## 源码入口
+
+- [数据源自动配置](src/main/java/com/kfpd/cloud/common/config/datasource/MultiDataSourceAutoConfiguration.java)、[连接池参数](src/main/java/com/kfpd/cloud/common/config/datasource/MultiDataSourceProperties.java)、[密文工具](src/main/java/com/kfpd/cloud/common/config/datasource/EncryptedDataSourceValues.java)。
+- [Redis 自动配置](src/main/java/com/kfpd/cloud/common/config/redis/RedissonAutoConfiguration.java)、[缓存和锁方法](src/main/java/com/kfpd/cloud/common/config/redis/RedissonService.java)。
+- [RocketMQ 自动配置](src/main/java/com/kfpd/cloud/common/config/rocketmq/RocketMqAutoConfiguration.java)、[收发方法](src/main/java/com/kfpd/cloud/common/config/rocketmq/RocketMqService.java)。
+- [公共响应](src/main/java/com/kfpd/cloud/common/web/ApiResponse.java)、[错误码](src/main/java/com/kfpd/cloud/common/exception/ErrorCode.java)、[网关 Header](src/main/java/com/kfpd/cloud/common/web/GatewayHeaders.java)。
+- [自动配置注册清单](src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports)、[OAuth2 建表脚本](src/main/resources/db/fa-cloud/spring-security-oauth2-authorization-schema.sql)。
 
 ## 维护约定
 

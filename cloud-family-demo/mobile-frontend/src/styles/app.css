@@ -2699,6 +2699,249 @@ img {
   background: #e9eef4;
 }
 
+.trip-no-show-dialog {
+  width: min(360px, calc(100% - 40px));
+  max-height: calc(100dvh - 48px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 24px;
+  color: #1e293b;
+  background: #fff;
+  box-shadow: 0 24px 80px #0f172a38, 0 4px 16px #0f172a0f;
+}
+
+.trip-no-show-dialog[open] {
+  animation: trip-dialog-enter 180ms ease-out;
+}
+
+.trip-no-show-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(4px);
+}
+
+.trip-no-show-content {
+  position: relative;
+  padding: 28px 24px 24px;
+}
+
+.trip-no-show-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #94a3b8;
+  background: transparent;
+  cursor: pointer;
+}
+
+.trip-no-show-close:hover {
+  color: #475569;
+  background: #f1f5f9;
+}
+
+.trip-no-show-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 18px;
+  border: 1px solid #ffedd5;
+  border-radius: 17px;
+  color: #ea7544;
+  background: #fff7ed;
+}
+
+.trip-no-show-content h2 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 750;
+  line-height: 1.4;
+  letter-spacing: -0.4px;
+}
+
+.trip-no-show-description {
+  margin: 10px 0 22px;
+  color: #7b8798;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.trip-no-show-summary {
+  padding: 16px;
+  border: 1px solid #edf0f4;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.trip-no-show-person {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.trip-no-show-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+  color: #64748b;
+  background: #fff;
+}
+
+.trip-no-show-person > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.trip-no-show-person strong,
+.trip-no-show-trip strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.trip-no-show-person div > span {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.trip-no-show-trip {
+  display: grid;
+  gap: 6px;
+  margin-top: 15px;
+  padding-top: 14px;
+  border-top: 1px solid #e8edf3;
+}
+
+.trip-no-show-trip strong {
+  color: #475569;
+  font-size: 13px;
+}
+
+.trip-no-show-trip span {
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.trip-no-show-penalty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 15px;
+  padding-top: 14px;
+  border-top: 1px solid #e8edf3;
+}
+
+.trip-no-show-penalty > span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.trip-no-show-penalty strong {
+  color: #e26843;
+  font-size: 25px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.trip-no-show-penalty small {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.trip-no-show-error {
+  margin: 14px 0 0;
+  color: #b42318;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.trip-no-show-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.trip-no-show-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 11px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 150ms, opacity 150ms;
+}
+
+.trip-no-show-cancel {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.trip-no-show-cancel:hover {
+  background: #e8eef5;
+}
+
+.trip-no-show-confirm {
+  color: #fff;
+  background: #e77851;
+}
+
+.trip-no-show-confirm:hover {
+  background: #d86943;
+}
+
+.trip-no-show-dialog button:focus-visible {
+  outline: 2px solid #ea7544;
+  outline-offset: 3px;
+}
+
+.trip-no-show-dialog button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.trip-no-show-spinner {
+  animation: trip-dialog-spin 900ms linear infinite;
+}
+
+@keyframes trip-dialog-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes trip-dialog-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trip-no-show-dialog[open],
+  .trip-no-show-spinner {
+    animation: none;
+  }
+}
+
 .trip-meta {
   grid-column: 1 / -1;
   display: flex;

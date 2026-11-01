@@ -66,6 +66,7 @@ import {
 import { ApiError } from '../services/apiClient';
 import type { Session } from '../services/tokenStore';
 import { COUNTRY_CALLING_CODE_OPTIONS } from '../constants/countryCallingCodes';
+import { TripNoShowDialog } from './TripNoShowDialog';
 
 type HomePageProps = {
   session: Session;
@@ -965,6 +966,9 @@ function TripScheduleScreen({
   const [selectedOwnerSlots, setSelectedOwnerSlots] = useState<TripSlot[]>([]);
   const [mySlots, setMySlots] = useState<TripSlot[]>([]);
   const [reservedSlots, setReservedSlots] = useState<TripSlot[]>([]);
+  const [noShowSlot, setNoShowSlot] = useState<TripSlot | null>(null);
+  const [noShowSubmitting, setNoShowSubmitting] = useState(false);
+  const [noShowError, setNoShowError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState('下午可约');
   const [place, setPlace] = useState('线上会议');
@@ -1128,15 +1132,24 @@ function TripScheduleScreen({
   }
 
   function markNoShow(slot: TripSlot) {
-    const applicant = slot.applicantDisplayName || slot.applicantUsername || '预约人';
-    const confirmed = window.confirm(`确认将 ${applicant} 标记为未履约？系统将扣除 ${tripCredit.noShowPenalty} 信用分。`);
-    if (!confirmed) {
-      return;
+    setNoShowError(null);
+    setNoShowSlot(slot);
+  }
+
+  async function confirmNoShow() {
+    if (!noShowSlot || noShowSubmitting) return;
+    setNoShowSubmitting(true);
+    setNoShowError(null);
+    try {
+      await markTripNoShow(noShowSlot.id);
+      setNoShowSlot(null);
+      await reloadTrips();
+      showTripToast('已标记未履约并扣除信用分');
+    } catch (err) {
+      setNoShowError(readSettingError(err));
+    } finally {
+      setNoShowSubmitting(false);
     }
-    markTripNoShow(slot.id)
-      .then(() => reloadTrips())
-      .then(() => showTripToast('已标记未履约并扣除信用分'))
-      .catch((err) => showTripToast(readSettingError(err)));
   }
 
   function changeTripTab(nextTab: string) {
@@ -1189,7 +1202,7 @@ function TripScheduleScreen({
       </div>
 
       {tab === '我的行程' ? (
-        <TripSlotList emptyText={loading ? '加载中' : '暂无我的行程'} slots={mySlots} currentUser={username} />
+        <MyTripList slots={mySlots} currentUser={username} loading={loading} />
       ) : null}
 
       {tab === '我的发布' ? (
@@ -1283,6 +1296,12 @@ function TripScheduleScreen({
       ) : null}
 
       {toast ? <div className="home-toast">{toast}</div> : null}
+      {noShowSlot ? (
+        <TripNoShowDialog slot={noShowSlot} penalty={tripCredit.noShowPenalty}
+          submitting={noShowSubmitting} error={noShowError}
+          onClose={() => { if (!noShowSubmitting) setNoShowSlot(null); }}
+          onConfirm={() => { void confirmNoShow(); }} />
+      ) : null}
     </div>
   );
 }
@@ -1561,6 +1580,38 @@ function TripTimelineGroup({
         );
       })}
     </div>
+  );
+}
+
+function MyTripList({ slots, currentUser, loading }: { slots: TripSlot[]; currentUser: string; loading: boolean }) {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const sortedSlots = [...slots].sort(compareTripSlots);
+  const upcoming = sortedSlots.filter((slot) => !isTripSlotExpired(slot, now));
+  const completed = sortedSlots.filter((slot) => isTripSlotExpired(slot, now)).reverse();
+  const groups = [
+    { title: '未出行', description: '尚未结束的行程', slots: upcoming },
+    { title: '已出行', description: '已结束或已过期的行程', slots: completed },
+  ];
+
+  return (
+    <section className="trip-timeline-preview" aria-label="我的行程分类">
+      {groups.map((group) => (
+        <div className="trip-timeline-group" key={group.title}>
+          <div className="trip-timeline-group-title">
+            <strong>{group.title}（{group.slots.length}）</strong>
+            <span>{group.description}</span>
+          </div>
+          <TripSlotList slots={group.slots} currentUser={currentUser}
+            emptyText={loading ? '加载中' : `暂无${group.title}行程`} />
+        </div>
+      ))}
+    </section>
   );
 }
 
