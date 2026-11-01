@@ -142,6 +142,22 @@ public class UserController {
         return ApiResponse.success(userService.membership(username));
     }
 
+    @PostMapping("/tools/recent")
+    public ApiResponse<java.util.List<UserHistoryItemVO>> recentTools(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username
+    ) {
+        return ApiResponse.success(userService.recentTools(username));
+    }
+
+    @PostMapping("/tools/usage")
+    public ApiResponse<Void> recordToolUsage(
+            @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,
+            @RequestBody com.kfpd.cloud.partner.pojo.vo.ToolUsageRequestVO request
+    ) {
+        userService.recordToolUsage(username, request.toolCode());
+        return ApiResponse.success(null);
+    }
+
     @PostMapping("/history/page")
     public ApiResponse<PageVO<UserHistoryItemVO>> history(
             @RequestHeader(value = GatewayHeaders.USER_NAME, defaultValue = "anonymous") String username,

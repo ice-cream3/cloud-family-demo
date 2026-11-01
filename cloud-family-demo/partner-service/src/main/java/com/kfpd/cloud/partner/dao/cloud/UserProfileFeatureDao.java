@@ -32,6 +32,13 @@ public interface UserProfileFeatureDao {
 
     int insertDefaultMembership(@Param("username") String username);
 
+    List<UserHistoryItemVO> findRecentTools(@Param("username") String username);
+
+    int insertToolUsage(@Param("username") String username,
+                        @Param("category") String category,
+                        @Param("title") String title,
+                        @Param("iconTone") String iconTone);
+
     long countHistory(@Param("username") String username, @Param("category") String category);
 
     List<UserHistoryItemVO> findHistoryPage(@Param("username") String username,

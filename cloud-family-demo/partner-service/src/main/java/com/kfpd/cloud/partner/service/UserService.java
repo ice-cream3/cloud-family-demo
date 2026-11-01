@@ -59,6 +59,10 @@ public interface UserService {
 
     MembershipVO membership(String username);
 
+    java.util.List<UserHistoryItemVO> recentTools(String username);
+
+    void recordToolUsage(String username, String toolCode);
+
     PageVO<UserHistoryItemVO> history(String username, PageQueryVO query);
 
     PageVO<FavoriteItemVO> favorites(String username, PageQueryVO query);

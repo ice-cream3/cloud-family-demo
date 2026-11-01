@@ -291,6 +291,24 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public List<UserHistoryItemVO> recentTools(String username) {
+        findCurrentVipUser(username);
+        return userProfileFeatureDao.findRecentTools(username);
+    }
+
+    @Override
+    public void recordToolUsage(String username, String toolCode) {
+        findCurrentVipUser(username);
+        if ("image-compress".equals(toolCode)) {
+            userProfileFeatureDao.insertToolUsage(username, "图片处理", "图片压缩", "green");
+        } else if ("trip-booking".equals(toolCode)) {
+            userProfileFeatureDao.insertToolUsage(username, "生活工具", "行程预约", "blue");
+        } else {
+            throw new BusinessException(ErrorCode.COMMON_BAD_REQUEST, "Unsupported tool");
+        }
+    }
+
+    @Override
     public PageVO<UserHistoryItemVO> history(String username, PageQueryVO query) {
         findCurrentVipUser(username);
         int pageNum = normalizePageNum(query == null ? null : query.pageNum());

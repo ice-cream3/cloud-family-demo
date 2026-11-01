@@ -181,3 +181,11 @@ export function markTripNoShow(slotId: number) {
 export function loadPartnerHealth() {
   return post<PartnerHealth>('/api/users/health');
 }
+
+export function loadRecentTools() {
+  return post<UserHistoryItem[]>('/api/users/tools/recent');
+}
+
+export function recordToolUsage(toolCode: string) {
+  return post<void>('/api/users/tools/usage', { body: { toolCode } });
+}

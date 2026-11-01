@@ -46,6 +46,8 @@ import {
   loadAppVersion,
   loadFavorites,
   loadHistory,
+  loadRecentTools,
+  recordToolUsage,
   loadMembership,
   loadNotificationSettings,
   loadBookableTripSlots,
@@ -85,7 +87,7 @@ type SearchableTool = {
   icon: typeof Image;
   label: string;
   tone: string;
-  screen?: 'compress';
+  screen?: 'compress' | 'trips';
 };
 
 const TRIP_CONFLICT_CODE = 200002;
@@ -221,6 +223,18 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
     }
   }
 
+  const [toolUsageError, setToolUsageError] = useState<string | null>(null);
+
+  async function openToolScreen(target: 'compress' | 'trips' | 'myTrips') {
+    setToolUsageError(null);
+    try {
+      await recordToolUsage(target === 'compress' ? 'image-compress' : 'trip-booking');
+    } catch (err) {
+      setToolUsageError(`使用记录保存失败：${readSettingError(err)}`);
+    }
+    setScreen(target);
+  }
+
   function setTab(tab: TabKey) {
     setScreen(tab);
     setShowMoreTools(false);
@@ -231,18 +245,19 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
       <section className="tool-phone" aria-label="移动端工具 App">
         <StatusBar />
         {error ? <div className="tool-error">{error}</div> : null}
+        {toolUsageError ? <div className="tool-error">{toolUsageError}</div> : null}
 
         {screen === 'home' ? (
           <HomeScreen
             displayName={displayName}
             tripCredit={tripCredit}
             onOpenTools={() => setTab('tools')}
-            onOpenCompress={() => setScreen('compress')}
-            onOpenTrips={() => setScreen('trips')}
+            onOpenCompress={() => { void openToolScreen('compress'); }}
+            onOpenTrips={() => { void openToolScreen('trips'); }}
           />
         ) : null}
         {screen === 'tools' ? (
-          <ToolsScreen onOpenCompress={() => setScreen('compress')} onOpenMore={() => setShowMoreTools(true)} />
+          <ToolsScreen onOpenCompress={() => { void openToolScreen('compress'); }} onOpenMore={() => setShowMoreTools(true)} />
         ) : null}
         {screen === 'compress' ? (
           <CompressScreen onBack={() => setScreen('tools')} />
@@ -262,7 +277,7 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
             onOpenMembership={() => setScreen('membership')}
             onOpenHistory={() => setScreen('history')}
             onOpenFavorites={() => setScreen('favorites')}
-            onOpenTrips={() => setScreen('myTrips')}
+            onOpenTrips={() => { void openToolScreen('myTrips'); }}
             onOpenSettings={() => setScreen('settings')}
           />
         ) : null}
@@ -294,7 +309,7 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
             onRefreshTripCredit={reloadTripCredit}
             onOpenPhoneVerification={() => setScreen('phoneVerification')}
             onBack={() => setScreen('profile')}
-            onOpenBooking={() => setScreen('trips')}
+            onOpenBooking={() => { void openToolScreen('trips'); }}
           />
         ) : null}
         {screen === 'settings' ? (
@@ -337,11 +352,34 @@ function HomeScreen({
   const [searchText, setSearchText] = useState('');
   const [searchActive, setSearchActive] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [recentTools, setRecentTools] = useState<SearchableTool[]>([]);
+  const [recentLoading, setRecentLoading] = useState(true);
+  const [recentError, setRecentError] = useState<string | null>(null);
+  const [showAllRecent, setShowAllRecent] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    loadRecentTools().then((items) => {
+      if (active) setRecentTools(items.flatMap((item) => {
+        const tool = allSearchableTools().find((candidate) => candidate.label === item.title);
+        return tool ? [tool] : [];
+      }));
+    }).catch((err) => {
+      if (active) setRecentError(readSettingError(err));
+    }).finally(() => {
+      if (active) setRecentLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
   const searchResults = searchTools(searchText);
 
   function openTool(item: SearchableTool) {
     if (item.screen === 'compress') {
       onOpenCompress();
+      return;
+    }
+    if (item.screen === 'trips') {
+      onOpenTrips();
       return;
     }
     showToast(`${item.label}功能建设中`);
@@ -450,12 +488,15 @@ function HomeScreen({
         })}
       </div>
 
-      <SectionTitle title="最近使用" action="查看全部" />
+      <SectionTitle title="最近使用" action={showAllRecent ? '收起' : '查看全部'} onAction={() => setShowAllRecent(!showAllRecent)} />
+      {recentLoading ? <div className="settings-info-card">加载中</div> : null}
+      {recentError ? <div className="settings-message error">{recentError}</div> : null}
+      {!recentLoading && !recentError && recentTools.length === 0 ? <div className="settings-info-card">暂无使用记录，快去体验工具吧</div> : null}
       <div className="tool-recent-grid">
-        {imageTools.slice(0, 4).map((item) => {
+        {(showAllRecent ? recentTools : recentTools.slice(0, 4)).map((item) => {
           const Icon = item.icon;
           return (
-            <button key={item.label} type="button" onClick={item.screen ? onOpenCompress : undefined}>
+            <button key={item.label} type="button" onClick={() => openTool(item)}>
               <span className={`tool-icon ${item.tone}`}>
                 <Icon size={22} />
               </span>
@@ -505,7 +546,7 @@ function CreditLevelPill({ credit }: { credit: TripCredit }) {
 }
 
 function allSearchableTools(): SearchableTool[] {
-  return [...imageTools, ...fileTools, ...moreTools];
+  return [{ icon: CalendarDays, label: '行程预约', tone: 'blue', screen: 'trips' }, ...imageTools, ...fileTools, ...moreTools];
 }
 
 function searchTools(keyword: string) {
@@ -2811,11 +2852,11 @@ function HeaderWithBack({ title, onBack, right }: { title: string; onBack: () =>
   );
 }
 
-function SectionTitle({ title, action }: { title: string; action?: string }) {
+function SectionTitle({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return (
     <div className="tool-section-title">
       <h2>{title}</h2>
-      {action ? <button type="button">{action}<ChevronRight size={14} /></button> : null}
+      {action ? <button type="button" onClick={onAction}>{action}<ChevronRight size={14} /></button> : null}
     </div>
   );
 }

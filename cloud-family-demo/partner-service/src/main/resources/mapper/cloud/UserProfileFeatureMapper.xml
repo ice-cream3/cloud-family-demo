@@ -136,6 +136,33 @@
         VALUES (#{username}, '普通会员', 'ACTIVE', '基础工具可用')
     </insert>
 
+    <select id="findRecentTools" resultMap="UserHistoryItemResultMap">
+        SELECT MAX(id) AS id, category, title, '打开工具' AS description,
+               icon_tone, MAX(occurred_at) AS occurred_at
+        FROM (
+            SELECT id, category, title, icon_tone, occurred_at
+            FROM user_history
+            WHERE username = #{username} AND description = '打开工具'
+            UNION ALL
+            SELECT id, '生活工具' AS category, '行程预约' AS title, 'blue' AS icon_tone,
+                   created_at AS occurred_at
+            FROM user_trip_slot
+            WHERE owner_username = #{username}
+            UNION ALL
+            SELECT id, '生活工具' AS category, '行程预约' AS title, 'blue' AS icon_tone,
+                   applied_at AS occurred_at
+            FROM user_trip_slot
+            WHERE applicant_username = #{username} AND applied_at IS NOT NULL
+        ) usages
+        GROUP BY category, title, icon_tone
+        ORDER BY occurred_at DESC, id DESC
+    </select>
+
+    <insert id="insertToolUsage">
+        INSERT INTO user_history (username, category, title, description, icon_tone, occurred_at)
+        VALUES (#{username}, #{category}, #{title}, '打开工具', #{iconTone}, CURRENT_TIMESTAMP)
+    </insert>
+
     <sql id="HistoryFilters">
         WHERE username = #{username}
         <if test="category != null and category != '' and category != '全部'">
