@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfpd.cloud.partner.dao.cloud.CommerceDao">
+    <sql id="ShopColumns">s.id, s.owner_username ownerUsername, s.name, s.cover_url coverUrl, s.description, s.contact, s.status, s.sort_order sortOrder</sql>
+    <sql id="PublicShop">s.status='ACTIVE' AND u.status='ENABLED'</sql>
+    <sql id="ShopFilter">
+        WHERE <include refid="PublicShop"/>
+        <if test="keyword != null and keyword != ''">AND (s.name LIKE CONCAT('%',#{keyword},'%') OR s.description LIKE CONCAT('%',#{keyword},'%'))</if>
+    </sql>
+    <select id="countShops" resultType="long">SELECT COUNT(*) FROM showcase_shop s JOIN vip_user u ON u.username=s.owner_username <include refid="ShopFilter"/></select>
+    <select id="shops" resultType="map">
+        SELECT <include refid="ShopColumns"/>,
+          (SELECT COUNT(*) FROM showcase_product p WHERE p.shop_id=s.id AND p.status='PUBLISHED' AND p.moderation_status='ACTIVE') productCount
+        FROM showcase_shop s JOIN vip_user u ON u.username=s.owner_username <include refid="ShopFilter"/>
+        ORDER BY s.sort_order, s.id DESC LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+    <select id="shop" resultType="map">
+        SELECT <include refid="ShopColumns"/> FROM showcase_shop s JOIN vip_user u ON u.username=s.owner_username
+        WHERE s.id=#{id} AND <include refid="PublicShop"/>
+    </select>
+    <sql id="ProductColumns">p.id, p.shop_id shopId, p.title, p.category, p.cover_url coverUrl, p.summary, p.price, p.stock, p.status, p.moderation_status moderationStatus, p.moderation_reason moderationReason, p.sort_order sortOrder, p.published_at publishedAt</sql>
+    <sql id="PublicProduct">p.status='PUBLISHED' AND p.moderation_status='ACTIVE' AND <include refid="PublicShop"/></sql>
+    <sql id="ProductFilter">
+        WHERE p.shop_id=#{shopId} AND <include refid="PublicProduct"/>
+        <if test="keyword != null and keyword != ''">AND (p.title LIKE CONCAT('%',#{keyword},'%') OR p.summary LIKE CONCAT('%',#{keyword},'%'))</if>
+        <if test="category != null and category != ''">AND p.category=#{category}</if>
+    </sql>
+    <sql id="ProductJoin">FROM showcase_product p JOIN showcase_shop s ON s.id=p.shop_id JOIN vip_user u ON u.username=s.owner_username</sql>
+    <select id="countProducts" resultType="long">SELECT COUNT(*) <include refid="ProductJoin"/> <include refid="ProductFilter"/></select>
+    <select id="products" resultType="map">
+        SELECT <include refid="ProductColumns"/> <include refid="ProductJoin"/> <include refid="ProductFilter"/>
+        ORDER BY p.sort_order,p.id DESC LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+    <select id="categories" resultType="string">
+        SELECT DISTINCT p.category <include refid="ProductJoin"/> WHERE p.shop_id=#{shopId} AND <include refid="PublicProduct"/> ORDER BY p.category
+    </select>
+    <select id="product" resultType="map">
+        SELECT <include refid="ProductColumns"/>,p.content,s.name shopName,s.contact
+        <include refid="ProductJoin"/> WHERE p.id=#{id} AND <include refid="PublicProduct"/>
+    </select>
+    <select id="mineShop" resultType="map">SELECT <include refid="ShopColumns"/> FROM showcase_shop s WHERE s.owner_username=#{username}</select>
+    <insert id="saveShop">
+        INSERT INTO showcase_shop(owner_username,name,cover_url,description,contact)
+        SELECT username,#{record.name},#{record.coverUrl},#{record.description},#{record.contact}
+        FROM vip_user WHERE username=#{username} AND status='ENABLED'
+        ON DUPLICATE KEY UPDATE name=#{record.name},cover_url=#{record.coverUrl},description=#{record.description},contact=#{record.contact}
+    </insert>
+    <sql id="MineFilter">
+        WHERE s.owner_username=#{username}
+        <if test="keyword != null and keyword != ''">AND p.title LIKE CONCAT('%',#{keyword},'%')</if>
+        <choose>
+            <when test="status == 'SYSTEM_BLOCKED'">AND p.moderation_status='BLOCKED'</when>
+            <otherwise><if test="status != null and status != ''">AND p.status=#{status}</if></otherwise>
+        </choose>
+    </sql>
+    <select id="countMine" resultType="long">SELECT COUNT(*) <include refid="ProductJoin"/> <include refid="MineFilter"/></select>
+    <select id="mine" resultType="map">
+        SELECT <include refid="ProductColumns"/>,p.content,p.updated_at updatedAt
+        <include refid="ProductJoin"/> <include refid="MineFilter"/> ORDER BY p.id DESC LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+    <insert id="create">
+        INSERT INTO showcase_product(shop_id,title,category,cover_url,summary,content,price,stock,status,sort_order,published_at)
+        SELECT s.id,#{record.title},#{record.category},#{record.coverUrl},#{record.summary},#{record.content},#{record.price},#{record.stock},#{record.status},#{record.sortOrder},
+          CASE WHEN #{record.status}='PUBLISHED' THEN CURRENT_TIMESTAMP ELSE NULL END
+        FROM showcase_shop s JOIN vip_user u ON u.username=s.owner_username
+        WHERE s.owner_username=#{username} AND u.status='ENABLED'
+          AND (#{record.status} != 'PUBLISHED' OR s.status='ACTIVE')
+    </insert>
+    <select id="publishState" resultType="map">
+        SELECT p.moderation_status moderationStatus,s.status shopStatus
+        FROM showcase_product p JOIN showcase_shop s ON s.id=p.shop_id
+        WHERE p.id=#{id} AND s.owner_username=#{username}
+    </select>
+    <update id="update">
+        UPDATE showcase_product p JOIN showcase_shop s ON s.id=p.shop_id JOIN vip_user u ON u.username=s.owner_username
+        SET p.published_at=CASE WHEN #{record.status}='PUBLISHED' AND p.status!='PUBLISHED' THEN CURRENT_TIMESTAMP ELSE p.published_at END,
+          p.title=#{record.title},p.category=#{record.category},p.cover_url=#{record.coverUrl},p.summary=#{record.summary},p.content=#{record.content},
+          p.price=#{record.price},p.stock=#{record.stock},p.status=#{record.status},p.sort_order=#{record.sortOrder}
+        WHERE p.id=#{id} AND s.owner_username=#{username} AND u.status='ENABLED'
+          AND (#{record.status} != 'PUBLISHED' OR (s.status='ACTIVE' AND p.moderation_status='ACTIVE'))
+    </update>
+    <delete id="delete">
+        DELETE p FROM showcase_product p JOIN showcase_shop s ON s.id=p.shop_id
+        WHERE p.id=#{id} AND s.owner_username=#{username}
+    </delete>
+</mapper>

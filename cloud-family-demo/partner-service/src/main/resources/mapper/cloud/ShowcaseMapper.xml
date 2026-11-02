@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfpd.cloud.partner.dao.cloud.ShowcaseDao">
+    <sql id="Filters">
+        WHERE status = 'PUBLISHED'
+        <if test="category != null and category != ''">AND category = #{category}</if>
+        <if test="keyword != null and keyword != ''">
+            AND (title LIKE CONCAT('%', #{keyword}, '%') OR summary LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+    </sql>
+    <select id="count" resultType="long">SELECT COUNT(*) FROM showcase_item <include refid="Filters"/></select>
+    <select id="page" resultType="map">
+        SELECT id, title, category, cover_url coverUrl, summary, published_at publishedAt
+        FROM showcase_item <include refid="Filters"/>
+        ORDER BY sort_order ASC, id DESC LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+    <select id="detail" resultType="map">
+        SELECT id, title, category, cover_url coverUrl, summary, content, published_at publishedAt
+        FROM showcase_item WHERE id = #{id} AND status = 'PUBLISHED'
+    </select>
+    <select id="categories" resultType="string">
+        SELECT DISTINCT category FROM showcase_item WHERE status = 'PUBLISHED' ORDER BY category
+    </select>
+</mapper>

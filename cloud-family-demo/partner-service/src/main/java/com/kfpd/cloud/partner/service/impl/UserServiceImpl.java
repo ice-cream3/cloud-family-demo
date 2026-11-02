@@ -301,6 +301,8 @@ public class UserServiceImpl implements UserService {
         findCurrentVipUser(username);
         if ("image-compress".equals(toolCode)) {
             userProfileFeatureDao.insertToolUsage(username, "图片处理", "图片压缩", "green");
+        } else if ("showcase".equals(toolCode)) {
+            userProfileFeatureDao.insertToolUsage(username, "精品展示", "精品展示", "orange");
         } else if ("trip-booking".equals(toolCode)) {
             userProfileFeatureDao.insertToolUsage(username, "生活工具", "行程预约", "blue");
         } else {

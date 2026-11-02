@@ -7,6 +7,25 @@ import org.apache.ibatis.annotations.Param;
 
 public interface UserFeatureAdminDao {
 
+    long countCommerceShops(@Param("keyword") String keyword,@Param("status") String status);
+    List<Map<String,Object>> findCommerceShops(@Param("keyword") String keyword,@Param("status") String status,@Param("offset") int offset,@Param("pageSize") int pageSize);
+    int insertCommerceShop(Map<String,Object> record);
+    int updateCommerceShop(@Param("id") Long id,@Param("record") Map<String,Object> record);
+    int deleteCommerceShop(@Param("id") Long id);
+    long countCommerceShopProducts(@Param("id") Long id);
+    long countCommerceProducts(@Param("keyword") String keyword,@Param("status") String status);
+    List<Map<String,Object>> findCommerceProducts(@Param("keyword") String keyword,@Param("status") String status,@Param("offset") int offset,@Param("pageSize") int pageSize);
+    int insertCommerceProduct(Map<String,Object> record);
+    int updateCommerceProduct(@Param("id") Long id,@Param("record") Map<String,Object> record);
+    int deleteCommerceProduct(@Param("id") Long id);
+
+    long countShowcase(@Param("keyword") String keyword, @Param("status") String status);
+    List<Map<String, Object>> findShowcasePage(@Param("keyword") String keyword,
+        @Param("status") String status, @Param("offset") int offset, @Param("pageSize") int pageSize);
+    int insertShowcase(Map<String, Object> record);
+    int updateShowcase(@Param("id") Long id, @Param("record") Map<String, Object> record);
+    int deleteShowcase(@Param("id") Long id);
+
     long countNotifications(@Param("keyword") String keyword);
 
     List<Map<String, Object>> findNotificationPage(@Param("keyword") String keyword,

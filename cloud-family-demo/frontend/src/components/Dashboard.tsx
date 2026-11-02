@@ -1848,13 +1848,16 @@ function PartnerFeatureQueryBar({
   const [keyword, setKeyword] = useState(query.keyword || '');
   const [status, setStatus] = useState(query.status || '');
   const [businessType, setBusinessType] = useState(query.businessType || '');
-  const showStatus = path === '/api/manager/partner/memberships';
+  const isShowcase = path === '/api/manager/partner/showcase';
+  const isCommerceShop = path === '/api/manager/partner/shops';
+  const isCommerceProduct = path === '/api/manager/partner/products';
+  const showStatus = isCommerceShop || isCommerceProduct || isShowcase || path === '/api/manager/partner/memberships';
   const showCategory = path === '/api/manager/partner/histories';
   const placeholder = path === '/api/manager/partner/settings/documents'
     ? '文档类型 / 标题'
     : path === '/api/manager/partner/settings/versions'
       ? '版本号'
-      : '账号 / 标题';
+      : isCommerceShop ? '店铺名称 / 所属账号' : isCommerceProduct ? '商品 / 店铺 / 所属账号 / 商家ID' : isShowcase ? '标题 / 分类' : '账号 / 标题';
 
   useEffect(() => {
     setKeyword(query.keyword || '');
@@ -1898,9 +1901,13 @@ function PartnerFeatureQueryBar({
           状态
           <select value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="">全部状态</option>
-            <option value="ACTIVE">生效中</option>
-            <option value="EXPIRED">已过期</option>
-            <option value="SUSPENDED">已暂停</option>
+            {isCommerceShop ? <>
+              <option value="ACTIVE">正常</option><option value="BLOCKED">已停用</option>
+            </> : isShowcase || isCommerceProduct ? <>
+              <option value="DRAFT">草稿</option><option value="PUBLISHED">已上架</option><option value="OFFLINE">已下架</option>
+            </> : <>
+              <option value="ACTIVE">生效中</option><option value="EXPIRED">已过期</option><option value="SUSPENDED">已暂停</option>
+            </>}
           </select>
         </label>
       ) : null}
@@ -2905,10 +2912,12 @@ function initialEditorValues(fields: EditorField[], record: SystemPageRecord | n
     const raw = record ? (record as Record<string, unknown>)[field.key] : undefined;
     if (field.type === 'checkbox') {
       values[field.key] = raw === undefined ? true : Boolean(raw);
+    } else if (field.key === 'sortOrder') {
+      values[field.key] = raw === null || raw === undefined ? '0' : String(raw);
     } else if (field.key === 'occurredAt') {
       values[field.key] = raw === null || raw === undefined || raw === '' ? '' : formatDate(String(raw));
     } else if (field.key === 'status') {
-      values[field.key] = typeof raw === 'string' ? raw : 'ENABLED';
+      values[field.key] = typeof raw === 'string' ? raw : field.options?.[0]?.value || 'ENABLED';
     } else {
       values[field.key] = raw === null || raw === undefined ? '' : String(raw);
     }
@@ -2939,6 +2948,11 @@ function buildPayload(fields: EditorField[], values: Record<string, string | boo
 }
 
 function validateEditorValues(fields: EditorField[], values: Record<string, string | boolean>) {
+  if (fields.some((field) => field.key === 'moderationReason') && values.moderationStatus === 'BLOCKED') {
+    const reason=String(values.moderationReason || '').trim();
+    if (!reason) return '请填写系统停用原因';
+    if (reason.length > 500) return '系统停用原因最多500字';
+  }
   for (const field of fields) {
     const value = values[field.key];
     const text = typeof value === 'string' ? value.trim() : '';
@@ -3206,6 +3220,73 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
     };
   }
 
+  if (path === '/api/manager/partner/shops') {
+    return {
+      title: '商家管理', apiPath: '/api/manager/partner/features/commerce-shops/page',
+      columns: [commonColumns[0],
+        ...[['ownerUsername','所属账号'],['name','店铺名称'],['contact','公开联系方式'],['productCount','商品数'],['sortOrder','排序']].map(([key,title]) => ({key,title,render:(record: SystemPageRecord)=>textValue(readField(record,key))})),
+        {key:'status',title:'状态',render:(record)=>readField(record,'status')==='ACTIVE'?'正常':'已停用'},
+        {key:'updatedAt',title:'更新时间',render:(record)=>formatDate(readField(record,'updatedAt'))},
+      ],
+      fields: [
+        {key:'ownerUsername',label:'所属用户账号',required:true,readonlyOnEdit:true},
+        {key:'name',label:'店铺名称',required:true}, {key:'coverUrl',label:'封面图片地址'},
+        {key:'contact',label:'公开联系方式'}, {key:'sortOrder',label:'排序',type:'number'},
+        {key:'status',label:'后台状态',type:'select',options:[{label:'正常',value:'ACTIVE'},{label:'停用（隐藏全部商品）',value:'BLOCKED'}]},
+        {key:'description',label:'店铺介绍',type:'textarea',required:true},
+      ],
+    };
+  }
+  if (path === '/api/manager/partner/products') {
+    return {
+      title: '商品管理', apiPath: '/api/manager/partner/features/commerce-products/page',
+      columns: [commonColumns[0],
+        ...[['ownerUsername','所属账号'],['shopId','商家ID'],['shopName','店铺'],['title','商品名称'],['category','分类'],['price','价格（元）'],['stock','库存']].map(([key,title])=>({key,title,render:(record:SystemPageRecord)=>textValue(readField(record,key))})),
+        {key:'status',title:'上架状态',render:(record)=>({DRAFT:'草稿',PUBLISHED:'已上架',OFFLINE:'已下架'}[readField(record,'status')||'']||'-')},
+        {key:'moderationStatus',title:'系统状态',render:(record)=>readField(record,'moderationStatus')==='ACTIVE'?'正常':'系统停用'},
+        {key:'moderationReason',title:'停用原因',render:(record)=>truncateText(readField(record,'moderationReason'),40)},
+      ],
+      fields: [
+        {key:'shopId',label:'所属商家ID',type:'number',required:true,readonlyOnEdit:true,placeholder:'在商家管理中查看'},
+        {key:'title',label:'商品名称',required:true}, {key:'category',label:'分类',required:true},
+        {key:'coverUrl',label:'封面图片地址'}, {key:'price',label:'价格（元）',required:true,placeholder:'例如 99.90'},
+        {key:'stock',label:'库存',type:'number',required:true}, {key:'sortOrder',label:'排序',type:'number'},
+        {key:'status',label:'上架状态',type:'select',options:[{label:'草稿',value:'DRAFT'},{label:'上架',value:'PUBLISHED'},{label:'下架',value:'OFFLINE'}]},
+        {key:'moderationStatus',label:'后台状态',type:'select',options:[{label:'正常',value:'ACTIVE'},{label:'停用',value:'BLOCKED'}]},
+        {key:'summary',label:'商品简介',type:'textarea',required:true}, {key:'content',label:'商品详情',type:'textarea',required:true},
+        {key:'moderationReason',label:'系统停用原因（停用时必填，最多500字）',type:'textarea'},
+      ],
+    };
+  }
+
+  if (path === '/api/manager/partner/showcase') {
+    return {
+      title: '精品展示',
+      apiPath: '/api/manager/partner/features/showcase/page',
+      columns: [
+        commonColumns[0],
+        { key: 'title', title: '标题', render: (record) => textValue(readField(record, 'title')) },
+        { key: 'category', title: '分类', render: (record) => textValue(readField(record, 'category')) },
+        { key: 'summary', title: '摘要', render: (record) => truncateText(readField(record, 'summary'), 40) },
+        { key: 'status', title: '状态', render: (record) => ({ DRAFT: '草稿', PUBLISHED: '已上架', OFFLINE: '已下架' }[readField(record, 'status') || ''] || '-') },
+        { key: 'sortOrder', title: '排序', render: (record) => textValue(readField(record, 'sortOrder')) },
+        { key: 'publishedAt', title: '上架时间', render: (record) => formatDate(readField(record, 'publishedAt')) },
+        { key: 'updatedAt', title: '更新时间', render: (record) => formatDate(readField(record, 'updatedAt')) },
+      ],
+      fields: [
+        { key: 'title', label: '标题', required: true, placeholder: '最多100字' },
+        { key: 'category', label: '分类', required: true, placeholder: '例如 精选推荐，最多32字' },
+        { key: 'coverUrl', label: '封面图片地址', placeholder: 'https://… 或站内图片路径（可选）' },
+        { key: 'sortOrder', label: '排序', type: 'number', placeholder: '整数，越小越靠前' },
+        { key: 'status', label: '状态', type: 'select', required: true, options: [
+          { label: '草稿', value: 'DRAFT' }, { label: '上架', value: 'PUBLISHED' }, { label: '下架', value: 'OFFLINE' },
+        ] },
+        { key: 'summary', label: '摘要', type: 'textarea', required: true, placeholder: '列表简介，最多300字' },
+        { key: 'content', label: '详情正文', type: 'textarea', required: true, placeholder: '输入正文，支持换行，最多100000字' },
+      ],
+    };
+  }
+
   if (path === '/api/manager/partner/memberships') {
     return {
       title: '会员中心配置',
@@ -3383,6 +3464,9 @@ function isSystemPageMenu(path?: string) {
     || path === '/api/manager/partner/settings/notifications'
     || path === '/api/manager/partner/settings/documents'
     || path === '/api/manager/partner/settings/versions'
+    || path === '/api/manager/partner/shops'
+    || path === '/api/manager/partner/products'
+    || path === '/api/manager/partner/showcase'
     || path === '/api/manager/partner/memberships'
     || path === '/api/manager/partner/histories'
     || path === '/api/manager/partner/favorites'
@@ -3395,6 +3479,9 @@ function isPartnerFeaturePage(path?: string) {
   return path === '/api/manager/partner/settings/notifications'
     || path === '/api/manager/partner/settings/documents'
     || path === '/api/manager/partner/settings/versions'
+    || path === '/api/manager/partner/shops'
+    || path === '/api/manager/partner/products'
+    || path === '/api/manager/partner/showcase'
     || path === '/api/manager/partner/memberships'
     || path === '/api/manager/partner/histories'
     || path === '/api/manager/partner/favorites'
@@ -3439,6 +3526,9 @@ function systemActionPermissions(menu: MenuTreeNode | null, action: 'add' | 'edi
     '/api/manager/partner/settings/notifications': partnerFeaturePermissions(),
     '/api/manager/partner/settings/documents': partnerFeaturePermissions(),
     '/api/manager/partner/settings/versions': partnerFeaturePermissions(),
+    '/api/manager/partner/shops': { add: ['partner:showcase:add'], edit: ['partner:showcase:edit'], delete: ['partner:showcase:delete'] },
+    '/api/manager/partner/products': { add: ['partner:showcase:add'], edit: ['partner:showcase:edit'], delete: ['partner:showcase:delete'] },
+    '/api/manager/partner/showcase': { add: ['partner:showcase:add'], edit: ['partner:showcase:edit'], delete: ['partner:showcase:delete'] },
     '/api/manager/partner/memberships': partnerFeaturePermissions(),
     '/api/manager/partner/histories': partnerFeaturePermissions(),
     '/api/manager/partner/favorites': partnerFeaturePermissions(),
@@ -4030,7 +4120,7 @@ function formatLogValue(value: unknown) {
 }
 
 function deleteRecordLabel(record: SystemPageRecord) {
-  const keys = ['title', 'menuName', 'roleName', 'permissionName', 'displayName', 'username', 'planName', 'versionName'];
+  const keys = ['title', 'name', 'menuName', 'roleName', 'permissionName', 'displayName', 'username', 'planName', 'versionName'];
   for (const key of keys) {
     const value = readField(record, key)?.trim();
     if (value) return value;

@@ -1,3 +1,4 @@
+import { ShowcaseScreen } from './ShowcaseScreen';
 import { useEffect, useState } from 'react';
 import type { FocusEvent, FormEvent, MouseEvent } from 'react';
 import {
@@ -81,13 +82,13 @@ type HomePageProps = {
 };
 
 type TabKey = 'home' | 'tools' | 'activity' | 'message' | 'profile';
-type ScreenKey = TabKey | 'compress' | 'history' | 'settings' | 'phoneVerification' | 'membership' | 'favorites' | 'trips' | 'myTrips';
+type ScreenKey = TabKey | 'showcase' | 'compress' | 'history' | 'settings' | 'phoneVerification' | 'membership' | 'favorites' | 'trips' | 'myTrips';
 type SettingDetail = 'account' | 'notifications' | 'about' | 'privacy' | 'agreement' | 'version';
 type SearchableTool = {
   icon: typeof Image;
   label: string;
   tone: string;
-  screen?: 'compress' | 'trips';
+  screen?: 'compress' | 'trips' | 'showcase';
 };
 
 const TRIP_CONFLICT_CODE = 200002;
@@ -101,7 +102,7 @@ const defaultTripCredit: TripCredit = {
 
 const mainTools = [
   { icon: Image, label: '图片处理', tone: 'green' },
-  { icon: FileText, label: '文件转换', tone: 'orange' },
+  { icon: Gift, label: '精品展示', tone: 'orange' },
   { icon: ScanLine, label: '扫描识别', tone: 'purple' },
   { icon: PackageCheck, label: '生活工具', tone: 'pink' },
 ];
@@ -115,17 +116,6 @@ const imageTools = [
   { icon: Images, label: '拼图', tone: 'blue' },
   { icon: Camera, label: '图片尺寸调整', tone: 'sky' },
   { icon: Sparkles, label: '图片修复', tone: 'green' },
-];
-
-const fileTools = [
-  { icon: FileText, label: 'PDF转图片', tone: 'orange' },
-  { icon: FileImage, label: '图片转PDF', tone: 'red' },
-  { icon: FileText, label: 'Word转PDF', tone: 'blue' },
-  { icon: FileText, label: 'PDF转Word', tone: 'indigo' },
-  { icon: FileText, label: 'Excel转PDF', tone: 'green' },
-  { icon: FileText, label: 'PPT转PDF', tone: 'orange' },
-  { icon: FileText, label: 'TXT转PDF', tone: 'blue' },
-  { icon: Archive, label: 'PDF合并', tone: 'red' },
 ];
 
 const moreTools = [
@@ -173,7 +163,7 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
   const [dynamicLoading, setDynamicLoading] = useState(false);
   const displayName = profile?.displayName || session.username || '用户名';
   const serviceStatus = dynamic?.serviceStatus || health?.status || (profile ? 'UP' : 'UNKNOWN');
-  const activeTab = ['history', 'settings', 'phoneVerification', 'membership', 'favorites', 'trips', 'myTrips'].includes(screen) ? 'profile' : screen === 'compress' ? 'tools' : screen as TabKey;
+  const activeTab = ['history', 'settings', 'phoneVerification', 'membership', 'favorites', 'trips', 'myTrips'].includes(screen) ? 'profile' : screen === 'compress' ? 'tools' : screen === 'showcase' ? 'home' : screen as TabKey;
 
   useEffect(() => {
     void loadDynamic();
@@ -225,10 +215,10 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
 
   const [toolUsageError, setToolUsageError] = useState<string | null>(null);
 
-  async function openToolScreen(target: 'compress' | 'trips' | 'myTrips') {
+  async function openToolScreen(target: 'compress' | 'trips' | 'myTrips' | 'showcase') {
     setToolUsageError(null);
     try {
-      await recordToolUsage(target === 'compress' ? 'image-compress' : 'trip-booking');
+      await recordToolUsage(target === 'compress' ? 'image-compress' : target === 'showcase' ? 'showcase' : 'trip-booking');
     } catch (err) {
       setToolUsageError(`使用记录保存失败：${readSettingError(err)}`);
     }
@@ -252,13 +242,15 @@ export function HomePage({ session, profile, health, loading, error, onReload, o
             displayName={displayName}
             tripCredit={tripCredit}
             onOpenTools={() => setTab('tools')}
+            onOpenShowcase={() => { void openToolScreen('showcase'); }}
             onOpenCompress={() => { void openToolScreen('compress'); }}
             onOpenTrips={() => { void openToolScreen('trips'); }}
           />
         ) : null}
         {screen === 'tools' ? (
-          <ToolsScreen onOpenCompress={() => { void openToolScreen('compress'); }} onOpenMore={() => setShowMoreTools(true)} />
+          <ToolsScreen onOpenShowcase={() => { void openToolScreen('showcase'); }} onOpenCompress={() => { void openToolScreen('compress'); }} onOpenMore={() => setShowMoreTools(true)} />
         ) : null}
+        {screen === 'showcase' ? <ShowcaseScreen onBack={() => setScreen('home')} /> : null}
         {screen === 'compress' ? (
           <CompressScreen onBack={() => setScreen('tools')} />
         ) : null}
@@ -340,12 +332,14 @@ function HomeScreen({
   displayName,
   tripCredit,
   onOpenTools,
+  onOpenShowcase,
   onOpenCompress,
   onOpenTrips,
 }: {
   displayName: string;
   tripCredit: TripCredit;
   onOpenTools: () => void;
+  onOpenShowcase: () => void;
   onOpenCompress: () => void;
   onOpenTrips: () => void;
 }) {
@@ -376,6 +370,10 @@ function HomeScreen({
   function openTool(item: SearchableTool) {
     if (item.screen === 'compress') {
       onOpenCompress();
+      return;
+    }
+    if (item.screen === 'showcase') {
+      onOpenShowcase();
       return;
     }
     if (item.screen === 'trips') {
@@ -478,7 +476,7 @@ function HomeScreen({
         {mainTools.map((item) => {
           const Icon = item.icon;
           return (
-            <button key={item.label} type="button" onClick={item.label === '图片处理' ? onOpenTools : undefined}>
+            <button key={item.label} type="button" onClick={item.label === '图片处理' ? onOpenTools : item.label === '精品展示' ? onOpenShowcase : undefined}>
               <span className={`tool-icon ${item.tone}`}>
                 <Icon size={24} />
               </span>
@@ -546,7 +544,7 @@ function CreditLevelPill({ credit }: { credit: TripCredit }) {
 }
 
 function allSearchableTools(): SearchableTool[] {
-  return [{ icon: CalendarDays, label: '行程预约', tone: 'blue', screen: 'trips' }, ...imageTools, ...fileTools, ...moreTools];
+  return [{ icon: CalendarDays, label: '行程预约', tone: 'blue', screen: 'trips' }, { icon: Gift, label: '精品展示', tone: 'orange', screen: 'showcase' }, ...imageTools, ...moreTools];
 }
 
 function searchTools(keyword: string) {
@@ -562,22 +560,24 @@ function toolCategoryLabel(item: SearchableTool) {
   if (imageTools.some((tool) => tool.label === item.label)) {
     return '图片处理';
   }
-  if (fileTools.some((tool) => tool.label === item.label)) {
-    return '文件转换';
-  }
+  if (item.screen === 'showcase') return '精品展示';
   return '生活工具';
 }
 
-function ToolsScreen({ onOpenCompress, onOpenMore }: { onOpenCompress: () => void; onOpenMore: () => void }) {
+function ToolsScreen({ onOpenCompress, onOpenMore, onOpenShowcase }: { onOpenCompress: () => void; onOpenMore: () => void; onOpenShowcase: () => void }) {
   return (
     <div className="tool-screen">
       <header className="tool-page-head">
         <h1>工具中心</h1>
         <Search size={20} />
       </header>
-      <SegmentedTabs items={['全部', '图片处理', '文件转换', '扫描识别', '生活工具']} />
+      <SegmentedTabs items={['全部', '图片处理', '精品展示', '扫描识别', '生活工具']} />
       <ToolSection title="图片处理" tools={imageTools} onOpenCompress={onOpenCompress} />
-      <ToolSection title="文件转换" tools={fileTools} />
+      <SectionTitle title="精品展示" />
+      <button className="more-tools-entry" type="button" onClick={onOpenShowcase}>
+        <span><strong>精品展示</strong><small>查看精品内容</small></span>
+        <ChevronRight size={18} />
+      </button>
       <ToolSection title="扫描识别" tools={imageTools.slice(2, 6)} />
       <button className="more-tools-entry" type="button" onClick={onOpenMore}>
         <span>

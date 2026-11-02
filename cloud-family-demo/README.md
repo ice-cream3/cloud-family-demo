@@ -360,3 +360,9 @@ System menu endpoints:
 | POST | `http://localhost:38080/api/manager/system/menus` | Create menu |
 | POST | `http://localhost:38080/api/manager/system/menus/update/{id}` | Update menu |
 | POST | `http://localhost:38080/api/manager/system/menus/delete/{id}` | Delete menu |
+
+## 精品展示
+
+精品展示的功能、表结构、接口、权限和部署说明见 [docs/showcase.md](docs/showcase.md)。
+
+商家与用户自营商品业务见 [docs/showcase-commerce.md](docs/showcase-commerce.md)，前台精品入口现按商家浏览商品。

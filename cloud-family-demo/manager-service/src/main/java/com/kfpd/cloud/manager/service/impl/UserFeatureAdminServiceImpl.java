@@ -38,6 +38,12 @@ public class UserFeatureAdminServiceImpl implements UserFeatureAdminService {
         long total;
         List<Map<String, Object>> records;
         switch (feature) {
+            case "commerce-shops" -> { total=userFeatureAdminDao.countCommerceShops(keyword,status); records=userFeatureAdminDao.findCommerceShops(keyword,status,offset,pageSize); }
+            case "commerce-products" -> { total=userFeatureAdminDao.countCommerceProducts(keyword,status); records=userFeatureAdminDao.findCommerceProducts(keyword,status,offset,pageSize); }
+            case "showcase" -> {
+                total = userFeatureAdminDao.countShowcase(keyword, status);
+                records = userFeatureAdminDao.findShowcasePage(keyword, status, offset, pageSize);
+            }
             case "notifications" -> {
                 total = userFeatureAdminDao.countNotifications(keyword);
                 records = userFeatureAdminDao.findNotificationPage(keyword, offset, pageSize);
@@ -91,8 +97,11 @@ public class UserFeatureAdminServiceImpl implements UserFeatureAdminService {
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public Map<String, Object> create(String feature, Map<String, Object> record) {
-        Map<String, Object> normalized = normalize(record);
+        Map<String, Object> normalized = feature.startsWith("commerce-") ? normalizeCommerce(feature,record) : "showcase".equals(feature) ? normalizeShowcase(record) : normalize(record);
         int affected = switch (feature) {
+            case "commerce-shops" -> userFeatureAdminDao.insertCommerceShop(normalized);
+            case "commerce-products" -> userFeatureAdminDao.insertCommerceProduct(normalized);
+            case "showcase" -> userFeatureAdminDao.insertShowcase(normalized);
             case "notifications" -> userFeatureAdminDao.insertNotification(normalized);
             case "documents" -> userFeatureAdminDao.insertDocument(normalized);
             case "versions" -> userFeatureAdminDao.insertVersion(normalized);
@@ -113,8 +122,11 @@ public class UserFeatureAdminServiceImpl implements UserFeatureAdminService {
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public Map<String, Object> update(String feature, Long id, Map<String, Object> record) {
-        Map<String, Object> normalized = normalize(record);
+        Map<String, Object> normalized = feature.startsWith("commerce-") ? normalizeCommerce(feature,record) : "showcase".equals(feature) ? normalizeShowcase(record) : normalize(record);
         int affected = switch (feature) {
+            case "commerce-shops" -> userFeatureAdminDao.updateCommerceShop(id, normalized);
+            case "commerce-products" -> userFeatureAdminDao.updateCommerceProduct(id, normalized);
+            case "showcase" -> userFeatureAdminDao.updateShowcase(id, normalized);
             case "notifications" -> userFeatureAdminDao.updateNotification(id, normalized);
             case "documents" -> userFeatureAdminDao.updateDocument(id, normalized);
             case "versions" -> userFeatureAdminDao.updateVersion(id, normalized);
@@ -137,6 +149,12 @@ public class UserFeatureAdminServiceImpl implements UserFeatureAdminService {
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void delete(String feature, Long id) {
         int affected = switch (feature) {
+            case "commerce-shops" -> {
+                if (userFeatureAdminDao.countCommerceShopProducts(id)>0) throw SystemManagementSupport.badRequest("请先删除店铺中的全部商品，或将店铺停用");
+                yield userFeatureAdminDao.deleteCommerceShop(id);
+            }
+            case "commerce-products" -> userFeatureAdminDao.deleteCommerceProduct(id);
+            case "showcase" -> userFeatureAdminDao.deleteShowcase(id);
             case "notifications" -> userFeatureAdminDao.deleteNotification(id);
             case "documents" -> userFeatureAdminDao.deleteDocument(id);
             case "versions" -> userFeatureAdminDao.deleteVersion(id);
@@ -151,6 +169,62 @@ public class UserFeatureAdminServiceImpl implements UserFeatureAdminService {
             throw SystemManagementSupport.notFound("Feature record not found");
         }
         operationLogService.recordDelete(MODULE_PARTNER, businessType(feature), id, String.valueOf(id), Map.of("id", id));
+    }
+
+    private Map<String,Object> normalizeCommerce(String feature,Map<String,Object> record) {
+        normalize(record);
+        if ("commerce-shops".equals(feature)) {
+            var result=com.kfpd.cloud.common.showcase.CommerceRules.shop(record);
+            result.put("ownerUsername",com.kfpd.cloud.common.showcase.CommerceRules.text(record,"ownerUsername",64,true));
+            result.put("status",com.kfpd.cloud.common.showcase.CommerceRules.state(record.get("status"),List.of("ACTIVE","BLOCKED"),"ACTIVE"));
+            result.put("sortOrder",com.kfpd.cloud.common.showcase.CommerceRules.integer(record.get("sortOrder"),0,Integer.MAX_VALUE));
+            return result;
+        }
+        var result=com.kfpd.cloud.common.showcase.CommerceRules.product(record);
+        result.put("shopId",com.kfpd.cloud.common.showcase.CommerceRules.id(record.get("shopId")));
+        result.put("moderationStatus",com.kfpd.cloud.common.showcase.CommerceRules.state(record.get("moderationStatus"),List.of("ACTIVE","BLOCKED"),"ACTIVE"));
+        boolean blocked="BLOCKED".equals(result.get("moderationStatus"));
+        String reason=com.kfpd.cloud.common.showcase.CommerceRules.text(record,"moderationReason",500,blocked);
+        result.put("moderationReason",blocked?reason:null);
+        if (blocked) result.put("status","OFFLINE");
+        return result;
+    }
+
+    private Map<String, Object> normalizeShowcase(Map<String, Object> record) {
+        normalize(record);
+        Map<String, Object> normalized = new java.util.HashMap<>();
+        String[] keys = {"title", "category", "summary", "content"};
+        int[] limits = {100, 32, 300, 100000};
+        for (int i = 0; i < keys.length; i++) {
+            Object raw = record.get(keys[i]);
+            if (!(raw instanceof String value) || value.isBlank() || value.trim().length() > limits[i]) {
+                throw SystemManagementSupport.badRequest("标题、分类、摘要和正文不能为空且不能超长");
+            }
+            normalized.put(keys[i], value.trim());
+        }
+        String status = record.get("status") instanceof String value ? value : "DRAFT";
+        if (!List.of("DRAFT", "PUBLISHED", "OFFLINE").contains(status)) {
+            throw SystemManagementSupport.badRequest("精品状态无效");
+        }
+        normalized.put("status", status);
+        String cover = record.get("coverUrl") instanceof String value ? value.trim() : "";
+        if (!cover.isEmpty()) {
+            try {
+                java.net.URI uri = java.net.URI.create(cover);
+                boolean relative = cover.startsWith("/") && !cover.startsWith("//") && uri.getHost() == null;
+                boolean remote = ("https".equalsIgnoreCase(uri.getScheme()) || "http".equalsIgnoreCase(uri.getScheme())) && uri.getHost() != null;
+                if (cover.length() > 1024 || (!relative && !remote)) throw new IllegalArgumentException();
+            } catch (IllegalArgumentException ex) {
+                throw SystemManagementSupport.badRequest("封面需填写 http(s) 图片地址或站内绝对路径");
+            }
+        }
+        normalized.put("coverUrl", cover.isEmpty() ? null : cover);
+        try {
+            normalized.put("sortOrder", Integer.parseInt(String.valueOf(record.getOrDefault("sortOrder", 0))));
+        } catch (NumberFormatException ex) {
+            throw SystemManagementSupport.badRequest("排序必须是整数");
+        }
+        return normalized;
     }
 
     private Map<String, Object> normalize(Map<String, Object> record) {

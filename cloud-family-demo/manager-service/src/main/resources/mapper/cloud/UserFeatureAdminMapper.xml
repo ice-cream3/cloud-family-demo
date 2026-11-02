@@ -396,4 +396,71 @@
     <delete id="deleteTrip">
         DELETE FROM user_trip_slot WHERE id = #{id}
     </delete>
+    <sql id="ShowcaseFilters">
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (title LIKE CONCAT('%', #{keyword}, '%') OR category LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="status != null and status != ''">AND status = #{status}</if>
+        </where>
+    </sql>
+    <select id="countShowcase" resultType="long">
+        SELECT COUNT(*) FROM showcase_item <include refid="ShowcaseFilters"/>
+    </select>
+    <select id="findShowcasePage" resultType="map">
+        SELECT id, title, category, cover_url coverUrl, summary, content, status,
+               sort_order sortOrder, published_at publishedAt, created_at createdAt, updated_at updatedAt
+        FROM showcase_item <include refid="ShowcaseFilters"/>
+        ORDER BY sort_order ASC, id DESC LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+    <insert id="insertShowcase" parameterType="map" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO showcase_item (title, category, cover_url, summary, content, status, sort_order, published_at)
+        VALUES (#{title}, #{category}, #{coverUrl}, #{summary}, #{content}, #{status}, #{sortOrder},
+                CASE WHEN #{status} = 'PUBLISHED' THEN CURRENT_TIMESTAMP ELSE NULL END)
+    </insert>
+    <update id="updateShowcase">
+        UPDATE showcase_item
+        SET published_at = CASE WHEN #{record.status} = 'PUBLISHED' AND status != 'PUBLISHED'
+                                THEN CURRENT_TIMESTAMP ELSE published_at END,
+            title = #{record.title}, category = #{record.category}, cover_url = #{record.coverUrl},
+            summary = #{record.summary}, content = #{record.content}, status = #{record.status},
+            sort_order = #{record.sortOrder}
+        WHERE id = #{id}
+    </update>
+    <delete id="deleteShowcase">DELETE FROM showcase_item WHERE id = #{id}</delete>
+    <sql id="CommerceShopFilters"><where>
+      <if test="keyword != null and keyword != ''">AND (s.name LIKE CONCAT('%',#{keyword},'%') OR s.owner_username LIKE CONCAT('%',#{keyword},'%'))</if>
+      <if test="status != null and status != ''">AND s.status=#{status}</if>
+    </where></sql>
+    <select id="countCommerceShops" resultType="long">SELECT COUNT(*) FROM showcase_shop s <include refid="CommerceShopFilters"/></select>
+    <select id="findCommerceShops" resultType="map">
+      SELECT s.id,s.owner_username ownerUsername,s.name,s.cover_url coverUrl,s.description,s.contact,s.status,s.sort_order sortOrder,s.created_at createdAt,s.updated_at updatedAt,
+        (SELECT COUNT(*) FROM showcase_product p WHERE p.shop_id=s.id) productCount
+      FROM showcase_shop s <include refid="CommerceShopFilters"/> ORDER BY s.sort_order,s.id DESC LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+    <insert id="insertCommerceShop" parameterType="map" useGeneratedKeys="true" keyProperty="id">
+      INSERT INTO showcase_shop(owner_username,name,cover_url,description,contact,status,sort_order)
+      SELECT username,#{name},#{coverUrl},#{description},#{contact},#{status},#{sortOrder} FROM vip_user WHERE username=#{ownerUsername}
+    </insert>
+    <update id="updateCommerceShop">UPDATE showcase_shop SET name=#{record.name},cover_url=#{record.coverUrl},description=#{record.description},contact=#{record.contact},status=#{record.status},sort_order=#{record.sortOrder} WHERE id=#{id}</update>
+    <select id="countCommerceShopProducts" resultType="long">SELECT COUNT(*) FROM showcase_product WHERE shop_id=#{id}</select>
+    <delete id="deleteCommerceShop">DELETE FROM showcase_shop WHERE id=#{id}</delete>
+    <sql id="CommerceProductFilters"><where>
+      <if test="keyword != null and keyword != ''">AND (p.title LIKE CONCAT('%',#{keyword},'%') OR s.name LIKE CONCAT('%',#{keyword},'%') OR s.owner_username LIKE CONCAT('%',#{keyword},'%') OR CAST(s.id AS CHAR)=#{keyword})</if>
+      <if test="status != null and status != ''">AND p.status=#{status}</if>
+    </where></sql>
+    <select id="countCommerceProducts" resultType="long">SELECT COUNT(*) FROM showcase_product p JOIN showcase_shop s ON s.id=p.shop_id <include refid="CommerceProductFilters"/></select>
+    <select id="findCommerceProducts" resultType="map">
+      SELECT p.id,p.shop_id shopId,s.name shopName,s.owner_username ownerUsername,p.title,p.category,p.cover_url coverUrl,p.summary,p.content,p.price,p.stock,p.status,p.moderation_status moderationStatus,p.moderation_reason moderationReason,p.sort_order sortOrder,p.published_at publishedAt,p.updated_at updatedAt
+      FROM showcase_product p JOIN showcase_shop s ON s.id=p.shop_id <include refid="CommerceProductFilters"/> ORDER BY p.id DESC LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+    <insert id="insertCommerceProduct" parameterType="map" useGeneratedKeys="true" keyProperty="id">
+      INSERT INTO showcase_product(shop_id,title,category,cover_url,summary,content,price,stock,status,moderation_status,moderation_reason,sort_order,published_at)
+      SELECT id,#{title},#{category},#{coverUrl},#{summary},#{content},#{price},#{stock},#{status},#{moderationStatus},#{moderationReason},#{sortOrder},CASE WHEN #{status}='PUBLISHED' THEN CURRENT_TIMESTAMP ELSE NULL END FROM showcase_shop WHERE id=#{shopId}
+    </insert>
+    <update id="updateCommerceProduct">
+      UPDATE showcase_product SET published_at=CASE WHEN #{record.status}='PUBLISHED' AND status!='PUBLISHED' THEN CURRENT_TIMESTAMP ELSE published_at END,
+        title=#{record.title},category=#{record.category},cover_url=#{record.coverUrl},summary=#{record.summary},content=#{record.content},price=#{record.price},stock=#{record.stock},status=#{record.status},moderation_status=#{record.moderationStatus},moderation_reason=#{record.moderationReason},sort_order=#{record.sortOrder} WHERE id=#{id}
+    </update>
+    <delete id="deleteCommerceProduct">DELETE FROM showcase_product WHERE id=#{id}</delete>
 </mapper>

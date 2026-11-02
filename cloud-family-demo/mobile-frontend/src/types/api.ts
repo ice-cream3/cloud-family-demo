@@ -217,3 +217,13 @@ export type TripPublishRequest = {
   startTime: string;
   endTime: string;
 };
+
+export type ShowcaseItem = {
+  id: number;
+  title: string;
+  category: string;
+  coverUrl?: string | null;
+  summary: string;
+  content?: string;
+  publishedAt?: string | null;
+};

@@ -1,3 +1,4 @@
+import type { ShowcaseItem } from '../types/api';
 import type {
   AccountSecurity,
   AccountSecurityUpdateRequest,
@@ -188,4 +189,14 @@ export function loadRecentTools() {
 
 export function recordToolUsage(toolCode: string) {
   return post<void>('/api/users/tools/usage', { body: { toolCode } });
+}
+
+export function loadShowcasePage(category = '', keyword = '', pageNum = 1, pageSize = 12) {
+  return post<PageResult<ShowcaseItem>>('/api/users/showcase/page', { body: { category, keyword, pageNum, pageSize } });
+}
+export function loadShowcaseCategories() {
+  return post<string[]>('/api/users/showcase/categories');
+}
+export function loadShowcaseDetail(id: number) {
+  return post<ShowcaseItem>(`/api/users/showcase/detail/${id}`);
 }
