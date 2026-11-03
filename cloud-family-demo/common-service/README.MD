@@ -8,7 +8,7 @@
 gateway-service/auth-service/partner-service/manager-service/job-service -> common-service
 ```
 
-`common-service` 不应依赖任何业务服务模块，也不承载具体业务流程。
+`common-service` 不应依赖任何业务服务模块。它可以承载两端共用的纯校验和类型策略，但账号校验、商家申请审核、权限控制及事务编排仍由业务服务负责。
 
 本文中的 Maven、MySQL 命令均在仓库根目录执行。当前构建目标为 JDK 21，依赖版本由[根 pom.xml](../pom.xml)管理；本模块没有启动类、独立端口或 `application.yml`，运行配置由引用它的服务提供。
 
@@ -38,6 +38,7 @@ mvn -pl common-service -am install
 - RocketMQ producer 和通用收发封装
 - Redis key 常量与拼装工具
 - Spring Authorization Server JDBC 表结构脚本
+- 商家、商品字段白名单校验与共用类型策略：`CommerceRules`、`CommerceTypePolicy`、`CommerceTypeStore`
 
 ## 接入方式
 
@@ -106,12 +107,44 @@ common-service/src/main/java/com/kfpd/cloud/common
 ├── exception
 │   ├── BusinessException.java
 │   └── ErrorCode.java
+├── showcase
+│   ├── CommerceRules.java
+│   ├── CommerceTypePolicy.java
+│   └── CommerceTypeStore.java
 ├── utils
 │   └── RedisKeyUtil.java
 └── web
     ├── ApiResponse.java
     └── GatewayHeaders.java
 ```
+
+## 商家与商品共享规则
+
+源码位于 `com.kfpd.cloud.common.showcase`。这些类不参与自动装配，无独立 HTTP 接口；partner 和 manager 显式调用同一套规则，通过各自的 MyBatis DAO 实现持久化接口。
+
+| 类 / 方法 | 职责 |
+| --- | --- |
+| `CommerceRules.shop` | 校验店铺名称、介绍、联系方式与封面，只返回允许保存的资料字段。 |
+| `CommerceRules.product` | 校验商品资料、价格、库存、排序和用户上下架状态，不接受所属账号及后台停用状态等管理字段。 |
+| `CommerceRules.typeCode` | 去除首尾空白并转大写；编码以字母开头，仅含字母、数字、下划线，最多 64 位。 |
+| `CommerceTypePolicy.codes` | 要求提交 1–20 个类型编码，再规范化、去重并排序。 |
+| `CommerceTypePolicy.assign` | 锁定商家和类型，确认所有类型已启用，替换经营类型关联，并下架已移出经营范围的商品。 |
+| `CommerceTypePolicy.product` | 确认商品类型属于商家且启用，由字典生成 `category` 展示名称，返回类型 ID 与编码。 |
+| `CommerceTypePolicy.attach` | 批量补充商家的 `types`、`typeCodes`、`typeNames`，避免逐条查询。 |
+| `CommerceTypeStore` | 类型查询、商家及类型行锁、关联写入和商品下架的持久化契约。 |
+
+价格范围为 `0` 至 `9999999999.99`，最多两位小数；库存和排序为非负整数。封面支持 HTTP(S) 地址或以单个 `/` 开头的站内路径；商品详情作为文本保存。
+
+`CommerceTypeStore` 由 [partner DAO](../partner-service/src/main/java/com/kfpd/cloud/partner/dao/cloud/CommerceTypeDao.java) 和 [manager DAO](../manager-service/src/main/java/com/kfpd/cloud/manager/dao/cloud/CommerceTypeDao.java) 实现。调用 `assign` 或 `product` 的服务方法需使用 `fa-cloud` 事务管理器，保证校验、行锁和写入在同一事务中：
+
+```java
+@Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+public void changeTypes(Long shopId, List<String> codes) {
+    CommerceTypePolicy.assign(commerceTypeDao, shopId, codes);
+}
+```
+
+公共策略不判断登录账号归属，也不决定商家是否允许编辑或公开展示。业务服务须先校验账号与归属，并执行申请状态限制：申请必选启用类型，提交后只读，驳回后可重提；仅审核通过且正常启用的商家可新增商品。字典由后台维护，审核时可调整申请类型。完整流程及迁移顺序见[项目 README](../README.md#商家申请与精品展示)。
 
 ## 统一响应
 
@@ -666,8 +699,8 @@ JWT 变量：
 | --- | --- |
 | `gateway-service` | JWT secret、统一错误响应、网关错误码、Header 常量。 |
 | `auth-service` | JWT 配置、双数据源、OAuth2 JDBC、Redis 会话、统一异常。 |
-| `partner-service` | `fa-cloud` 数据源、Redis、统一响应和异常。 |
-| `manager-service` | `fa-cloud` / `fa-model` 双数据源、Redis、RocketMQ、统一响应和异常。 |
+| `partner-service` | `fa-cloud` 数据源、Redis、统一响应和异常、商家申请及商品类型校验。 |
+| `manager-service` | `fa-cloud` / `fa-model` 双数据源、Redis、RocketMQ、统一响应和异常、商家审核及共用类型策略。 |
 | `job-service` | `fa-cloud` 过期行程更新、`fa-model` 登录日志读取和统计写入、双事务管理器。 |
 
 ## 本地初始化
@@ -732,6 +765,8 @@ mvn test
 | 测试类 | 覆盖点 |
 | --- | --- |
 | `EncryptedDataSourceValuesTests` | `ENC(...)` 密文解密、明文透传、加密后可解密。 |
+| `CommerceRulesTests` | 商品价格及状态约束、字段白名单、文本和封面等输入校验。 |
+| `CommerceTypePolicyTests` | 类型编码、经营范围分配、商品类型归属与服务端展示名称。 |
 
 这些单元测试不验证 MySQL、Redis 或 RocketMQ 的连接。基础设施联调需要启动相应组件和业务服务，并核对当前激活的 profile。
 
@@ -748,6 +783,8 @@ mvn test
 | RocketMQ producer 已启动但未消费消息 | 核对业务代码是否调用 `subscribe`，以及 consumer group、topic、tag 是否与发送端匹配。 |
 
 ## 源码入口
+
+- [商家与商品校验](src/main/java/com/kfpd/cloud/common/showcase/CommerceRules.java)、[类型策略](src/main/java/com/kfpd/cloud/common/showcase/CommerceTypePolicy.java)、[持久化契约](src/main/java/com/kfpd/cloud/common/showcase/CommerceTypeStore.java)。
 
 - [数据源自动配置](src/main/java/com/kfpd/cloud/common/config/datasource/MultiDataSourceAutoConfiguration.java)、[连接池参数](src/main/java/com/kfpd/cloud/common/config/datasource/MultiDataSourceProperties.java)、[密文工具](src/main/java/com/kfpd/cloud/common/config/datasource/EncryptedDataSourceValues.java)。
 - [Redis 自动配置](src/main/java/com/kfpd/cloud/common/config/redis/RedissonAutoConfiguration.java)、[缓存和锁方法](src/main/java/com/kfpd/cloud/common/config/redis/RedissonService.java)。

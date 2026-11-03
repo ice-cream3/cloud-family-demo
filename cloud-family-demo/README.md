@@ -4,7 +4,7 @@ JDK 21 + Spring Boot 4.0.8 + Spring Cloud 2025.1.3 microservice demo.
 
 ## Modules
 
-- `common-service`: shared configuration properties, constants, and MySQL multi-data-source auto-configuration.
+- `common-service`: shared configuration, responses, exceptions, Redis/RocketMQ utilities, dual data sources, and commerce validation. See [common-service/README.MD](common-service/README.MD).
 - `gateway-service`: Spring Cloud Gateway WebFlux gateway on port `38080`.
 - `auth-service`: JWT issuing service on port `38081`.
 - `partner-service`: protected partner API service on port `38082`.
@@ -23,6 +23,9 @@ System users, roles, permissions, menus, and their relationships are manager-ser
 - Manager dashboard and system management APIs for users, roles, permissions, and menus.
 - Lightweight XXL-JOB admin, executor registration, manual trigger APIs, and demo job handlers.
 - Shared common module for cross-service configuration, constants, and infrastructure setup.
+- Merchant applications and manager review, merchant type management, product publishing and moderation.
+- Merchant discovery by enabled type and keyword, with server-side pagination.
+- Membership configuration with permission-controlled account password reset and operation logs.
 
 ## Integrations
 
@@ -37,17 +40,59 @@ System users, roles, permissions, menus, and their relationships are manager-ser
 - Spring Boot Actuator for health and info endpoints.
 - Log4j2 for application logging.
 
+## 环境与配置
+
+所有后端构建命令在仓库根目录执行，前端命令在对应前端目录执行。
+
+| 依赖 | 用途与配置入口 |
+| --- | --- |
+| JDK 21、Maven | 根 `pom.xml` 定义 Java 目标版本及后端依赖版本。 |
+| Node.js、npm | 两个 React/Vite 应用独立安装、构建；使用符合各前端依赖要求的 Node.js 版本。 |
+| MySQL 8 | `fa-cloud` 保存账号、权限及业务数据，`fa-model` 保存登录日志、操作日志和统计。 |
+| Redis Cluster | 各服务按 `spring.data.redis.cluster.nodes` 配置；公共客户端启用条件见 common README。 |
+| RocketMQ（按需） | 默认关闭，使用消息能力时配置 NameServer 并启用 `ROCKETMQ_ENABLED`。 |
+| XXL-JOB Admin（按需） | 调度 job-service；执行器默认指向本地 `38088/xxl-job-admin`。 |
+
+默认 profile 为 `dev`，服务配置位于各模块 `src/main/resources/application.yml` 和 `application-dev.yml`；测试连接配置位于 `application-test.yml`。用 `SPRING_PROFILES_ACTIVE` 切换环境。
+
+- 数据源使用 `FA_CLOUD_DB_URL/USERNAME/PASSWORD`、`FA_MODEL_DB_URL/USERNAME/PASSWORD`；用户名和密码支持明文及 `ENC(...)`，密钥由 `DATASOURCE_CRYPTO_SECRET` 提供。
+- Redis 使用 `REDIS_CLUSTER_NODES`、`REDIS_PASSWORD`；会话存储可用 `AUTH_SESSION_STORE=redis` 切换。
+- auth 与 gateway 的 JWT 配置必须一致；网关与下游的 `demo.gateway.internal-token` 也必须一致。
+- 两组数据源均由公共模块创建。配置、Bean 名、事务边界和环境变量详见 [common README](common-service/README.MD)。
+
+## 数据库初始化与升级
+
+SQL 脚本由开发者执行，公共模块不会在启动时自动迁移。新环境先创建基础表，再初始化功能和菜单。以下为基础初始化顺序（连接账号按实际环境替换）：
+
+```bash
+mysql -h127.0.0.1 -P3306 -uroot -p < partner-service/src/main/resources/db/fa-cloud/vip-user-schema.sql
+mysql -h127.0.0.1 -P3306 -uroot -p < manager-service/src/main/resources/db/fa-cloud/system-management-schema.sql
+mysql -h127.0.0.1 -P3306 -uroot -p < common-service/src/main/resources/db/fa-cloud/spring-security-oauth2-authorization-schema.sql
+mysql -h127.0.0.1 -P3306 -uroot -p < partner-service/src/main/resources/db/fa-cloud/user-profile-features.sql
+mysql -h127.0.0.1 -P3306 -uroot -p < auth-service/src/main/resources/db/fa-model/auth-login-log-schema.sql
+mysql -h127.0.0.1 -P3306 -uroot -p fa-model < manager-service/src/main/resources/db/fa-model/operation-log-schema.sql
+mysql -h127.0.0.1 -P3306 -uroot -p < manager-service/src/main/resources/db/fa-cloud/partner-management-menu.sql
+```
+
+商家表、类型关联和功能菜单按下文及专题文档继续初始化；登录统计表按任务章节初始化。旧环境应根据已有表结构选择增量脚本，不能依靠重新执行 `CREATE TABLE IF NOT EXISTS` 更新已有约束。脚本中的 `USE fa-cloud` / `USE fa-model` 不会随 Spring profile 自动变化，测试库执行前需核对脚本的目标库。
+
 ## Build
 
 ```bash
 mvn clean package
 ```
 
-Build the standalone frontend separately:
+Build each frontend separately (the Maven build does not build frontend assets):
 
 ```bash
 cd frontend
 npm install
+npm run build
+```
+
+```bash
+cd mobile-frontend
+npm ci
 npm run build
 ```
 
@@ -56,7 +101,7 @@ npm run build
 Install the shared module once before starting individual services from the Maven reactor:
 
 ```bash
-mvn -pl common-service install
+mvn -pl common-service -am install
 ```
 
 Start each service in a separate terminal:
@@ -163,12 +208,18 @@ and `job-service/src/main/resources/db/fa-model/partner-login-stats-schema.sql`.
 
 ## Try
 
+Request an API challenge first and complete it in the user frontend. Login and registration require the challenge ID and answer; the challenge endpoint also accepts `{"purpose":"api_register"}` for registration.
+
+```bash
+curl -s -X POST http://localhost:38080/auth/api/login/challenge
+```
+
 Login as an API user through the gateway:
 
 ```bash
 curl -s -X POST http://localhost:38080/auth/api/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"demo"}'
+  -d '{"username":"alice","password":"demo","antiAbuseChallengeId":"<challengeId>","antiAbuseAnswer":"<answer>"}'
 ```
 
 Use the returned `accessToken`:
@@ -197,7 +248,7 @@ curl -s -X POST http://localhost:38080/auth/logout \
 
 Configure the enabled login challenge schemes:
 
-Configure `mobile-frontend` login/registration and `frontend` manager login independently. Each side randomly selects from all five schemes when its own setting is omitted or empty; configuring one side does not affect the other. Configure `auth-service/src/main/resources/application.yml`:
+Configure `mobile-frontend` login/registration and `frontend` manager login independently. An empty effective scheme list randomly selects from all five schemes; configuring one side does not affect the other. The current application.yml defaults API challenges to all schemes and manager challenges to graphic_set. Configure `auth-service/src/main/resources/application.yml`:
 
 ```yaml
 demo:
@@ -281,7 +332,9 @@ Auth service endpoints:
 
 | Method | Request URL | Description |
 | --- | --- | --- |
+| POST | `http://localhost:38080/auth/api/login/challenge` | API login or registration challenge (`{"purpose":"api_register"}` for registration) |
 | POST | `http://localhost:38080/auth/api/login` | API user login |
+| POST | `http://localhost:38080/auth/api/register` | API user registration |
 | POST | `http://localhost:38080/auth/manager/login/challenge` | Create manager login image challenge |
 | POST | `http://localhost:38080/auth/manager/login` | Manager user login |
 | POST | `http://localhost:38080/auth/refresh` | Refresh access token |
@@ -361,7 +414,74 @@ System menu endpoints:
 | POST | `http://localhost:38080/api/manager/system/menus/update/{id}` | Update menu |
 | POST | `http://localhost:38080/api/manager/system/menus/delete/{id}` | Delete menu |
 
-## 精品展示
+## 商家申请与精品展示
+
+商家、商品、经营类型由 partner-service 和 manager-service 共用 `common-service.showcase` 规则，账号登录仍由 auth-service 负责。
+
+1. 后台维护商家类型字典，用户申请时必须选择 1–20 个已启用类型，可多选。
+2. 提交后进入 `PENDING`，用户仅可查看；后台商家管理通过“审核”确认资料和类型，可通过或驳回。
+3. `ACTIVE` 为审核通过且启用，只有该状态及启用账号的商家公开展示并允许新增商品（包括草稿）。`REJECTED` 可修改后重新申请，`BLOCKED` 由后台停用；用户不能修改已通过或停用商家的资料。
+4. 商品类型必须属于商家经营范围且启用。移除或停用类型会下架相关商品，恢复类型不会自动上架。
+5. 精品展示支持“全部商家”及启用类型筛选，可叠加关键词；切换类型回到第一页，列表和总数均由后端筛选。
+
+| 接口（均为 POST，通过网关访问） | 用途 |
+| --- | --- |
+| `/api/users/commerce/types` | 查询已启用类型。 |
+| `/api/users/commerce/shops/page` | 按 `keyword`、`typeCode`、`pageNum`、`pageSize` 查询商家；不传类型表示全部。 |
+| `/api/users/commerce/mine/shop/save` | 提交申请或驳回后重提；资料包含 `name`、`description`、`contact`、`coverUrl`、必填 `typeCodes`。 |
+| `/api/manager/partner/features/commerce-shops/page` | 后台商家列表，可按审核状态查询。 |
+| `/api/manager/partner/features/commerce-shops/update/{id}` | 后台保存商家资料、审核状态及类型，要求 `partner:showcase:edit`。 |
+
+SQL 位于 `manager-service/src/main/resources/db/fa-cloud/`。新库依次执行 `showcase-schema.sql`、`showcase-menu.sql`（包含精品模块权限）、`showcase-commerce-schema.sql`、`showcase-shop-types.sql`、`showcase-commerce-menu.sql`、`showcase-shop-types-menu.sql`；菜单依赖基础系统管理表，旧内容模块说明见下列专题文档。
+
+已有环境按实际结构补齐迁移：
+
+| 脚本 | 适用变更 |
+| --- | --- |
+| `showcase-shop-type-code.sql` | 旧类型表增加稳定的唯一业务编码。 |
+| `showcase-shop-type-rel-code.sql` | 旧商家类型关联由 `type_id` 迁移为 `type_code`。 |
+| `showcase-commerce-moderation-reason.sql` | 旧商品表增加后台停用原因。 |
+| `showcase-commerce-blocked-offline.sql` | 将系统停用商品统一置为下架。 |
+| `showcase-shop-approval.sql` | 旧商家表状态约束加入 `PENDING/REJECTED`，默认状态改为待审核。 |
+
+**旧库上线申请功能前必须执行审核状态迁移。** 否则保存申请会报 `Check constraint 'chk_showcase_shop_status' is violated`。迁移保留已有商家状态。部署后重启 partner-service、manager-service，并更新移动端及管理端。
+
+## 会员中心重置密码
+
+后台“会员中心配置”提供“重置会员密码”。接口为 `POST /api/manager/partner/features/memberships/password/reset/{会员记录ID}`，请求体为 `{"password":"新密码"}`，需要独立权限 `partner:membership:reset-password`。
+
+服务端先按会员记录查找关联 VIP 账号，再复用密码重置服务和操作日志，不能将会员记录 ID 当成用户 ID。会员方案、权益和到期时间保持不变。
+
+- 为 `SUPER_ADMIN` 补齐按钮和接口权限：执行 [membership-password-reset-super-admin.sql](manager-service/src/main/resources/db/fa-cloud/membership-password-reset-super-admin.sql)，不影响其他角色已有授权。
+- 通用初始化脚本 [membership-password-reset-menu.sql](manager-service/src/main/resources/db/fa-cloud/membership-password-reset-menu.sql) 默认授权 `SUPER_ADMIN`、`MANAGER`；按所需授权范围选择脚本。
+- 执行后重新登录后台刷新权限，详情见 [会员密码重置说明](docs/membership-password-reset.md)。
+
+## 验证与排错
+
+```bash
+# 公共模块单元测试，无需启动中间件
+mvn -pl common-service -am test
+
+# 商家流程和会员重置密码的定向回归
+mvn -pl partner-service,manager-service -am test -Dtest=CommerceServiceTests,MembershipPasswordTests -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+完整后端测试使用 `mvn test`；两个前端分别执行 `npm run build`，需要检查风格时执行 `npm run lint`。单元测试及前端构建不能替代真实数据库约束和接口验证。
+
+| 现象 | 检查方式 |
+| --- | --- |
+| 改码后仍返回旧校验提示 | 确认目标服务已重新构建并重启，核对实际监听端口与日志中的启动时间。 |
+| 商家申请报状态约束错误 | 检查目标数据库是否执行 `showcase-shop-approval.sql`，不要只修改建表脚本。 |
+| 商家或商品不展示 | 检查账号、商家审核状态、商品上下架与后台停用状态，以及类型是否启用且属于商家。 |
+| 后台无按钮或返回 403 | 同时检查角色菜单和接口权限，授权后重新登录。 |
+| 前端请求失败 | 前端 `/auth`、`/api` 代理到 gateway，查看 gateway 和目标业务服务日志；日志默认在 `logs/<服务名>/<profile>/`。 |
+
+## 专题文档
+
+- [公共模块配置与扩展](common-service/README.MD)
+- [管理端使用说明](frontend/README.md)
+- [用户端使用说明](mobile-frontend/README.md)
+
 
 精品展示的功能、表结构、接口、权限和部署说明见 [docs/showcase.md](docs/showcase.md)。
 
