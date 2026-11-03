@@ -22,6 +22,7 @@ import {
   loadSystemUserRoles,
   loadSystemUsers,
   resetPartnerInfoPassword,
+  resetMembershipPassword,
   resetSystemUserPassword,
   replaceSystemMenuPermissions,
   replaceSystemRoleMenus,
@@ -188,7 +189,9 @@ export default function App() {
   }
 
   async function handleResetUserPassword(id: number, password: string) {
-    if (activeMenu?.path === '/api/manager/partner/info') {
+    if (activeMenu?.path === '/api/manager/partner/memberships') {
+      await resetMembershipPassword(id, password);
+    } else if (activeMenu?.path === '/api/manager/partner/info') {
       await resetPartnerInfoPassword(id, password);
     } else {
       await resetSystemUserPassword(id, password);
@@ -347,6 +350,7 @@ function getSystemPageLoaders(): Record<string, (pageNum: number, pageSize: numb
     '/api/manager/partner/settings/notifications': (pageNum, pageSize, query) => loadPartnerFeaturePage('notifications', pageNum, pageSize, query),
     '/api/manager/partner/settings/documents': (pageNum, pageSize, query) => loadPartnerFeaturePage('documents', pageNum, pageSize, query),
     '/api/manager/partner/settings/versions': (pageNum, pageSize, query) => loadPartnerFeaturePage('versions', pageNum, pageSize, query),
+    '/api/manager/partner/shop-types': (pageNum, pageSize, query) => loadPartnerFeaturePage('commerce-types', pageNum, pageSize, query),
     '/api/manager/partner/shops': (pageNum, pageSize, query) => loadPartnerFeaturePage('commerce-shops', pageNum, pageSize, query),
     '/api/manager/partner/products': (pageNum, pageSize, query) => loadPartnerFeaturePage('commerce-products', pageNum, pageSize, query),
     '/api/manager/partner/showcase': (pageNum, pageSize, query) => loadPartnerFeaturePage('showcase', pageNum, pageSize, query),

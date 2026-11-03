@@ -4,12 +4,12 @@ import java.util.Map;
 import org.apache.ibatis.annotations.Param;
 
 public interface CommerceDao {
-    long countShops(@Param("keyword") String keyword);
-    List<Map<String,Object>> shops(@Param("keyword") String keyword,@Param("offset") int offset,@Param("pageSize") int pageSize);
+    long countShops(@Param("keyword") String keyword,@Param("typeCode") String typeCode);
+    List<Map<String,Object>> shops(@Param("keyword") String keyword,@Param("typeCode") String typeCode,@Param("offset") int offset,@Param("pageSize") int pageSize);
     Map<String,Object> shop(@Param("id") Long id);
-    long countProducts(@Param("shopId") Long shopId,@Param("keyword") String keyword,@Param("category") String category);
-    List<Map<String,Object>> products(@Param("shopId") Long shopId,@Param("keyword") String keyword,@Param("category") String category,@Param("offset") int offset,@Param("pageSize") int pageSize);
-    List<String> categories(@Param("shopId") Long shopId);
+    long countProducts(@Param("shopId") Long shopId,@Param("keyword") String keyword,@Param("typeCode") String typeCode);
+    List<Map<String,Object>> products(@Param("shopId") Long shopId,@Param("keyword") String keyword,@Param("typeCode") String typeCode,@Param("offset") int offset,@Param("pageSize") int pageSize);
+    List<Map<String,Object>> categories(@Param("shopId") Long shopId);
     Map<String,Object> product(@Param("id") Long id);
     Map<String,Object> mineShop(@Param("username") String username);
     int saveShop(@Param("username") String username,@Param("record") Map<String,Object> record);

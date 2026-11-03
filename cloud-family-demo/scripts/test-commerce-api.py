@@ -16,7 +16,7 @@ assert A.startswith('__commerce_test_') and B.startswith('__commerce_test_') and
 PARTNER = os.environ.get('PARTNER_TEST_URL', 'http://localhost:48082')
 MANAGER = os.environ.get('MANAGER_TEST_URL', 'http://localhost:48083')
 TOKEN = os.environ.get('COMMERCE_INTERNAL_TOKEN', 'cloud-family-demo-gateway-internal-token')
-PERMS = ','.join('partner:showcase:' + action for action in ('view', 'add', 'edit', 'delete'))
+PERMS = ','.join(prefix + action for prefix in ('partner:showcase:', 'partner:shop-type:') for action in ('view', 'add', 'edit', 'delete'))
 ROOT = '/api/users/commerce'
 ADMIN = '/api/manager/partner/features/'
 checks = 0
@@ -44,13 +44,19 @@ def ok(name):
     print('PASS:', name)
 
 shop_a = shop_b = product = None
+created_types = []
 try:
     assert call(ROOT + '/mine/shop') is None and call(ROOT + '/mine/shop', user=B) is None
-    shop_a = call(ROOT + '/mine/shop/save', {'name': A, 'description': '测试商家A', 'contact': '测试公开联系方式', 'ownerUsername': B, 'status': 'BLOCKED'})
-    shop_b = call(ROOT + '/mine/shop/save', {'name': B, 'description': '测试商家B'}, user=B)
+    available = call(ROOT + '/types')
+    assert available, 'Initialize merchant types first'
+    base_type = available[0]['id']
+    base_name = available[0]['name']
+    base_code = available[0]['typeCode']
+    shop_a = call(ROOT + '/mine/shop/save', {'name': A, 'description': '测试商家A', 'contact': '测试公开联系方式', 'ownerUsername': B, 'status': 'BLOCKED', 'typeCodes': [base_code]})
+    shop_b = call(ROOT + '/mine/shop/save', {'name': B, 'description': '测试商家B', 'typeCodes': [base_code]}, user=B)
     assert shop_a['ownerUsername'] == A and shop_a['status'] == 'ACTIVE' and shop_a['id'] != shop_b['id']
     ok('shop creation binds authenticated owner and ignores supplied admin status')
-    value = {'title': A + '-商品', 'category': '测试分类', 'summary': '商品简介', 'content': '商品详情\n第二段', 'price': '19.90', 'stock': '5', 'sortOrder': '0', 'status': 'DRAFT', 'shopId': shop_b['id'], 'ownerUsername': B}
+    value = {'title': A + '-商品', 'category': base_name, 'typeCode': base_code, 'summary': '商品简介', 'content': '商品详情\n第二段', 'price': '19.90', 'stock': '5', 'sortOrder': '0', 'status': 'DRAFT', 'shopId': shop_b['id'], 'ownerUsername': B}
     call(ROOT + '/mine/products', value)
     result = call(ROOT + '/mine/products/page')
     assert result['total'] == 1
@@ -63,9 +69,9 @@ try:
     call(ROOT + '/mine/products/update/' + str(pid), value)
     detail = call(ROOT + '/products/detail/' + str(pid))
     assert detail['shopName'] == A and detail['content'] == '商品详情\n第二段'
-    page = call(ROOT + '/shops/' + str(shop_a['id']) + '/products/page', {'keyword': A, 'category': '测试分类', 'pageSize': 1})
+    page = call(ROOT + '/shops/' + str(shop_a['id']) + '/products/page', {'keyword': A, 'typeCode': base_code, 'pageSize': 1})
     assert page['total'] == 1 and len(page['records']) == 1
-    assert call(ROOT + '/shops/' + str(shop_a['id']) + '/categories') == ['测试分类']
+    assert call(ROOT + '/shops/' + str(shop_a['id']) + '/categories') == [{'typeCode': base_code, 'name': base_name}]
     assert call(ROOT + '/shops/' + str(shop_b['id']) + '/products/page')['total'] == 0
     ok('merchant -> product list -> detail, category/search and merchant isolation')
     call(ROOT + '/mine/products/update/' + str(pid), value, user=B, expected=400)
@@ -104,7 +110,7 @@ try:
     call(ROOT + '/shops/' + str(shop_a['id']), expected=404)
     call(ROOT + '/products/detail/' + str(pid), expected=404)
     call(ROOT + '/mine/products/update/' + str(pid), value, expected=400)
-    own = call(ROOT + '/mine/shop/save', {'name': A, 'description': '更新资料', 'status': 'ACTIVE'})
+    own = call(ROOT + '/mine/shop/save', {'name': A, 'description': '更新资料', 'status': 'ACTIVE', 'typeCodes': [base_code]})
     assert own['status'] == 'BLOCKED'
     ok('blocked shop hides all products and seller profile changes cannot unblock')
     shop_admin['status'] = 'ACTIVE'
@@ -112,6 +118,54 @@ try:
     assert call(ROOT + '/shops/page', {'keyword': A})['records'][0]['productCount'] == 1
     call(ADMIN + 'commerce-shops/delete/' + str(shop_a['id']), expected=400)
     ok('admin restore and non-empty shop deletion guard')
+    call(ADMIN + 'commerce-types/page', expected=403, permissions='partner:showcase:view')
+    for suffix in ('A', 'B', 'C'):
+        item = call(ADMIN + 'commerce-types', {'typeCode': 'TEST_' + A[-12:].upper() + '_' + suffix, 'name': '测试同名-' + A[-12:], 'description': '自动化测试类型', 'status': 'ENABLED', 'sortOrder': 0})
+        created_types.append(item)
+    ta, tb, tc = [item['id'] for item in created_types]
+    ca, cb, cc = [item['typeCode'] for item in created_types]
+    def assign_types(codes):
+        return call(ROOT + '/mine/shop/save', {'name': A, 'description': '类型约束测试', 'typeCodes': codes})
+    assigned = assign_types([base_code, ca, cb])
+    assert set(assigned['typeCodes']) == {base_code, ca, cb}
+    assert 'typeIds' not in assigned
+    call(ADMIN + 'commerce-types/delete/' + str(tb), expected=400)
+    call(ROOT + '/mine/shop/save', {'name': A, 'description': '数字关联应拒绝', 'typeIds': [base_type]}, expected=400)
+    options = call('/api/manager/partner/shop-types/options', {'shopId': shop_a['id']})
+    assert {item['typeCode'] for item in options} == {base_code, ca, cb}
+    call(ROOT + '/mine/shop/save', {'name': A, 'description': '空类型应拒绝', 'typeCodes': []}, expected=400)
+    call(ROOT + '/mine/products', {**value, 'typeCode': cc}, expected=400)
+    value['typeCode'] = ca
+    value['category'] = '试图伪造类型名称'
+    call(ROOT + '/mine/products/update/' + str(pid), value)
+    assert call(ROOT + '/products/detail/' + str(pid))['category'] == created_types[0]['name']
+    ok('merchant multi-type selection, required types and product scope validation')
+    call(ADMIN + 'commerce-types', {**created_types[0], 'name': '另一个展示名称'}, expected=400)
+    call(ADMIN + 'commerce-types/update/' + str(ta), {**created_types[0], 'typeCode': 'ATTEMPTED_CHANGE'}, expected=400)
+    created_types[0]['name'] = '测试修改展示名称'
+    call(ADMIN + 'commerce-types/update/' + str(ta), created_types[0])
+    renamed = call(ROOT + '/products/detail/' + str(pid))
+    assert renamed['typeCode'] == ca and renamed['category'] == created_types[0]['name']
+    assert call(ROOT + '/shops/' + str(shop_a['id']) + '/products/page', {'typeCode': ca})['total'] == 1
+    assert call(ROOT + '/shops/' + str(shop_a['id']) + '/products/page', {'typeCode': cb})['total'] == 0
+    call(ROOT + '/shops/' + str(shop_a['id']) + '/products/page', {'category': created_types[0]['name']}, expected=400)
+    ok('unique immutable type code, duplicate display names, rename-safe code filtering')
+
+    call(ADMIN + 'commerce-types/update/' + str(ta), {**created_types[0], 'status': 'DISABLED'})
+    assert call(ROOT + '/mine/products/page')['records'][0]['status'] == 'OFFLINE'
+    call(ROOT + '/products/detail/' + str(pid), expected=404)
+    call(ROOT + '/mine/products/update/' + str(pid), value, expected=400)
+    call(ADMIN + 'commerce-types/update/' + str(ta), {**created_types[0], 'status': 'ENABLED'})
+    assert call(ROOT + '/mine/products/page')['records'][0]['status'] == 'OFFLINE'
+    call(ROOT + '/mine/products/update/' + str(pid), value)
+    ok('disabled types offline products and restoring type does not auto-publish')
+    assign_types([base_code, cb])
+    assert call(ROOT + '/mine/products/page')['records'][0]['status'] == 'OFFLINE'
+    call(ROOT + '/mine/products/update/' + str(pid), value, expected=400)
+    value['typeCode'] = cb
+    call(ROOT + '/mine/products/update/' + str(pid), value)
+    call(ADMIN + 'commerce-types/delete/' + str(tb), expected=400)
+    ok('removing merchant type offlines affected products and used type deletion is protected')
     assert call(ROOT + '/shops/' + str(shop_a['id']) + '/products/page', {'keyword': A, 'pageNum': 2, 'pageSize': 1})['records'] == []
     call(ROOT + '/mine/products/delete/' + str(pid))
     product = None
@@ -125,4 +179,6 @@ finally:
     for shop in (shop_a, shop_b):
         if shop:
             call(ADMIN + 'commerce-shops/delete/' + str(shop['id']))
-    print('Test-created shops/products cleaned up')
+    for item in created_types:
+        call(ADMIN + 'commerce-types/delete/' + str(item['id']))
+    print('Test-created shops/products/types cleaned up')

@@ -39,6 +39,11 @@ public final class CommerceRules {
         } catch (NumberFormatException ex) { throw bad("请输入有效价格"); }
         return result;
     }
+    public static String typeCode(Object raw) {
+        String code=raw instanceof String value?value.trim().toUpperCase(java.util.Locale.ROOT):"";
+        require(code.matches("[A-Z][A-Z0-9_]{0,63}"),"类型编码必填，需以字母开头，仅包含字母、数字和下划线，最多64位");
+        return code;
+    }
     public static String state(Object raw, List<String> allowed, String defaultValue) {
         String value = raw == null ? defaultValue : String.valueOf(raw);
         require(allowed.contains(value), "状态无效"); return value;

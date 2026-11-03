@@ -366,3 +366,5 @@ System menu endpoints:
 精品展示的功能、表结构、接口、权限和部署说明见 [docs/showcase.md](docs/showcase.md)。
 
 商家与用户自营商品业务见 [docs/showcase-commerce.md](docs/showcase-commerce.md)，前台精品入口现按商家浏览商品。
+
+商家类型、多类型经营范围和商品类型约束见 [docs/showcase-shop-types.md](docs/showcase-shop-types.md)。

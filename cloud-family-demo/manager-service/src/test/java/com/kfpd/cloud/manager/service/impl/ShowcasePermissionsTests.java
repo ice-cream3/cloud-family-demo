@@ -54,6 +54,17 @@ class ShowcasePermissionsTests {
         }
     }
 
+    @Test void merchantTypesUseIndependentPermissions() {
+        try(var context=new AnnotationConfigApplicationContext(Config.class)) {
+            var controller=context.getBean(UserFeatureAdminController.class);
+            login("partner:showcase:view");
+            assertThatThrownBy(()->controller.page("commerce-types",null)).isInstanceOf(AccessDeniedException.class);
+            login("partner:shop-type:view");controller.page("commerce-types",null);
+            assertThatThrownBy(()->controller.create("commerce-types",Map.of())).isInstanceOf(AccessDeniedException.class);
+            login("partner:shop-type:add");controller.create("commerce-types",Map.of());
+        }
+    }
+
     @Test void correspondingPermissionsAllowEachAction() {
         try (var context = new AnnotationConfigApplicationContext(Config.class)) {
             var controller = context.getBean(UserFeatureAdminController.class);

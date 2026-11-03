@@ -13,10 +13,11 @@ import org.springframework.web.bind.annotation.*;
 public class CommerceController {
     private final CommerceService service;
     public CommerceController(CommerceService service) { this.service=service; }
+    @PostMapping("/types") public ApiResponse<List<Map<String,Object>>> types() { return ApiResponse.success(service.availableTypes()); }
     @PostMapping("/shops/page") public ApiResponse<PageVO<Map<String,Object>>> shops(@RequestBody(required=false) CommerceQueryVO q) { return ApiResponse.success(service.shops(q)); }
     @PostMapping("/shops/{id}") public ApiResponse<Map<String,Object>> shop(@PathVariable Long id) { return ApiResponse.success(service.shop(id)); }
     @PostMapping("/shops/{id}/products/page") public ApiResponse<PageVO<Map<String,Object>>> products(@PathVariable Long id,@RequestBody(required=false) CommerceQueryVO q) { return ApiResponse.success(service.products(id,q)); }
-    @PostMapping("/shops/{id}/categories") public ApiResponse<List<String>> categories(@PathVariable Long id) { return ApiResponse.success(service.categories(id)); }
+    @PostMapping("/shops/{id}/categories") public ApiResponse<List<Map<String,Object>>> categories(@PathVariable Long id) { return ApiResponse.success(service.categories(id)); }
     @PostMapping("/products/detail/{id}") public ApiResponse<Map<String,Object>> detail(@PathVariable Long id) { return ApiResponse.success(service.product(id)); }
     @PostMapping("/mine/shop") public ApiResponse<Map<String,Object>> mineShop(@RequestHeader(GatewayHeaders.USER_NAME) String username) { return ApiResponse.success(service.mineShop(username)); }
     @PostMapping("/mine/shop/save") public ApiResponse<Map<String,Object>> saveShop(@RequestHeader(GatewayHeaders.USER_NAME) String username,@RequestBody Map<String,Object> input) { return ApiResponse.success(service.saveShop(username,input)); }

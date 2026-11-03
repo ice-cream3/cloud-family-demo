@@ -1,0 +1,23 @@
+package com.kfpd.cloud.manager.controller;
+import java.util.List;
+import java.util.Map;
+import com.kfpd.cloud.common.web.ApiResponse;
+import com.kfpd.cloud.manager.dao.cloud.CommerceTypeDao;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/manager/partner/shop-types")
+public class CommerceTypeAdminController {
+    private final CommerceTypeDao types;
+    public CommerceTypeAdminController(CommerceTypeDao types) { this.types=types; }
+    @PostMapping("/options")
+    @PreAuthorize("hasAuthority('partner:showcase:view') or hasAuthority('partner:shop-type:view')")
+    public ApiResponse<List<Map<String,Object>>> options(@RequestBody(required=false) Map<String,Object> query) {
+        if(query!=null && query.get("shopId")!=null) {
+            long shopId=com.kfpd.cloud.common.showcase.CommerceRules.id(query.get("shopId"));
+            return ApiResponse.success(types.shopTypes(Map.of("shopIds",List.of(shopId))).stream().filter(t->"ENABLED".equals(t.get("status"))).toList());
+        }
+        return ApiResponse.success(types.available());
+    }
+}

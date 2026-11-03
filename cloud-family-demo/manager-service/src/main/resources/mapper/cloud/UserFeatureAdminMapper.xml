@@ -135,6 +135,9 @@
         </where>
     </select>
 
+    <select id="findMembershipUserId" resultType="long">
+        SELECT u.id FROM user_membership m JOIN vip_user u ON u.username=m.username WHERE m.id=#{id}
+    </select>
     <select id="findMembershipDetail" resultType="map">
         SELECT m.id, m.username, m.plan_name planName, m.status, m.expire_at expireAt,
                m.benefits, m.updated_at updatedAt,
@@ -451,16 +454,28 @@
     </where></sql>
     <select id="countCommerceProducts" resultType="long">SELECT COUNT(*) FROM showcase_product p JOIN showcase_shop s ON s.id=p.shop_id <include refid="CommerceProductFilters"/></select>
     <select id="findCommerceProducts" resultType="map">
-      SELECT p.id,p.shop_id shopId,s.name shopName,s.owner_username ownerUsername,p.title,p.category,p.cover_url coverUrl,p.summary,p.content,p.price,p.stock,p.status,p.moderation_status moderationStatus,p.moderation_reason moderationReason,p.sort_order sortOrder,p.published_at publishedAt,p.updated_at updatedAt
+      SELECT p.id,p.shop_id shopId,p.type_id typeId,(SELECT type_code FROM showcase_shop_type WHERE id=p.type_id) typeCode,s.name shopName,s.owner_username ownerUsername,p.title,p.category,p.cover_url coverUrl,p.summary,p.content,p.price,p.stock,p.status,p.moderation_status moderationStatus,p.moderation_reason moderationReason,p.sort_order sortOrder,p.published_at publishedAt,p.updated_at updatedAt
       FROM showcase_product p JOIN showcase_shop s ON s.id=p.shop_id <include refid="CommerceProductFilters"/> ORDER BY p.id DESC LIMIT #{pageSize} OFFSET #{offset}
     </select>
     <insert id="insertCommerceProduct" parameterType="map" useGeneratedKeys="true" keyProperty="id">
-      INSERT INTO showcase_product(shop_id,title,category,cover_url,summary,content,price,stock,status,moderation_status,moderation_reason,sort_order,published_at)
-      SELECT id,#{title},#{category},#{coverUrl},#{summary},#{content},#{price},#{stock},#{status},#{moderationStatus},#{moderationReason},#{sortOrder},CASE WHEN #{status}='PUBLISHED' THEN CURRENT_TIMESTAMP ELSE NULL END FROM showcase_shop WHERE id=#{shopId}
+      INSERT INTO showcase_product(shop_id,type_id,title,category,cover_url,summary,content,price,stock,status,moderation_status,moderation_reason,sort_order,published_at)
+      SELECT id,#{typeId},#{title},#{category},#{coverUrl},#{summary},#{content},#{price},#{stock},#{status},#{moderationStatus},#{moderationReason},#{sortOrder},CASE WHEN #{status}='PUBLISHED' THEN CURRENT_TIMESTAMP ELSE NULL END FROM showcase_shop WHERE id=#{shopId}
     </insert>
     <update id="updateCommerceProduct">
       UPDATE showcase_product SET published_at=CASE WHEN #{record.status}='PUBLISHED' AND status!='PUBLISHED' THEN CURRENT_TIMESTAMP ELSE published_at END,
-        title=#{record.title},category=#{record.category},cover_url=#{record.coverUrl},summary=#{record.summary},content=#{record.content},price=#{record.price},stock=#{record.stock},status=#{record.status},moderation_status=#{record.moderationStatus},moderation_reason=#{record.moderationReason},sort_order=#{record.sortOrder} WHERE id=#{id}
+        type_id=#{record.typeId},title=#{record.title},category=#{record.category},cover_url=#{record.coverUrl},summary=#{record.summary},content=#{record.content},price=#{record.price},stock=#{record.stock},status=#{record.status},moderation_status=#{record.moderationStatus},moderation_reason=#{record.moderationReason},sort_order=#{record.sortOrder} WHERE id=#{id}
     </update>
     <delete id="deleteCommerceProduct">DELETE FROM showcase_product WHERE id=#{id}</delete>
+    <sql id="CommerceTypeFilters"><where>
+      <if test="keyword != null and keyword != ''">AND (name LIKE CONCAT('%',#{keyword},'%') OR type_code LIKE CONCAT('%',#{keyword},'%'))</if>
+      <if test="status != null and status != ''">AND status=#{status}</if>
+    </where></sql>
+    <select id="countCommerceTypes" resultType="long">SELECT COUNT(*) FROM showcase_shop_type <include refid="CommerceTypeFilters"/></select>
+    <select id="findCommerceTypes" resultType="map">SELECT id,type_code typeCode,name,description,status,sort_order sortOrder,updated_at updatedAt FROM showcase_shop_type <include refid="CommerceTypeFilters"/> ORDER BY sort_order,id LIMIT #{pageSize} OFFSET #{offset}</select>
+    <insert id="insertCommerceType" parameterType="map" useGeneratedKeys="true" keyProperty="id">INSERT INTO showcase_shop_type(type_code,name,description,status,sort_order) VALUES(#{typeCode},#{name},#{description},#{status},#{sortOrder})</insert>
+    <select id="findCommerceTypeCode" resultType="string">SELECT type_code FROM showcase_shop_type WHERE id=#{id} FOR UPDATE</select>
+    <update id="updateCommerceType">UPDATE showcase_shop_type SET name=#{record.name},description=#{record.description},status=#{record.status},sort_order=#{record.sortOrder} WHERE id=#{id}</update>
+    <update id="refreshCommerceTypeProducts">UPDATE showcase_product SET category=#{record.name},status=CASE WHEN #{record.status}='DISABLED' AND status='PUBLISHED' THEN 'OFFLINE' ELSE status END WHERE type_id=#{id}</update>
+    <select id="countCommerceTypeUsage" resultType="long">SELECT (SELECT COUNT(*) FROM showcase_shop_type_rel r JOIN showcase_shop_type t ON t.type_code=r.type_code WHERE t.id=#{id})+(SELECT COUNT(*) FROM showcase_product WHERE type_id=#{id})</select>
+    <delete id="deleteCommerceType">DELETE FROM showcase_shop_type WHERE id=#{id}</delete>
 </mapper>

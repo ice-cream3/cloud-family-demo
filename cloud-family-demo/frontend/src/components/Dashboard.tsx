@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from 'react';
 import { ChevronRight, Eye, EyeOff, FolderTree, KeyRound, Layers3, ListTree, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
 import type { LoginTrendPoint, ManagerDashboard, MenuTreeNode, OperationLog, PageQuery, PageResult, SysMenu, SysPermission, SysRole, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
 import type { Session } from '../services/tokenStore';
-import { loadMembershipDetail, loadSystemMenuTree } from '../services/dashboardService';
+import { loadCommerceTypeOptions, loadMembershipDetail, loadSystemMenuTree } from '../services/dashboardService';
 import { COUNTRY_CALLING_CODE_OPTIONS } from '../constants/countryCallingCodes';
 
 type DashboardProps = {
@@ -529,6 +529,8 @@ function SystemPagePanel({
   const canEdit = menu?.path !== '/api/manager/partner/histories'
     && (hasAnyPermission(permissions, systemActionPermissions(menu, 'edit')) || hasActionButton(menu, 'edit'));
   const canDelete = hasAnyPermission(permissions, systemActionPermissions(menu, 'delete')) || hasActionButton(menu, 'delete');
+  const canResetMembershipPassword = menu?.path === '/api/manager/partner/memberships'
+    && hasPermission(permissions, 'partner:membership:reset-password');
   const canResetPassword = hasPermission(permissions, 'system:user:reset-password');
   const canResetPartnerPassword = menu?.path === '/api/manager/partner/info'
     && (hasPermission(permissions, 'partner:info:reset-password') || hasMenuButton(menu, 'partner-info-reset-password'));
@@ -565,6 +567,7 @@ function SystemPagePanel({
 
   const [editorRecord, setEditorRecord] = useState<SystemPageRecord | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [reviewMode, setReviewMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [passwordRecord, setPasswordRecord] = useState<SystemPageRecord | null>(null);
@@ -654,6 +657,7 @@ function SystemPagePanel({
   }
 
   function openEdit(record: SystemPageRecord) {
+    setReviewMode(false);
     if (!canEdit) return;
     if (isMenuManagement) {
       if (isOperationLogMenuRecord(record)) {
@@ -690,7 +694,7 @@ function SystemPagePanel({
     try {
       if (editorRecord && editorRecord.id !== 0) {
         await onUpdate(editorRecord.id, payload);
-        setOperationMessage({ type: 'success', text: '修改成功' });
+        setOperationMessage({ type: 'success', text: reviewMode ? '商家审核已保存' : '修改成功' });
       } else {
         await onCreate(payload);
         setOperationMessage({ type: 'success', text: '新增成功' });
@@ -1116,6 +1120,11 @@ function SystemPagePanel({
                             <Search size={14} />详情
                           </button>
                         ) : null}
+                        {canEdit && menu?.path === '/api/manager/partner/shops' && readField(record, 'status') === 'PENDING' ? (
+                          <button type="button" disabled={saving} onClick={() => {
+                            setReviewMode(true); setEditorRecord(record); setEditorError(null); setEditorOpen(true);
+                          }}><Search size={14} />审核</button>
+                        ) : null}
                         {canEdit && (!isMenuManagement || !isOperationLogMenuRecord(record)) ? (
                           <button type="button" onClick={() => openEdit(record)} disabled={saving}>
                             <Pencil size={14} />
@@ -1137,6 +1146,11 @@ function SystemPagePanel({
                               </button>
                             ) : null}
                           </>
+                        ) : null}
+                        {canResetMembershipPassword ? (
+                          <button type="button" onClick={() => setPasswordRecord(record)} disabled={saving}>
+                            <KeyRound size={14} />重置会员密码
+                          </button>
                         ) : null}
                         {canResetPartnerPassword ? (
                           <button type="button" onClick={() => setPasswordRecord(record)} disabled={saving}>
@@ -1206,6 +1220,7 @@ function SystemPagePanel({
       /> : null}
       {editorOpen ? (
         <RecordEditorDialog
+          reviewMode={reviewMode && Boolean(editorRecord)}
           config={withMenuParentOptions(config, menuParentOptions)}
           record={editorRecord?.id === 0 ? null : editorRecord}
           initialRecord={editorRecord?.id === 0 ? editorRecord : null}
@@ -1849,15 +1864,16 @@ function PartnerFeatureQueryBar({
   const [status, setStatus] = useState(query.status || '');
   const [businessType, setBusinessType] = useState(query.businessType || '');
   const isShowcase = path === '/api/manager/partner/showcase';
+  const isCommerceType = path === '/api/manager/partner/shop-types';
   const isCommerceShop = path === '/api/manager/partner/shops';
   const isCommerceProduct = path === '/api/manager/partner/products';
-  const showStatus = isCommerceShop || isCommerceProduct || isShowcase || path === '/api/manager/partner/memberships';
+  const showStatus = isCommerceType || isCommerceShop || isCommerceProduct || isShowcase || path === '/api/manager/partner/memberships';
   const showCategory = path === '/api/manager/partner/histories';
   const placeholder = path === '/api/manager/partner/settings/documents'
     ? '文档类型 / 标题'
     : path === '/api/manager/partner/settings/versions'
       ? '版本号'
-      : isCommerceShop ? '店铺名称 / 所属账号' : isCommerceProduct ? '商品 / 店铺 / 所属账号 / 商家ID' : isShowcase ? '标题 / 分类' : '账号 / 标题';
+      : isCommerceType ? '类型编码 / 类型名称' : isCommerceShop ? '店铺名称 / 所属账号' : isCommerceProduct ? '商品 / 店铺 / 所属账号 / 商家ID' : isShowcase ? '标题 / 分类' : '账号 / 标题';
 
   useEffect(() => {
     setKeyword(query.keyword || '');
@@ -1901,8 +1917,10 @@ function PartnerFeatureQueryBar({
           状态
           <select value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="">全部状态</option>
-            {isCommerceShop ? <>
-              <option value="ACTIVE">正常</option><option value="BLOCKED">已停用</option>
+            {isCommerceType ? <>
+              <option value="ENABLED">启用</option><option value="DISABLED">停用</option>
+            </> : isCommerceShop ? <>
+              <option value="PENDING">待审核</option><option value="ACTIVE">审核通过</option><option value="REJECTED">已驳回</option><option value="BLOCKED">已停用</option>
             </> : isShowcase || isCommerceProduct ? <>
               <option value="DRAFT">草稿</option><option value="PUBLISHED">已上架</option><option value="OFFLINE">已下架</option>
             </> : <>
@@ -1947,13 +1965,13 @@ type TableColumn = {
 type EditorField = {
   key: string;
   label: string;
-  type?: 'text' | 'password' | 'number' | 'select' | 'checkbox' | 'textarea' | 'email' | 'tel';
+  type?: 'text' | 'password' | 'number' | 'select' | 'multi-select' | 'checkbox' | 'textarea' | 'email' | 'tel';
   valueType?: 'string' | 'number';
   validateAs?: 'email' | 'phone' | 'phoneCountryCode';
   required?: boolean;
   createOnly?: boolean;
   readonlyOnEdit?: boolean;
-  options?: Array<{ label: string; value: string }>;
+  options?: Array<{ label: string; value: string; disabled?: boolean }>;
   placeholder?: string;
 };
 
@@ -1971,6 +1989,7 @@ type SystemPageConfig = {
 };
 
 function RecordEditorDialog({
+  reviewMode = false,
   config,
   record,
   initialRecord,
@@ -1979,6 +1998,7 @@ function RecordEditorDialog({
   onClose,
   onSave,
 }: {
+  reviewMode?: boolean;
   config: SystemPageConfig;
   record: SystemPageRecord | null;
   initialRecord?: SystemPageRecord | null;
@@ -1987,20 +2007,51 @@ function RecordEditorDialog({
   onClose: () => void;
   onSave: (payload: SystemRecordPayload) => Promise<void>;
 }) {
-  const visibleFields = config.fields.filter((field) => !field.createOnly || !record);
+  const [typeOptions,setTypeOptions]=useState<Array<{label:string;value:string;disabled?:boolean}>>([]);
+  const [typeOptionsError,setTypeOptionsError]=useState<string|null>(null);
+  const [typeOptionsLoading,setTypeOptionsLoading]=useState(false);
+  const visibleFields = config.fields.filter((field) => !field.createOnly || !record).map((field) =>
+    field.key === 'typeCodes' || (field.key === 'typeCode' && field.type === 'select') ? {...field,options:typeOptions} : field);
   const fields = [
     ...visibleFields.filter((field) => field.type !== 'textarea'),
     ...visibleFields.filter((field) => field.type === 'textarea'),
   ];
   const [values, setValues] = useState<Record<string, string | boolean>>(() => initialEditorValues(fields, initialRecord || record));
   const [validationError, setValidationError] = useState<string | null>(null);
+  const typeShopId = values.shopId ? Number(values.shopId) : undefined;
+  const hasTypeFields = config.fields.some((field) => field.key === 'typeCodes' || (field.key === 'typeCode' && field.type === 'select'));
+  useEffect(() => {
+    if (!hasTypeFields) return;
+    let active=true;setTypeOptionsLoading(true);setTypeOptionsError(null);
+    if (config.fields.some((field)=>field.key==='typeCode' && field.type==='select') && !typeShopId) { setTypeOptions([]);setTypeOptionsLoading(false);return; }
+    loadCommerceTypeOptions(typeShopId).then((rows)=>{
+      if(!active)return;
+      const options:Array<{label:string;value:string;disabled?:boolean}>=rows.map((row)=>({label:`${row.name}（${row.typeCode}）`,value:row.typeCode}));
+      const existing=record ? (record as unknown as Record<string,unknown>).types : undefined;
+      if(config.fields.some((field)=>field.key==='typeCodes') && Array.isArray(existing)) {
+        for(const item of existing) {
+          const type=item as {id:number;typeCode:string;name:string};
+          if(!options.some((option)=>option.value===type.typeCode)) options.push({label:`${type.name}（已停用，请取消）`,value:type.typeCode,disabled:true});
+        }
+      }
+      setTypeOptions(options);
+    })
+      .catch((err:unknown)=>{if(active)setTypeOptionsError(err instanceof Error?err.message:'类型加载失败');})
+      .finally(()=>{if(active)setTypeOptionsLoading(false);});
+    return ()=>{active=false;};
+  },[hasTypeFields,typeShopId,config.fields,record]);
+
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if(typeOptionsLoading || typeOptionsError) return;
     const nextValidationError = validateEditorValues(fields, values);
     if (nextValidationError) {
       setValidationError(nextValidationError);
       return;
+    }
+    if (reviewMode && !['ACTIVE', 'REJECTED'].includes(String(values.status))) {
+      setValidationError('请选择审核通过或驳回申请'); return;
     }
     setValidationError(null);
     void onSave(buildPayload(fields, values));
@@ -2008,35 +2059,48 @@ function RecordEditorDialog({
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="record-dialog" role="dialog" aria-modal="true" aria-label={record ? '修改记录' : '新增记录'}>
+      <section className="record-dialog" role="dialog" aria-modal="true" aria-label={reviewMode ? '审核商家' : record ? '修改记录' : '新增记录'}>
         <div className="dialog-heading">
           <div>
-            <h3>{record ? `修改${config.title}` : `新增${config.title}`}</h3>
-            <p>{record ? `ID ${record.id}` : '填写基础字段后保存。'}</p>
+            <h3>{reviewMode ? '审核商家申请' : record ? `修改${config.title}` : `新增${config.title}`}</h3>
+            <p>{reviewMode ? '请核对申请资料，确认商家类型后选择审核结果。' : record ? `ID ${record.id}` : '填写基础字段后保存。'}</p>
           </div>
           <button className="icon-button" type="button" onClick={onClose} disabled={saving} title="关闭">
             <X size={18} />
           </button>
         </div>
         <form className="record-form" onSubmit={submit}>
-          {fields.map((field) => (
+          {fields.map((field) => field.type === 'multi-select' ? (
+            <fieldset key={field.key} className="record-type-choices full-width-field" disabled={saving || typeOptionsLoading}>
+              <legend>{field.label}</legend>
+              {field.options?.map((option) => <label key={option.value}>
+                <input type="checkbox" checked={String(values[field.key] || '').split(',').includes(option.value)} disabled={option.disabled && !String(values[field.key] || '').split(',').includes(option.value)} onChange={(event)=>setValues((current)=>{
+                  const ids=String(current[field.key] || '').split(',').filter(Boolean);
+                  return {...current,[field.key]:event.target.checked?[...ids,option.value].join(','):ids.filter((id)=>id!==option.value).join(',')};
+                })} />{option.label}
+              </label>)}
+              {!field.options?.length ? <small>{typeOptionsLoading?'类型加载中…':'暂无可用类型，请先在商家类型管理中新增'}</small> : null}
+            </fieldset>
+          ) : (
             <label key={field.key} className={field.type === 'checkbox' ? 'checkbox-field' : field.type === 'textarea' ? 'full-width-field' : ''}>
               <span>{field.label}</span>
               {renderEditorControl(
-                field,
+                reviewMode && field.key === 'status' ? {...field, options: [
+                  {label:'请选择审核结果',value:'PENDING'}, {label:'审核通过',value:'ACTIVE'}, {label:'驳回申请',value:'REJECTED'},
+                ]} : field,
                 values[field.key],
-                (value) => setValues((current) => ({ ...current, [field.key]: value })),
-                Boolean(record && field.readonlyOnEdit),
+                (value) => setValues((current) => ({ ...current, [field.key]: value, ...(field.key === 'shopId' ? {typeCode:''} : {}) })),
+                Boolean(record && field.readonlyOnEdit) || (reviewMode && !['typeCodes','status'].includes(field.key)),
               )}
             </label>
           ))}
-          {validationError || error ? <div className="error-banner compact">{validationError || error}</div> : null}
+          {validationError || error || typeOptionsError ? <div className="error-banner compact">{validationError || error || typeOptionsError}</div> : null}
           <div className="dialog-actions">
             <button className="ghost-button" type="button" onClick={onClose} disabled={saving}>
               取消
             </button>
-            <button className="primary-button" type="submit" disabled={saving}>
-              {saving ? '保存中' : '保存'}
+            <button className="primary-button" type="submit" disabled={saving || typeOptionsLoading || Boolean(typeOptionsError)}>
+              {saving ? '保存中' : reviewMode ? '提交审核结果' : '保存'}
             </button>
           </div>
         </form>
@@ -2848,6 +2912,12 @@ function renderEditorControl(
   onChange: (value: string | boolean) => void,
   disabled = false,
 ) {
+  if (field.type === 'multi-select') {
+    return <select multiple className="type-multi-select" value={String(value || '').split(',').filter(Boolean)} required={field.required} disabled={disabled}
+      onChange={(event)=>onChange(Array.from(event.target.selectedOptions).map((option)=>option.value).join(','))}>
+      {field.options?.map((option)=><option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>;
+  }
   if (field.type === 'select') {
     return (
       <select value={String(value ?? '')} onChange={(event) => onChange(event.target.value)} required={field.required} disabled={disabled}>
@@ -2942,6 +3012,7 @@ function buildPayload(fields: EditorField[], values: Record<string, string | boo
       return;
     }
     const text = typeof value === 'string' ? value.trim() : '';
+    if(field.type === 'multi-select') {payload[field.key]=field.key==='typeCodes'?text.split(',').filter(Boolean):text.split(',').filter(Boolean).map(Number);return;}
     payload[field.key] = text || undefined;
   });
   return payload;
@@ -2956,6 +3027,7 @@ function validateEditorValues(fields: EditorField[], values: Record<string, stri
   for (const field of fields) {
     const value = values[field.key];
     const text = typeof value === 'string' ? value.trim() : '';
+    if(field.type==='multi-select' && field.required && !text) return '请至少选择一个商家类型';
     if (!text) {
       continue;
     }
@@ -3220,19 +3292,36 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
     };
   }
 
+  if (path === '/api/manager/partner/shop-types') {
+    return {
+      title:'商家类型管理',apiPath:'/api/manager/partner/features/commerce-types/page',
+      columns:[commonColumns[0],
+        {key:'typeCode',title:'类型编码',render:(record)=>textValue(readField(record,'typeCode'))},
+        {key:'name',title:'类型名称',render:(record)=>textValue(readField(record,'name'))},
+        {key:'description',title:'说明',render:(record)=>truncateText(readField(record,'description'),40)},
+        {key:'status',title:'状态',render:(record)=><StatusValue value={readField(record,'status')} />},
+        {key:'sortOrder',title:'排序',render:(record)=>textValue(readField(record,'sortOrder'))},
+      ],
+      fields:[{key:'typeCode',label:'类型编码',required:true,readonlyOnEdit:true,placeholder:'字母开头，字母/数字/下划线，创建后不可修改'},
+        {key:'name',label:'类型名称',required:true,placeholder:'仅用于展示，允许重名，最多32字'},
+        {key:'sortOrder',label:'排序',type:'number'},statusField,
+        {key:'description',label:'说明',type:'textarea',placeholder:'停用类型将自动下架相关商品，恢复类型后需手动重新上架'}],
+    };
+  }
   if (path === '/api/manager/partner/shops') {
     return {
       title: '商家管理', apiPath: '/api/manager/partner/features/commerce-shops/page',
       columns: [commonColumns[0],
-        ...[['ownerUsername','所属账号'],['name','店铺名称'],['contact','公开联系方式'],['productCount','商品数'],['sortOrder','排序']].map(([key,title]) => ({key,title,render:(record: SystemPageRecord)=>textValue(readField(record,key))})),
-        {key:'status',title:'状态',render:(record)=>readField(record,'status')==='ACTIVE'?'正常':'已停用'},
+        ...[['ownerUsername','所属账号'],['name','店铺名称'],['typeNames','商家类型'],['contact','公开联系方式'],['productCount','商品数'],['sortOrder','排序']].map(([key,title]) => ({key,title,render:(record: SystemPageRecord)=>textValue(readField(record,key))})),
+        {key:'status',title:'状态',render:(record)=>({PENDING:'待审核',ACTIVE:'审核通过',REJECTED:'已驳回',BLOCKED:'已停用'}[textValue(readField(record,'status'))] || '未知')},
         {key:'updatedAt',title:'更新时间',render:(record)=>formatDate(readField(record,'updatedAt'))},
       ],
       fields: [
         {key:'ownerUsername',label:'所属用户账号',required:true,readonlyOnEdit:true},
         {key:'name',label:'店铺名称',required:true}, {key:'coverUrl',label:'封面图片地址'},
+        {key:'typeCodes',label:'商家类型（可多选，移除类型会下架相关商品）',type:'multi-select',required:true},
         {key:'contact',label:'公开联系方式'}, {key:'sortOrder',label:'排序',type:'number'},
-        {key:'status',label:'后台状态',type:'select',options:[{label:'正常',value:'ACTIVE'},{label:'停用（隐藏全部商品）',value:'BLOCKED'}]},
+        {key:'status',label:'申请审核',type:'select',options:[{label:'待审核',value:'PENDING'},{label:'审核通过',value:'ACTIVE'},{label:'驳回申请',value:'REJECTED'},{label:'停用（隐藏全部商品）',value:'BLOCKED'}]},
         {key:'description',label:'店铺介绍',type:'textarea',required:true},
       ],
     };
@@ -3248,7 +3337,7 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
       ],
       fields: [
         {key:'shopId',label:'所属商家ID',type:'number',required:true,readonlyOnEdit:true,placeholder:'在商家管理中查看'},
-        {key:'title',label:'商品名称',required:true}, {key:'category',label:'分类',required:true},
+        {key:'title',label:'商品名称',required:true}, {key:'typeCode',label:'商品类型',type:'select',required:true,placeholder:'请选择商家已选类型'},
         {key:'coverUrl',label:'封面图片地址'}, {key:'price',label:'价格（元）',required:true,placeholder:'例如 99.90'},
         {key:'stock',label:'库存',type:'number',required:true}, {key:'sortOrder',label:'排序',type:'number'},
         {key:'status',label:'上架状态',type:'select',options:[{label:'草稿',value:'DRAFT'},{label:'上架',value:'PUBLISHED'},{label:'下架',value:'OFFLINE'}]},
@@ -3464,6 +3553,7 @@ function isSystemPageMenu(path?: string) {
     || path === '/api/manager/partner/settings/notifications'
     || path === '/api/manager/partner/settings/documents'
     || path === '/api/manager/partner/settings/versions'
+    || path === '/api/manager/partner/shop-types'
     || path === '/api/manager/partner/shops'
     || path === '/api/manager/partner/products'
     || path === '/api/manager/partner/showcase'
@@ -3479,6 +3569,7 @@ function isPartnerFeaturePage(path?: string) {
   return path === '/api/manager/partner/settings/notifications'
     || path === '/api/manager/partner/settings/documents'
     || path === '/api/manager/partner/settings/versions'
+    || path === '/api/manager/partner/shop-types'
     || path === '/api/manager/partner/shops'
     || path === '/api/manager/partner/products'
     || path === '/api/manager/partner/showcase'
@@ -3526,6 +3617,7 @@ function systemActionPermissions(menu: MenuTreeNode | null, action: 'add' | 'edi
     '/api/manager/partner/settings/notifications': partnerFeaturePermissions(),
     '/api/manager/partner/settings/documents': partnerFeaturePermissions(),
     '/api/manager/partner/settings/versions': partnerFeaturePermissions(),
+    '/api/manager/partner/shop-types': { add: ['partner:shop-type:add'], edit: ['partner:shop-type:edit'], delete: ['partner:shop-type:delete'] },
     '/api/manager/partner/shops': { add: ['partner:showcase:add'], edit: ['partner:showcase:edit'], delete: ['partner:showcase:delete'] },
     '/api/manager/partner/products': { add: ['partner:showcase:add'], edit: ['partner:showcase:edit'], delete: ['partner:showcase:delete'] },
     '/api/manager/partner/showcase': { add: ['partner:showcase:add'], edit: ['partner:showcase:edit'], delete: ['partner:showcase:delete'] },

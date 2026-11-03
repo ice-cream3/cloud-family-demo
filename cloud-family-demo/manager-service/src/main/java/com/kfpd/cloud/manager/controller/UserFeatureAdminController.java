@@ -29,19 +29,19 @@ public class UserFeatureAdminController {
         return ApiResponse.success(userFeatureAdminService.membershipDetail(id));
     }
 
-    @org.springframework.security.access.prepost.PreAuthorize("(#feature != 'showcase' and #feature != 'commerce-shops' and #feature != 'commerce-products') or hasAuthority('partner:showcase:view')")
+    @org.springframework.security.access.prepost.PreAuthorize("((#feature != 'showcase' and #feature != 'commerce-shops' and #feature != 'commerce-products') or hasAuthority('partner:showcase:view')) and (#feature != 'commerce-types' or hasAuthority('partner:shop-type:view'))")
     @PostMapping("/{feature}/page")
     public ApiResponse<PageVO<Map<String, Object>>> page(@PathVariable String feature, @ModelAttribute PageQueryVO query) {
         return ApiResponse.success(userFeatureAdminService.findPage(feature, query));
     }
 
-    @org.springframework.security.access.prepost.PreAuthorize("(#feature != 'showcase' and #feature != 'commerce-shops' and #feature != 'commerce-products') or hasAuthority('partner:showcase:add')")
+    @org.springframework.security.access.prepost.PreAuthorize("((#feature != 'showcase' and #feature != 'commerce-shops' and #feature != 'commerce-products') or hasAuthority('partner:showcase:add')) and (#feature != 'commerce-types' or hasAuthority('partner:shop-type:add'))")
     @PostMapping("/{feature}")
     public ApiResponse<Map<String, Object>> create(@PathVariable String feature, @RequestBody Map<String, Object> record) {
         return ApiResponse.success(userFeatureAdminService.create(feature, record));
     }
 
-    @org.springframework.security.access.prepost.PreAuthorize("(#feature != 'showcase' and #feature != 'commerce-shops' and #feature != 'commerce-products') or hasAuthority('partner:showcase:edit')")
+    @org.springframework.security.access.prepost.PreAuthorize("((#feature != 'showcase' and #feature != 'commerce-shops' and #feature != 'commerce-products') or hasAuthority('partner:showcase:edit')) and (#feature != 'commerce-types' or hasAuthority('partner:shop-type:edit'))")
     @PostMapping("/{feature}/update/{id}")
     public ApiResponse<Map<String, Object>> update(@PathVariable String feature,
                                                    @PathVariable Long id,
@@ -49,7 +49,7 @@ public class UserFeatureAdminController {
         return ApiResponse.success(userFeatureAdminService.update(feature, id, record));
     }
 
-    @org.springframework.security.access.prepost.PreAuthorize("(#feature != 'showcase' and #feature != 'commerce-shops' and #feature != 'commerce-products') or hasAuthority('partner:showcase:delete')")
+    @org.springframework.security.access.prepost.PreAuthorize("((#feature != 'showcase' and #feature != 'commerce-shops' and #feature != 'commerce-products') or hasAuthority('partner:showcase:delete')) and (#feature != 'commerce-types' or hasAuthority('partner:shop-type:delete'))")
     @PostMapping("/{feature}/delete/{id}")
     public ApiResponse<Void> delete(@PathVariable String feature, @PathVariable Long id) {
         userFeatureAdminService.delete(feature, id);

@@ -7,6 +7,17 @@ import org.apache.ibatis.annotations.Param;
 
 public interface UserFeatureAdminDao {
 
+    Long findMembershipUserId(@Param("id") Long id);
+
+    long countCommerceTypes(@Param("keyword") String keyword,@Param("status") String status);
+    List<Map<String,Object>> findCommerceTypes(@Param("keyword") String keyword,@Param("status") String status,@Param("offset") int offset,@Param("pageSize") int pageSize);
+    int insertCommerceType(Map<String,Object> record);
+    String findCommerceTypeCode(@Param("id") Long id);
+    int updateCommerceType(@Param("id") Long id,@Param("record") Map<String,Object> record);
+    int refreshCommerceTypeProducts(@Param("id") Long id,@Param("record") Map<String,Object> record);
+    long countCommerceTypeUsage(@Param("id") Long id);
+    int deleteCommerceType(@Param("id") Long id);
+
     long countCommerceShops(@Param("keyword") String keyword,@Param("status") String status);
     List<Map<String,Object>> findCommerceShops(@Param("keyword") String keyword,@Param("status") String status,@Param("offset") int offset,@Param("pageSize") int pageSize);
     int insertCommerceShop(Map<String,Object> record);

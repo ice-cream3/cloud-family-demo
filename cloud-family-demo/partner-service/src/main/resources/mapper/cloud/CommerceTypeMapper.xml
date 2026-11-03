@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfpd.cloud.partner.dao.cloud.CommerceTypeDao">
+  <select id="available" resultType="map">SELECT id,type_code typeCode,name,status,description,sort_order sortOrder FROM showcase_shop_type WHERE status='ENABLED' ORDER BY sort_order,id</select>
+  <select id="shopTypes" resultType="map">
+    SELECT r.shop_id shopId,t.id,t.type_code typeCode,t.name,t.status FROM showcase_shop_type_rel r JOIN showcase_shop_type t ON t.type_code=r.type_code
+    WHERE r.shop_id IN <foreach collection="shopIds" item="id" open="(" close=")" separator=",">#{id}</foreach> ORDER BY t.sort_order,t.id
+  </select>
+  <select id="lockShop" resultType="map">SELECT id,owner_username ownerUsername,status FROM showcase_shop WHERE id=#{id} FOR UPDATE</select>
+  <select id="lockTypes" resultType="map">SELECT id,type_code typeCode,name,status FROM showcase_shop_type WHERE type_code IN <foreach collection="codes" item="code" open="(" close=")" separator=",">#{code}</foreach> ORDER BY id FOR UPDATE</select>
+  <select id="allowedType" resultType="map">SELECT t.id,t.type_code typeCode,t.name FROM showcase_shop_type t JOIN showcase_shop_type_rel r ON r.type_code=t.type_code WHERE r.shop_id=#{shopId} AND <choose><when test="typeCode != null">t.type_code=#{typeCode}</when><otherwise>t.id=#{typeId}</otherwise></choose> AND t.status='ENABLED' FOR UPDATE</select>
+  <delete id="clearShopTypes">DELETE FROM showcase_shop_type_rel WHERE shop_id=#{id}</delete>
+  <insert id="insertShopTypes">INSERT INTO showcase_shop_type_rel(shop_id,type_code) VALUES <foreach collection="codes" item="code" separator=",">(#{shopId},#{code})</foreach></insert>
+  <update id="offlineUnassigned">UPDATE showcase_product p SET p.status='OFFLINE' WHERE p.shop_id=#{id} AND p.status='PUBLISHED' AND NOT EXISTS(SELECT 1 FROM showcase_shop_type_rel r JOIN showcase_shop_type t ON t.type_code=r.type_code WHERE r.shop_id=p.shop_id AND t.id=p.type_id)</update>
+  <select id="productShop" resultType="long">SELECT shop_id FROM showcase_product WHERE id=#{id}</select>
+</mapper>

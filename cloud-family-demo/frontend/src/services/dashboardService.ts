@@ -204,6 +204,7 @@ function getSystemEndpoint(path: string) {
     '/api/manager/partner/settings/notifications': '/api/manager/partner/features/notifications',
     '/api/manager/partner/settings/documents': '/api/manager/partner/features/documents',
     '/api/manager/partner/settings/versions': '/api/manager/partner/features/versions',
+    '/api/manager/partner/shop-types': '/api/manager/partner/features/commerce-types',
     '/api/manager/partner/shops': '/api/manager/partner/features/commerce-shops',
     '/api/manager/partner/products': '/api/manager/partner/features/commerce-products',
     '/api/manager/partner/showcase': '/api/manager/partner/features/showcase',
@@ -223,4 +224,14 @@ function getSystemEndpoint(path: string) {
 
 export function loadMembershipDetail(id: number) {
   return post<SystemPageRecord>(`/api/manager/partner/features/memberships/detail/${id}`);
+}
+
+export function loadCommerceTypeOptions(shopId?: number) {
+  return post<{ id: number; typeCode: string; name: string }[]>('/api/manager/partner/shop-types/options', { body: shopId ? { shopId } : {} });
+}
+
+export function resetMembershipPassword(id: number, password: string) {
+  return post<SystemPageRecord>(`/api/manager/partner/features/memberships/password/reset/${id}`, {
+    body: { password },
+  });
 }

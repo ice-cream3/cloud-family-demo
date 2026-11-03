@@ -147,7 +147,7 @@ export type VipUser = {
 export type SystemPageRecord = SysUser | SysRole | SysPermission | SysMenu | OperationLog | VipUser;
 
 export type SystemRecordPayload = {
-  [key: string]: string | number | boolean | null | undefined;
+  [key: string]: string | number | boolean | number[] | string[] | null | undefined;
 };
 
 export type LoginMode = 'partner' | 'manager';
