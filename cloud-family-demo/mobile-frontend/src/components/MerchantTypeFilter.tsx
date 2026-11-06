@@ -9,9 +9,13 @@ export function MerchantTypeFilter({ types, values, onChange }: {
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const content = useRef<HTMLDivElement>(null);
+  const strip = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
   const keyword = query.trim().toLowerCase();
+  const selected = new Set(values);
+  const selectedTypes = types.filter((type) => selected.has(type.typeCode));
+  const orderedTypes = [...selectedTypes, ...types.filter((type) => !selected.has(type.typeCode))];
   const groupMap = new Map<string, Category>();
   for (const type of types) {
     const code = type.categoryCode || 'OTHER';
@@ -22,18 +26,24 @@ export function MerchantTypeFilter({ types, values, onChange }: {
   const visibleGroups = groups.filter((group) => keyword || !category || group.code === category)
     .map((group) => ({ ...group, types: group.types.filter((type) => `${type.name} ${type.typeCode} ${group.name}`.toLowerCase().includes(keyword)) }))
     .filter((group) => group.types.length);
-  function choose(code: string) { onChange(values.includes(code) ? values.filter((value) => value !== code) : [...values, code]); }
+  function choose(code: string) {
+    onChange(selected.has(code) ? values.filter((value) => value !== code) : [...values, code]);
+    strip.current?.scrollTo({ left: 0, behavior: 'smooth' });
+  }
   function changeCategory(code: string) { setCategory(code); setQuery(''); content.current?.scrollTo({ top: 0 }); }
   return <div className="commerce-type-toolbar">
-    <div className="showcase-categories" role="group" aria-label="商家类型筛选">
+    <div className="showcase-categories" ref={strip} role="group" aria-label="商家类型筛选">
       <button type="button" className={!values.length ? 'active' : ''} aria-pressed={!values.length} onClick={() => onChange([])}>全部</button>
-      {types.map((type) => <button type="button" key={type.typeCode} className={values.includes(type.typeCode) ? 'active' : ''} aria-pressed={values.includes(type.typeCode)} onClick={() => choose(type.typeCode)}>{type.name}</button>)}
+      {orderedTypes.map((type) => <button type="button" key={type.typeCode} className={selected.has(type.typeCode) ? 'active commerce-selected-chip' : ''} aria-pressed={selected.has(type.typeCode)} aria-label={selected.has(type.typeCode) ? `取消筛选：${type.name}` : type.name} onClick={() => choose(type.typeCode)}>{type.name}{selected.has(type.typeCode) ? <X size={12} aria-hidden="true" /> : null}</button>)}
     </div>
     <button className="commerce-filter-trigger" type="button" aria-haspopup="dialog" onClick={() => { setQuery(''); setCategory(''); dialog.current?.showModal(); content.current?.scrollTo({ top: 0 }); }}><SlidersHorizontal size={15} />分类{values.length ? ` · ${values.length}` : ''}</button>
     <dialog ref={dialog} className="commerce-filter-dialog" aria-labelledby="commerce-filter-title" onClick={(event) => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
       <div className="commerce-filter-sheet">
         <header><div><h2 id="commerce-filter-title">商家分类 <small>可多选</small></h2><p>按经营大类查找，选择后点击完成</p></div><button type="button" aria-label="关闭分类" onClick={() => dialog.current?.close()}><X size={20} /></button></header>
         <label className="commerce-filter-search"><Search size={16} /><input value={query} aria-label="搜索商家类型" placeholder="搜索分类名称" onChange={(event) => { setQuery(event.target.value); content.current?.scrollTo({ top: 0 }); }} /></label>
+        {selectedTypes.length ? <div className="commerce-selected-types" role="group" aria-label="已选分类">
+          <span>已选</span><div>{selectedTypes.map((type) => <button key={type.typeCode} type="button" aria-label={`取消选择：${type.name}`} onClick={() => choose(type.typeCode)}>{type.name}<X size={12} aria-hidden="true" /></button>)}</div>
+        </div> : null}
         <div className="commerce-filter-body">
           <nav className="commerce-category-rail" aria-label="经营大类">
             <button type="button" className={keyword || !category ? 'active' : ''} aria-pressed={Boolean(keyword) || !category} onClick={() => changeCategory('')}>全部分类</button>

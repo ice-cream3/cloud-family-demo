@@ -54,7 +54,7 @@
     <select id="findById" resultMap="SysRoleResultMap">
         SELECT <include refid="SysRoleColumns"/>
         FROM sys_role
-        WHERE id = #{id}
+        WHERE id = #{id} FOR UPDATE
     </select>
 
     <insert id="insert" parameterType="com.kfpd.cloud.manager.pojo.entity.SysRole"
@@ -113,4 +113,5 @@
         INSERT INTO sys_role_menu (role_id, menu_id)
         VALUES (#{roleId}, #{menuId})
     </insert>
+    <delete id="deleteUserRolesByRole">DELETE FROM sys_user_role WHERE role_id=#{roleId}</delete>
 </mapper>

@@ -62,8 +62,7 @@ CREATE TABLE IF NOT EXISTS sys_menu (
     PRIMARY KEY (id),
     UNIQUE KEY uk_sys_menu_menu_code (menu_code),
     KEY idx_sys_menu_parent_id (parent_id),
-    KEY idx_sys_menu_status (status),
-    CONSTRAINT fk_sys_menu_parent FOREIGN KEY (parent_id) REFERENCES sys_menu (id)
+    KEY idx_sys_menu_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS sys_user_role (
@@ -71,8 +70,7 @@ CREATE TABLE IF NOT EXISTS sys_user_role (
     role_id bigint NOT NULL,
     created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, role_id),
-    CONSTRAINT fk_sys_user_role_user FOREIGN KEY (user_id) REFERENCES sys_user (id) ON DELETE CASCADE,
-    CONSTRAINT fk_sys_user_role_role FOREIGN KEY (role_id) REFERENCES sys_role (id) ON DELETE CASCADE
+    KEY idx_sys_user_role_role_id (role_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS sys_role_permission (
@@ -80,8 +78,7 @@ CREATE TABLE IF NOT EXISTS sys_role_permission (
     permission_id bigint NOT NULL,
     created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (role_id, permission_id),
-    CONSTRAINT fk_sys_role_permission_role FOREIGN KEY (role_id) REFERENCES sys_role (id) ON DELETE CASCADE,
-    CONSTRAINT fk_sys_role_permission_permission FOREIGN KEY (permission_id) REFERENCES sys_permission (id) ON DELETE CASCADE
+    KEY idx_sys_role_permission_permission_id (permission_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS sys_role_menu (
@@ -89,8 +86,7 @@ CREATE TABLE IF NOT EXISTS sys_role_menu (
     menu_id bigint NOT NULL,
     created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (role_id, menu_id),
-    CONSTRAINT fk_sys_role_menu_role FOREIGN KEY (role_id) REFERENCES sys_role (id) ON DELETE CASCADE,
-    CONSTRAINT fk_sys_role_menu_menu FOREIGN KEY (menu_id) REFERENCES sys_menu (id) ON DELETE CASCADE
+    KEY idx_sys_role_menu_menu_id (menu_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS sys_menu_permission (
@@ -98,8 +94,7 @@ CREATE TABLE IF NOT EXISTS sys_menu_permission (
     permission_id bigint NOT NULL,
     created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (menu_id, permission_id),
-    CONSTRAINT fk_sys_menu_permission_menu FOREIGN KEY (menu_id) REFERENCES sys_menu (id) ON DELETE CASCADE,
-    CONSTRAINT fk_sys_menu_permission_permission FOREIGN KEY (permission_id) REFERENCES sys_permission (id) ON DELETE CASCADE
+    KEY idx_sys_menu_permission_permission_id (permission_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 INSERT IGNORE INTO sys_user (username, password_hash, display_name, email, status)

@@ -32,4 +32,5 @@ public interface SysRoleDao extends BaseMapper<SysRole> {
     int deleteRoleMenus(@Param("roleId") Long roleId);
 
     int insertRoleMenu(@Param("roleId") Long roleId, @Param("menuId") Long menuId);
+    int deleteUserRolesByRole(@Param("roleId") Long roleId);
 }

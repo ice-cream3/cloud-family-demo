@@ -18,4 +18,6 @@ public interface SysPermissionDao extends BaseMapper<SysPermission> {
     int update(SysPermission permission);
 
     int deleteById(@Param("id") Long id);
+    int deleteRolePermissionsByPermission(@Param("permissionId") Long permissionId);
+    int deleteMenuPermissionsByPermission(@Param("permissionId") Long permissionId);
 }

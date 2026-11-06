@@ -1,7 +1,7 @@
 USE `fa-cloud`;
 -- 前置：system-dictionary.sql、merchant-type-dictionary.sql。兼容已建表，可重复执行。
 SELECT IF(COUNT(*)=0,
- 'ALTER TABLE sys_dict_type ADD COLUMN parent_type_code varchar(64) DEFAULT NULL COMMENT ''上级字典类型编码，空表示大类或独立字典，创建后不可修改'' AFTER type_code, ADD KEY idx_dict_parent(parent_type_code), ADD CONSTRAINT fk_dict_parent FOREIGN KEY(parent_type_code) REFERENCES sys_dict_type(type_code) ON DELETE RESTRICT ON UPDATE RESTRICT',
+ 'ALTER TABLE sys_dict_type ADD COLUMN parent_type_code varchar(64) DEFAULT NULL COMMENT ''上级字典类型编码，空表示大类或独立字典，创建后不可修改'' AFTER type_code, ADD KEY idx_dict_parent(parent_type_code)',
  'SELECT 1') INTO @dict_parent_ddl
 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='sys_dict_type' AND column_name='parent_type_code';
 PREPARE dict_parent_stmt FROM @dict_parent_ddl;

@@ -5,6 +5,7 @@ public interface DictionaryDao {
     List<Map<String,Object>> merchantCategories();
     Map<String,Object> merchantItem(@Param("id") Long id);
     Map<String,Object> merchantType(@Param("code") String code);
+    Long lockMerchantType(@Param("itemCode") String itemCode);
     int syncMerchantTypes();
     long countChildren(@Param("typeCode") String typeCode);
     long conflictingMerchantItems(Map<String,Object> record);

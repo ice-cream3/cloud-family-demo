@@ -27,7 +27,7 @@
     <select id="findById" resultMap="SysPermissionResultMap">
         SELECT <include refid="SysPermissionColumns"/>
         FROM sys_permission
-        WHERE id = #{id}
+        WHERE id = #{id} FOR UPDATE
     </select>
 
     <insert id="insert" parameterType="com.kfpd.cloud.manager.pojo.entity.SysPermission"
@@ -49,4 +49,6 @@
         DELETE FROM sys_permission
         WHERE id = #{id}
     </delete>
+    <delete id="deleteRolePermissionsByPermission">DELETE FROM sys_role_permission WHERE permission_id=#{permissionId}</delete>
+    <delete id="deleteMenuPermissionsByPermission">DELETE FROM sys_menu_permission WHERE permission_id=#{permissionId}</delete>
 </mapper>

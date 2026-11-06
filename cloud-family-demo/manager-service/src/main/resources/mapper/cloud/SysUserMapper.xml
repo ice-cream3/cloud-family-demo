@@ -65,7 +65,7 @@
     <select id="findById" resultMap="SysUserResultMap">
         SELECT <include refid="SysUserColumns"/>
         FROM sys_user
-        WHERE id = #{id}
+        WHERE id = #{id} FOR UPDATE
     </select>
 
     <select id="findByUsername" resultMap="SysUserResultMap">

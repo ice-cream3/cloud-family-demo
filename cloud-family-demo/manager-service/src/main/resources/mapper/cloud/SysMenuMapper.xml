@@ -44,7 +44,7 @@
     <select id="findById" resultMap="SysMenuResultMap">
         SELECT <include refid="SysMenuColumns"/>
         FROM sys_menu
-        WHERE id = #{id}
+        WHERE id = #{id} FOR UPDATE
     </select>
 
     <insert id="insert" parameterType="com.kfpd.cloud.manager.pojo.entity.SysMenu"
@@ -91,4 +91,6 @@
         INSERT IGNORE INTO sys_menu_permission (menu_id, permission_id)
         VALUES (#{menuId}, #{permissionId})
     </insert>
+    <delete id="deleteRoleMenusByMenu">DELETE FROM sys_role_menu WHERE menu_id=#{menuId}</delete>
+    <select id="countChildren" resultType="long">SELECT COUNT(*) FROM sys_menu WHERE parent_id=#{parentId}</select>
 </mapper>

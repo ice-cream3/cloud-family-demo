@@ -107,6 +107,8 @@ public class SysPermissionServiceImpl implements SysPermissionService {
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void deletePermission(Long id) {
         SysPermission before = findPermissionById(id);
+        permissionDao.deleteRolePermissionsByPermission(id);
+        permissionDao.deleteMenuPermissionsByPermission(id);
         if (permissionDao.deleteById(id) == 0) {
             log.warn("Permission service exception: action=deletePermission, id={}, message=Permission not found", id);
             throw SystemManagementSupport.notFound("Permission not found");

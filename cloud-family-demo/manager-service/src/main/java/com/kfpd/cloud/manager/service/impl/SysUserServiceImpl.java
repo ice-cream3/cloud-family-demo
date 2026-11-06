@@ -222,6 +222,7 @@ public class SysUserServiceImpl implements SysUserService {
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void deleteUser(Long id) {
         SysUser before = findUserEntityById(id);
+        userDao.deleteUserRoles(id);
         if (userDao.deleteById(id) == 0) {
             log.warn("User service exception: action=deleteUser, id={}, message=User not found", id);
             throw SystemManagementSupport.notFound("User not found");

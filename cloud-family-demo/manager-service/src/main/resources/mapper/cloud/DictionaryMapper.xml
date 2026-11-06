@@ -27,6 +27,7 @@
     UPDATE showcase_product p JOIN showcase_shop_type t ON t.id=p.type_id
     SET p.category=t.name,p.status=CASE WHEN t.status='DISABLED' AND p.status='PUBLISHED' THEN 'OFFLINE' ELSE p.status END
   </update>
+  <select id="lockMerchantType" resultType="long">SELECT id FROM showcase_shop_type WHERE type_code=#{itemCode} FOR UPDATE</select>
   <select id="merchantReferences" resultType="long">
     SELECT (SELECT COUNT(*) FROM showcase_shop_type_rel WHERE type_code=#{itemCode}) +
       (SELECT COUNT(*) FROM showcase_product p JOIN showcase_shop_type t ON t.id=p.type_id WHERE t.type_code=#{itemCode})

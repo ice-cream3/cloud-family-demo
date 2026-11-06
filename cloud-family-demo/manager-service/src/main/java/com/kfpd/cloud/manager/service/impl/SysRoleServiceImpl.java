@@ -128,6 +128,9 @@ public class SysRoleServiceImpl implements SysRoleService {
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void deleteRole(Long id) {
         SysRole before = findRoleById(id);
+        roleDao.deleteUserRolesByRole(id);
+        roleDao.deleteRolePermissions(id);
+        roleDao.deleteRoleMenus(id);
         if (roleDao.deleteById(id) == 0) {
             log.warn("Role service exception: action=deleteRole, id={}, message=Role not found", id);
             throw SystemManagementSupport.notFound("Role not found");
@@ -251,7 +254,9 @@ public class SysRoleServiceImpl implements SysRoleService {
     public void deleteMenu(Long id) {
         SysMenu before = findMenuById(id);
         requireMutableMenu(before);
+        if (menuDao.countChildren(id)>0) throw SystemManagementSupport.badRequest("菜单下存在子菜单或按钮，请先删除子项");
         menuDao.deleteMenuPermissions(id);
+        menuDao.deleteRoleMenusByMenu(id);
         if (menuDao.deleteById(id) == 0) {
             log.warn("Role service exception: action=deleteMenu, id={}, message=Menu not found", id);
             throw SystemManagementSupport.notFound("Menu not found");
@@ -330,6 +335,13 @@ public class SysRoleServiceImpl implements SysRoleService {
             throw SystemManagementSupport.badRequest("父菜单不能选择当前菜单");
         }
         SysMenu parent = findMenuById(parentId);
+        java.util.Set<Long> ancestors = new java.util.HashSet<>();
+        SysMenu ancestor = parent;
+        while (ancestor != null) {
+            if (!ancestors.add(ancestor.getId()) || ancestor.getId().equals(currentMenuId))
+                throw SystemManagementSupport.badRequest("父菜单不能选择当前菜单或其子菜单");
+            ancestor = ancestor.getParentId()==null ? null : findMenuById(ancestor.getParentId());
+        }
         if (Boolean.TRUE.equals(parent.getButtonFlag())) {
             throw SystemManagementSupport.badRequest("父菜单只能选择菜单，不能选择按钮");
         }

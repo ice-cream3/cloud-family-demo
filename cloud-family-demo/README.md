@@ -496,3 +496,8 @@ mvn -pl partner-service,manager-service -am test -Dtest=CommerceServiceTests,Mem
 商家与用户自营商品业务见 [docs/showcase-commerce.md](docs/showcase-commerce.md)，前台精品入口现按商家浏览商品。
 
 商家类型、多类型经营范围和商品类型约束见 [docs/showcase-shop-types.md](docs/showcase-shop-types.md)。
+
+
+### 业务代码维护关联完整性
+
+项目建表脚本不再创建数据库外键，已有库按 [无外键迁移说明](docs/relationship-integrity.md) 升级。先部署 manager-service 的显式关联清理与校验逻辑，再对 fa-cloud / fa-model 分别执行 `common-service/src/main/resources/db/remove-schema-foreign-keys.sql`。主键、唯一约束、CHECK 约束和索引保留。关联完整性检查及回归脚本见迁移说明。

@@ -181,7 +181,9 @@ public class UserFeatureAdminServiceImpl implements UserFeatureAdminService {
                 yield userFeatureAdminDao.deleteCommerceType(id);
             }
             case "commerce-shops" -> {
+                if (commerceTypes.lockShop(id)==null) throw SystemManagementSupport.notFound("商家不存在");
                 if (userFeatureAdminDao.countCommerceShopProducts(id)>0) throw SystemManagementSupport.badRequest("请先删除店铺中的全部商品，或将店铺停用");
+                commerceTypes.clearShopTypes(id);
                 yield userFeatureAdminDao.deleteCommerceShop(id);
             }
             case "commerce-products" -> userFeatureAdminDao.deleteCommerceProduct(id);

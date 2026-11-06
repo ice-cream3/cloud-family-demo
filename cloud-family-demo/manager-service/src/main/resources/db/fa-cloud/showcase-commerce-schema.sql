@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS showcase_product (
     updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_showcase_product_shop_state_sort (shop_id, status, moderation_status, sort_order, id),
-    CONSTRAINT fk_showcase_product_shop FOREIGN KEY (shop_id) REFERENCES showcase_shop(id) ON DELETE RESTRICT,
+
     CONSTRAINT chk_showcase_product_status CHECK (status IN ('DRAFT','PUBLISHED','OFFLINE')),
     CONSTRAINT chk_showcase_product_moderation CHECK (moderation_status IN ('PENDING','ACTIVE','REJECTED','BLOCKED')),
     CONSTRAINT chk_showcase_product_values CHECK (price >= 0 AND stock >= 0 AND sort_order >= 0)

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS sys_dict_type (
  updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后更新时间',
  UNIQUE KEY uk_dict_type_code(type_code),
  KEY idx_dict_parent(parent_type_code),
- CONSTRAINT fk_dict_parent FOREIGN KEY(parent_type_code) REFERENCES sys_dict_type(type_code) ON DELETE RESTRICT ON UPDATE RESTRICT,
+
  CONSTRAINT chk_dict_type_status CHECK(status IN ('ENABLED','DISABLED')),
  CONSTRAINT chk_dict_type_sort CHECK(sort_order>=0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='通用业务字典类型';
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS sys_dict_item (
  updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后更新时间',
  UNIQUE KEY uk_dict_item_code(type_code,item_code),
  KEY idx_dict_options(type_code,status,sort_order,id),
- CONSTRAINT fk_dict_item_type FOREIGN KEY(type_code) REFERENCES sys_dict_type(type_code) ON DELETE RESTRICT ON UPDATE RESTRICT,
+
  CONSTRAINT chk_dict_item_status CHECK(status IN ('ENABLED','DISABLED')),
  CONSTRAINT chk_dict_item_sort CHECK(sort_order>=0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='通用业务字典项';

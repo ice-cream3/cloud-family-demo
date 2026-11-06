@@ -25,4 +25,7 @@ public interface SysMenuDao extends BaseMapper<SysMenu> {
     int deleteMenuPermissions(@Param("menuId") Long menuId);
 
     int insertMenuPermission(@Param("menuId") Long menuId, @Param("permissionId") Long permissionId);
+    long countChildren(@Param("parentId") Long parentId);
+
+    int deleteRoleMenusByMenu(@Param("menuId") Long menuId);
 }

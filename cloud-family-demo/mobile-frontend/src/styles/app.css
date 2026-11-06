@@ -5032,3 +5032,12 @@ img {
 .commerce-filter-clear:disabled { opacity: .4; }
 .commerce-filter-actions .commerce-filter-done { min-width: 112px; padding: 0 15px; }
 @media (max-width: 340px) { .commerce-filter-body { grid-template-columns: 78px minmax(0, 1fr); } .commerce-category-content { padding: 10px 8px; } .commerce-category-content .commerce-filter-options button { padding: 7px 5px; } }
+
+
+.commerce-type-toolbar .showcase-categories .commerce-selected-chip { display: inline-flex; align-items: center; gap: 4px; }
+.commerce-selected-chip svg { flex-shrink: 0; opacity: .75; }
+.commerce-selected-types { display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; min-width: 0; margin: 0 16px 10px; }
+.commerce-selected-types > span { flex-shrink: 0; padding-top: 6px; color: #94a3b8; font-size: 11px; }
+.commerce-selected-types > div { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; max-height: 70px; overflow-y: auto; overscroll-behavior: contain; }
+.commerce-selected-types button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid #f2d6ad; border-radius: 6px; background: #fff5e6; color: #a94c08; font-size: 11px; }
+.commerce-selected-types button svg { flex-shrink: 0; }

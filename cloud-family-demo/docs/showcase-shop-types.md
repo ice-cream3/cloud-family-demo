@@ -27,8 +27,8 @@
 | 表/字段 | 用途与约束 |
 | --- | --- |
 | showcase_shop_type | id内部主键、type_code业务唯一且非空、name展示名称允许重名、description、status（ENABLED/DISABLED）、sort_order、created_at、updated_at |
-| showcase_shop_type_rel | shop_id/type_code 联合主键，按 type_code 外键关联类型字典；包含 (type_code,shop_id) 索引；shop删除级联清理关联，类型编码更新与删除受引用限制 |
-| showcase_product.type_id | 内部外键关联字典；业务使用 type_code，旧 category 字段仅作为展示名称同步维护 |
+| showcase_shop_type_rel | shop_id/type_code 联合主键，按 type_code 逻辑关联类型字典；包含 (type_code,shop_id) 索引；shop删除时业务代码清理关联，类型编码更新与删除受引用限制 |
+| showcase_product.type_id | 内部ID逻辑关联字典；业务使用 type_code，旧 category 字段仅作为展示名称同步维护 |
 
 完整建表及迁移脚本：`manager-service/src/main/resources/db/fa-cloud/showcase-shop-types.sql`。
 
@@ -49,7 +49,7 @@
 1. 执行 showcase-shop-types.sql。
 2. 执行 showcase-shop-types-menu.sql，初始化菜单、按钮及 `partner:shop-type:view/add/edit/delete` 权限。
 3. 先前已安装类型管理的环境执行增量脚本 showcase-shop-type-code.sql：按原ID回填 TYPE_<id>，新增编码非空及唯一约束，移除名称唯一约束。本地已执行。
-4. 先前使用 type_id 商家关联的环境执行 showcase-shop-type-rel-code.sql：通过旧ID找到编码回填，替换主键、索引和外键，删除关联表的 type_id 列；本地已迁移，原有关联数量保持一致。重复执行不会重复创建关联。
+4. 先前使用 type_id 商家关联的环境执行 showcase-shop-type-rel-code.sql：通过旧ID找到编码回填，移除旧外键并替换主键、索引，删除关联表的 type_id 列；本地已迁移，原有关联数量保持一致。重复执行不会重复创建关联。
 5. 重启 partner-service、manager-service，更新两端前端；后台重新登录刷新权限。关联表迁移需要与两个业务服务的新版本同时发布。
 
 本地 fa-cloud 已执行这两个脚本。SUPER_ADMIN、MANAGER 已授予类型管理菜单及接口权限。其他角色通过角色管理分配。

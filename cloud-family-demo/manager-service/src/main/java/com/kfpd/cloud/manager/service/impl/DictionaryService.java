@@ -89,6 +89,7 @@ public class DictionaryService {
         var type="items".equals(kind) ? dao.lockType((String)record.get("typeCode")) : null;
         if("items".equals(kind) && ("MERCHANT_TYPE".equals(record.get("typeCode")) || (type!=null && "ECOMMERCE".equals(type.get("parentTypeCode"))))) {
             String code=(String)record.get("itemCode");
+            dao.lockMerchantType(code);
             CommerceRules.require(dao.merchantReferences(code)==0,"商家或商品已引用此类型，请停用而非删除");
             dao.deleteMerchantType(code);
         }

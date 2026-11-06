@@ -1,6 +1,6 @@
 USE `fa-cloud`;
 -- 前置：ecommerce-dictionary-catalog.sql；合并旧商家类型，保留目标类型ID及业务记录。
--- CAKE -> CAKE_SHOP，FRUIT -> FRUIT_STORE。可重复执行，不关闭外键检查。
+-- CAKE -> CAKE_SHOP，FRUIT -> FRUIT_STORE。可重复执行，通过目标存在性检查保护业务关联。
 DROP TEMPORARY TABLE IF EXISTS merchant_type_code_map;
 CREATE TEMPORARY TABLE merchant_type_code_map (
  old_code varchar(64) PRIMARY KEY,
