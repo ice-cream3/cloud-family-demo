@@ -3,7 +3,8 @@ import type { FormEvent, ReactNode } from 'react';
 import { ChevronRight, Eye, EyeOff, FolderTree, KeyRound, Layers3, ListTree, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
 import type { LoginTrendPoint, ManagerDashboard, MenuTreeNode, OperationLog, PageQuery, PageResult, SysMenu, SysPermission, SysRole, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
 import type { Session } from '../services/tokenStore';
-import { loadCommerceTypeOptions, loadMembershipDetail, loadSystemMenuTree } from '../services/dashboardService';
+import { loadMerchantCategories, loadDictionaryTypes, loadCommerceTypeOptions, loadMembershipDetail, loadSystemMenuTree } from '../services/dashboardService';
+import { ParentCategorySelect } from './ParentCategorySelect';
 import { COUNTRY_CALLING_CODE_OPTIONS } from '../constants/countryCallingCodes';
 
 type DashboardProps = {
@@ -1023,7 +1024,7 @@ function SystemPagePanel({
           loading={loading || saving}
           onSearch={onSearch}
         />
-      ) : isPartnerFeaturePage(menu?.path) ? (
+      ) : isPartnerFeaturePage(menu?.path) || menu?.path?.startsWith('/api/manager/system/dictionaries/') ? (
         <PartnerFeatureQueryBar
           path={menu?.path}
           query={query}
@@ -1867,13 +1868,13 @@ function PartnerFeatureQueryBar({
   const isCommerceType = path === '/api/manager/partner/shop-types';
   const isCommerceShop = path === '/api/manager/partner/shops';
   const isCommerceProduct = path === '/api/manager/partner/products';
-  const showStatus = isCommerceType || isCommerceShop || isCommerceProduct || isShowcase || path === '/api/manager/partner/memberships';
+  const showStatus = path?.startsWith('/api/manager/system/dictionaries/') || isCommerceType || isCommerceShop || isCommerceProduct || isShowcase || path === '/api/manager/partner/memberships';
   const showCategory = path === '/api/manager/partner/histories';
   const placeholder = path === '/api/manager/partner/settings/documents'
     ? '文档类型 / 标题'
     : path === '/api/manager/partner/settings/versions'
       ? '版本号'
-      : isCommerceType ? '类型编码 / 类型名称' : isCommerceShop ? '店铺名称 / 所属账号' : isCommerceProduct ? '商品 / 店铺 / 所属账号 / 商家ID' : isShowcase ? '标题 / 分类' : '账号 / 标题';
+      : path?.startsWith('/api/manager/system/dictionaries/') ? '类型编码 / 字典项编码 / 名称' : isCommerceType ? '类型编码 / 类型名称' : isCommerceShop ? '店铺名称 / 所属账号' : isCommerceProduct ? '商品 / 店铺 / 所属账号 / 商家ID' : isShowcase ? '标题 / 分类' : '账号 / 标题';
 
   useEffect(() => {
     setKeyword(query.keyword || '');
@@ -1917,7 +1918,7 @@ function PartnerFeatureQueryBar({
           状态
           <select value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="">全部状态</option>
-            {isCommerceType ? <>
+            {isCommerceType || path?.startsWith('/api/manager/system/dictionaries/') ? <>
               <option value="ENABLED">启用</option><option value="DISABLED">停用</option>
             </> : isCommerceShop ? <>
               <option value="PENDING">待审核</option><option value="ACTIVE">审核通过</option><option value="REJECTED">已驳回</option><option value="BLOCKED">已停用</option>
@@ -1966,12 +1967,13 @@ type EditorField = {
   key: string;
   label: string;
   type?: 'text' | 'password' | 'number' | 'select' | 'multi-select' | 'checkbox' | 'textarea' | 'email' | 'tel';
+  treeSelect?: 'dictionary';
   valueType?: 'string' | 'number';
   validateAs?: 'email' | 'phone' | 'phoneCountryCode';
   required?: boolean;
   createOnly?: boolean;
   readonlyOnEdit?: boolean;
-  options?: Array<{ label: string; value: string; disabled?: boolean }>;
+  options?: Array<{ label: string; value: string; parentValue?: string | null; disabled?: boolean }>;
   placeholder?: string;
 };
 
@@ -2007,11 +2009,25 @@ function RecordEditorDialog({
   onClose: () => void;
   onSave: (payload: SystemRecordPayload) => Promise<void>;
 }) {
+  const [dictionaryTypes, setDictionaryTypes] = useState<Array<{label:string;value:string;parentValue?:string | null;disabled?:boolean}>>([]);
+  const [dictionaryError, setDictionaryError] = useState<string | null>(null);
+  const [dictionaryLoading, setDictionaryLoading] = useState(false);
+  const isDictionaryItem = config.apiPath === '/api/manager/system/dictionaries/items/page';
+  const isDictionaryType = config.apiPath === '/api/manager/system/dictionaries/types/page';
+  const isMerchantType = config.apiPath === '/api/manager/partner/features/commerce-types/page';
+  useEffect(() => {
+    if (!isDictionaryItem && !isDictionaryType && !isMerchantType) return;
+    let active = true; setDictionaryLoading(true);
+    (isMerchantType ? loadMerchantCategories() : loadDictionaryTypes()).then((rows) => { if(active) setDictionaryTypes(rows.map((row) => ({label: `${row.name}（${row.typeCode}）${row.status === 'DISABLED' ? ' · 已停用' : ''}`, value: row.typeCode, parentValue: row.parentTypeCode}))); })
+      .catch((err:unknown) => { if(active) setDictionaryError(err instanceof Error ? err.message : '字典类型加载失败'); })
+      .finally(() => { if(active) setDictionaryLoading(false); });
+    return () => { active = false; };
+  }, [isDictionaryItem,isDictionaryType,isMerchantType]);
   const [typeOptions,setTypeOptions]=useState<Array<{label:string;value:string;disabled?:boolean}>>([]);
   const [typeOptionsError,setTypeOptionsError]=useState<string|null>(null);
   const [typeOptionsLoading,setTypeOptionsLoading]=useState(false);
   const visibleFields = config.fields.filter((field) => !field.createOnly || !record).map((field) =>
-    field.key === 'typeCodes' || (field.key === 'typeCode' && field.type === 'select') ? {...field,options:typeOptions} : field);
+    isMerchantType && field.key === 'categoryCode' ? {...field,options:dictionaryTypes.filter((type)=>type.parentValue === 'ECOMMERCE' || (record && type.value === readField(record,'categoryCode')))} : isDictionaryType && field.key === 'parentTypeCode' ? {...field,options:[{label:'无（大类或独立字典）',value:''},...dictionaryTypes.filter((type)=>(!record || type.value !== readField(record,'typeCode')))]} : isDictionaryItem && field.key === 'typeCode' ? {...field, options:dictionaryTypes,treeSelect:'dictionary' as const} : field.key === 'typeCodes' || (field.key === 'typeCode' && field.type === 'select') ? {...field,options:typeOptions} : field);
   const fields = [
     ...visibleFields.filter((field) => field.type !== 'textarea'),
     ...visibleFields.filter((field) => field.type === 'textarea'),
@@ -2019,7 +2035,7 @@ function RecordEditorDialog({
   const [values, setValues] = useState<Record<string, string | boolean>>(() => initialEditorValues(fields, initialRecord || record));
   const [validationError, setValidationError] = useState<string | null>(null);
   const typeShopId = values.shopId ? Number(values.shopId) : undefined;
-  const hasTypeFields = config.fields.some((field) => field.key === 'typeCodes' || (field.key === 'typeCode' && field.type === 'select'));
+  const hasTypeFields = !isDictionaryItem && config.fields.some((field) => field.key === 'typeCodes' || (field.key === 'typeCode' && field.type === 'select'));
   useEffect(() => {
     if (!hasTypeFields) return;
     let active=true;setTypeOptionsLoading(true);setTypeOptionsError(null);
@@ -2044,7 +2060,7 @@ function RecordEditorDialog({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if(typeOptionsLoading || typeOptionsError) return;
+    if(typeOptionsLoading || typeOptionsError || dictionaryLoading || dictionaryError) return;
     const nextValidationError = validateEditorValues(fields, values);
     if (nextValidationError) {
       setValidationError(nextValidationError);
@@ -2079,7 +2095,7 @@ function RecordEditorDialog({
                   return {...current,[field.key]:event.target.checked?[...ids,option.value].join(','):ids.filter((id)=>id!==option.value).join(',')};
                 })} />{option.label}
               </label>)}
-              {!field.options?.length ? <small>{typeOptionsLoading?'类型加载中…':'暂无可用类型，请先在商家类型管理中新增'}</small> : null}
+              {!field.options?.length ? <small>{typeOptionsLoading?'类型加载中…':'暂无可用类型，请先在字典管理的电商分类中新增'}</small> : null}
             </fieldset>
           ) : (
             <label key={field.key} className={field.type === 'checkbox' ? 'checkbox-field' : field.type === 'textarea' ? 'full-width-field' : ''}>
@@ -2094,12 +2110,12 @@ function RecordEditorDialog({
               )}
             </label>
           ))}
-          {validationError || error || typeOptionsError ? <div className="error-banner compact">{validationError || error || typeOptionsError}</div> : null}
+          {validationError || error || typeOptionsError || dictionaryError ? <div className="error-banner compact">{validationError || error || typeOptionsError || dictionaryError}</div> : null}
           <div className="dialog-actions">
             <button className="ghost-button" type="button" onClick={onClose} disabled={saving}>
               取消
             </button>
-            <button className="primary-button" type="submit" disabled={saving || typeOptionsLoading || Boolean(typeOptionsError)}>
+            <button className="primary-button" type="submit" disabled={saving || typeOptionsLoading || Boolean(typeOptionsError) || dictionaryLoading || Boolean(dictionaryError)}>
               {saving ? '保存中' : reviewMode ? '提交审核结果' : '保存'}
             </button>
           </div>
@@ -2918,6 +2934,9 @@ function renderEditorControl(
       {field.options?.map((option)=><option key={option.value} value={option.value}>{option.label}</option>)}
     </select>;
   }
+  if (field.type === 'select' && (field.key === 'parentTypeCode' || field.treeSelect)) {
+    return <ParentCategorySelect value={String(value ?? '')} options={field.options || []} disabled={disabled} onChange={onChange} mode={field.treeSelect || 'parent'} placeholder={field.treeSelect ? field.placeholder : undefined} />;
+  }
   if (field.type === 'select') {
     return (
       <select value={String(value ?? '')} onChange={(event) => onChange(event.target.value)} required={field.required} disabled={disabled}>
@@ -3292,20 +3311,44 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
     };
   }
 
+  if (path?.startsWith('/api/manager/system/dictionaries/')) {
+    const items = path.endsWith('/items');
+    return {
+      title: items ? '字典项' : '字典类型', apiPath: `${path}/page`,
+      columns: [commonColumns[0],
+        {key:'typeCode',title:'类型编码',render:(record)=>textValue(readField(record,'typeCode'))},
+        ...(items ? [{key:'itemCode',title:'字典项编码',render:(record:SystemPageRecord)=>textValue(readField(record,'itemCode'))}] : [{key:'parentTypeCode',title:'上级大类编码',render:(record:SystemPageRecord)=>textValue(readField(record,'parentTypeCode'))}]),
+        {key:'name',title:'名称',render:(record)=>textValue(readField(record,'name'))},
+        {key:'status',title:'状态',render:(record)=><StatusValue value={readField(record,'status')} />},
+        {key:'sortOrder',title:'排序',render:(record)=>textValue(readField(record,'sortOrder'))},
+        {key:'description',title:'说明',render:(record)=>textValue(readField(record,'description'))},
+      ],
+      fields:[
+        {key:'typeCode',label:'类型编码',required:true,readonlyOnEdit:true,...(items ? {type:'select' as const,placeholder:'请选择字典类型'} : {placeholder:'例如 AFTER_SALE_REASON，创建后不可修改'})},
+        ...(items ? [{key:'itemCode',label:'字典项编码',required:true,readonlyOnEdit:true,placeholder:'例如 QUALITY_ISSUE，创建后不可修改'}] : [{key:'parentTypeCode',label:'上级大类',type:'select' as const,readonlyOnEdit:true,placeholder:'可选，例如 ECOMMERCE 电商大类'}]),
+        {key:'name',label:'名称',required:true},
+        {key:'sortOrder',label:'排序（数值越小越靠前）',type:'number'},statusField,
+        {key:'description',label:'说明',type:'textarea',placeholder:'停用后业务查询不再返回；业务引用前请确认编码'}],
+    };
+  }
   if (path === '/api/manager/partner/shop-types') {
     return {
       title:'商家类型管理',apiPath:'/api/manager/partner/features/commerce-types/page',
       columns:[commonColumns[0],
         {key:'typeCode',title:'类型编码',render:(record)=>textValue(readField(record,'typeCode'))},
+        {key:'categoryName',title:'经营大类',render:(record)=>textValue(readField(record,'categoryName'))},
         {key:'name',title:'类型名称',render:(record)=>textValue(readField(record,'name'))},
         {key:'description',title:'说明',render:(record)=>truncateText(readField(record,'description'),40)},
         {key:'status',title:'状态',render:(record)=><StatusValue value={readField(record,'status')} />},
         {key:'sortOrder',title:'排序',render:(record)=>textValue(readField(record,'sortOrder'))},
       ],
-      fields:[{key:'typeCode',label:'类型编码',required:true,readonlyOnEdit:true,placeholder:'字母开头，字母/数字/下划线，创建后不可修改'},
-        {key:'name',label:'类型名称',required:true,placeholder:'仅用于展示，允许重名，最多32字'},
+      fields:[
+        {key:'categoryCode',label:'经营大类',type:'select',required:true,readonlyOnEdit:true,placeholder:'请选择经营大类'},
+        {key:'typeCode',label:'类型编码',required:true,readonlyOnEdit:true,placeholder:'例如 CAKE_SHOP，创建后不可修改'},
+        {key:'name',label:'类型名称',required:true,placeholder:'例如 蛋糕店，最多32字'},
         {key:'sortOrder',label:'排序',type:'number'},statusField,
-        {key:'description',label:'说明',type:'textarea',placeholder:'停用类型将自动下架相关商品，恢复类型后需手动重新上架'}],
+        {key:'description',label:'说明',type:'textarea',placeholder:'停用后相关上架商品自动下架，重新启用需手动上架'},
+      ],
     };
   }
   if (path === '/api/manager/partner/shops') {
@@ -3543,7 +3586,9 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
 }
 
 function isSystemPageMenu(path?: string) {
-  return path === '/api/manager/system/users'
+  return path === '/api/manager/system/dictionaries/types'
+    || path === '/api/manager/system/dictionaries/items'
+    || path === '/api/manager/system/users'
     || path === '/api/manager/system/roles'
     || path === '/api/manager/system/permissions'
     || path === '/api/manager/system/menus'
@@ -3609,6 +3654,8 @@ function systemActionPermissions(menu: MenuTreeNode | null, action: 'add' | 'edi
       edit: ['vip:user:edit', 'vip-user:edit', 'partner:vip-user:edit', 'manager:vip-user:edit'],
       delete: ['vip:user:delete', 'vip-user:delete', 'partner:vip-user:delete', 'manager:vip-user:delete'],
     },
+    '/api/manager/system/dictionaries/types': {add:['system:dict:add'],edit:['system:dict:edit'],delete:['system:dict:delete']},
+    '/api/manager/system/dictionaries/items': {add:['system:dict:add'],edit:['system:dict:edit'],delete:['system:dict:delete']},
     '/api/manager/partner/info': {
       add: ['partner:info:add'],
       edit: ['partner:info:edit'],

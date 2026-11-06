@@ -10,7 +10,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/manager/partner/shop-types")
 public class CommerceTypeAdminController {
     private final CommerceTypeDao types;
-    public CommerceTypeAdminController(CommerceTypeDao types) { this.types=types; }
+    private final com.kfpd.cloud.manager.service.impl.MerchantTypeAdminService admin;
+    public CommerceTypeAdminController(CommerceTypeDao types,com.kfpd.cloud.manager.service.impl.MerchantTypeAdminService admin) { this.types=types;this.admin=admin; }
+    @PostMapping("/categories")
+    @PreAuthorize("hasAuthority('partner:shop-type:view') or hasAuthority('partner:shop-type:add') or hasAuthority('partner:shop-type:edit')")
+    public ApiResponse<List<Map<String,Object>>> categories() { return ApiResponse.success(admin.categories()); }
     @PostMapping("/options")
     @PreAuthorize("hasAuthority('partner:showcase:view') or hasAuthority('partner:shop-type:view')")
     public ApiResponse<List<Map<String,Object>>> options(@RequestBody(required=false) Map<String,Object> query) {

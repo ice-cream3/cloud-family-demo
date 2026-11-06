@@ -4,8 +4,8 @@ import java.util.Map;
 import org.apache.ibatis.annotations.Param;
 
 public interface CommerceDao {
-    long countShops(@Param("keyword") String keyword,@Param("typeCode") String typeCode);
-    List<Map<String,Object>> shops(@Param("keyword") String keyword,@Param("typeCode") String typeCode,@Param("offset") int offset,@Param("pageSize") int pageSize);
+    long countShops(@Param("keyword") String keyword,@Param("typeCodes") List<String> typeCodes);
+    List<Map<String,Object>> shops(@Param("keyword") String keyword,@Param("typeCodes") List<String> typeCodes,@Param("offset") int offset,@Param("pageSize") int pageSize);
     Map<String,Object> shop(@Param("id") Long id);
     long countProducts(@Param("shopId") Long shopId,@Param("keyword") String keyword,@Param("typeCode") String typeCode);
     List<Map<String,Object>> products(@Param("shopId") Long shopId,@Param("keyword") String keyword,@Param("typeCode") String typeCode,@Param("offset") int offset,@Param("pageSize") int pageSize);

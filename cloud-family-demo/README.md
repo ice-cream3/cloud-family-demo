@@ -432,6 +432,8 @@ System menu endpoints:
 | `/api/manager/partner/features/commerce-shops/page` | 后台商家列表，可按审核状态查询。 |
 | `/api/manager/partner/features/commerce-shops/update/{id}` | 后台保存商家资料、审核状态及类型，要求 `partner:showcase:edit`。 |
 
+后台菜单统一为 `Function Management → 商家管理 → 商家类型管理 / 商家管理 / 商品管理 / 精品展示`。执行 [function-commerce-menu.sql](manager-service/src/main/resources/db/fa-cloud/function-commerce-menu.sql) 迁移已有菜单，并为 `SUPER_ADMIN` 补齐四个页面、按钮和关联接口权限；该脚本在下列页面及类型菜单初始化后执行，可重复执行。页面路由保持不变，重新登录刷新菜单。
+
 SQL 位于 `manager-service/src/main/resources/db/fa-cloud/`。新库依次执行 `showcase-schema.sql`、`showcase-menu.sql`（包含精品模块权限）、`showcase-commerce-schema.sql`、`showcase-shop-types.sql`、`showcase-commerce-menu.sql`、`showcase-shop-types-menu.sql`；菜单依赖基础系统管理表，旧内容模块说明见下列专题文档。
 
 已有环境按实际结构补齐迁移：
@@ -445,6 +447,12 @@ SQL 位于 `manager-service/src/main/resources/db/fa-cloud/`。新库依次执�
 | `showcase-shop-approval.sql` | 旧商家表状态约束加入 `PENDING/REJECTED`，默认状态改为待审核。 |
 
 **旧库上线申请功能前必须执行审核状态迁移。** 否则保存申请会报 `Check constraint 'chk_showcase_shop_status' is violated`。迁移保留已有商家状态。部署后重启 partner-service、manager-service，并更新移动端及管理端。
+
+## 通用业务字典
+
+后台 `Function Management → 字典管理` 包含“字典类型”和“字典项”，用于配置各业务的编码、展示名称、说明、排序与启停。类型编码全局唯一，项编码在类型内唯一；编码创建后不可修改。业务端通过 `POST /api/users/dictionaries/{typeCode}/options` 读取启用选项，返回 `value/label`。
+
+执行 [system-dictionary.sql](manager-service/src/main/resources/db/fa-cloud/system-dictionary.sql) 创建表和菜单，默认赋予 `SUPER_ADMIN` 查询、新增、修改、删除权限。各业务需显式接入该接口；商家类型接入 `MERCHANT_TYPE` 通用字典，随后执行 `merchant-type-dictionary.sql`。部署与接口示例见 [通用字典说明](docs/system-dictionary.md)。
 
 ## 会员中心重置密码
 

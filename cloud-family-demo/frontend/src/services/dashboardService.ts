@@ -195,6 +195,8 @@ export function replaceSystemRoleMenus(id: number, ids: number[]) {
 
 function getSystemEndpoint(path: string) {
   const endpoints: Record<string, string> = {
+    '/api/manager/system/dictionaries/types': '/api/manager/system/dictionaries/types',
+    '/api/manager/system/dictionaries/items': '/api/manager/system/dictionaries/items',
     '/api/manager/system/users': '/api/manager/system/users',
     '/api/manager/system/roles': '/api/manager/system/roles',
     '/api/manager/system/permissions': '/api/manager/system/permissions',
@@ -234,4 +236,17 @@ export function resetMembershipPassword(id: number, password: string) {
   return post<SystemPageRecord>(`/api/manager/partner/features/memberships/password/reset/${id}`, {
     body: { password },
   });
+}
+
+export function loadDictionaryPage(kind: 'types' | 'items', pageNum = 1, pageSize = 10, query?: PageQuery) {
+  return post<PageResult<SystemPageRecord>>(`/api/manager/system/dictionaries/${kind}/page`, {
+    form: {pageNum, pageSize, keyword: query?.keyword, status: query?.status},
+  });
+}
+export function loadDictionaryTypes() {
+  return post<Array<{typeCode:string;parentTypeCode?:string | null;name:string;status:string}>>('/api/manager/system/dictionaries/type-options');
+}
+
+export function loadMerchantCategories() {
+  return post<Array<{typeCode:string;parentTypeCode?:string | null;name:string;status:string}>>('/api/manager/partner/shop-types/categories');
 }

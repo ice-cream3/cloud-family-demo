@@ -24,11 +24,13 @@ public class UserFeatureAdminServiceImpl implements UserFeatureAdminService {
     private final UserFeatureAdminDao userFeatureAdminDao;
     private final OperationLogService operationLogService;
     private final CommerceTypeDao commerceTypes;
+    private final MerchantTypeAdminService merchantTypeAdmin;
 
-    public UserFeatureAdminServiceImpl(UserFeatureAdminDao userFeatureAdminDao, OperationLogService operationLogService,CommerceTypeDao commerceTypes) {
+    public UserFeatureAdminServiceImpl(UserFeatureAdminDao userFeatureAdminDao, OperationLogService operationLogService,CommerceTypeDao commerceTypes,MerchantTypeAdminService merchantTypeAdmin) {
         this.userFeatureAdminDao = userFeatureAdminDao;
         this.operationLogService = operationLogService;
         this.commerceTypes=commerceTypes;
+        this.merchantTypeAdmin=merchantTypeAdmin;
     }
 
     @Override
@@ -103,6 +105,7 @@ public class UserFeatureAdminServiceImpl implements UserFeatureAdminService {
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public Map<String, Object> create(String feature, Map<String, Object> record) {
+        if ("commerce-types".equals(feature)) return merchantTypeAdmin.save(null,record);
         Map<String, Object> normalized = feature.startsWith("commerce-") ? normalizeCommerce(feature,record) : "showcase".equals(feature) ? normalizeShowcase(record) : normalize(record);
         int affected = switch (feature) {
             case "commerce-types" -> userFeatureAdminDao.insertCommerceType(normalized);
@@ -130,6 +133,7 @@ public class UserFeatureAdminServiceImpl implements UserFeatureAdminService {
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public Map<String, Object> update(String feature, Long id, Map<String, Object> record) {
+        if ("commerce-types".equals(feature)) return merchantTypeAdmin.save(id,record);
         normalize(record);
         if ("commerce-types".equals(feature)) {
             String currentCode=userFeatureAdminDao.findCommerceTypeCode(id);
@@ -170,6 +174,7 @@ public class UserFeatureAdminServiceImpl implements UserFeatureAdminService {
     @Override
     @Transactional(transactionManager = MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void delete(String feature, Long id) {
+        if ("commerce-types".equals(feature)) { merchantTypeAdmin.delete(id); return; }
         int affected = switch (feature) {
             case "commerce-types" -> {
                 if(userFeatureAdminDao.countCommerceTypeUsage(id)>0) throw SystemManagementSupport.badRequest("类型已被商家或商品使用，不能删除，可选择停用");

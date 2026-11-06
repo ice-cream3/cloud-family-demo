@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kfpd.cloud.manager.dao.cloud.DictionaryDao">
+  <select id="merchantCategories" resultType="map">
+    SELECT type_code typeCode,name,status,parent_type_code parentTypeCode FROM sys_dict_type
+    WHERE parent_type_code='ECOMMERCE' OR type_code='MERCHANT_TYPE' ORDER BY sort_order,id
+  </select>
+  <select id="merchantItem" resultType="map">
+    SELECT i.id,i.type_code typeCode,i.item_code itemCode FROM showcase_shop_type t
+    JOIN sys_dict_item i ON i.item_code=t.type_code JOIN sys_dict_type d ON d.type_code=i.type_code
+    WHERE t.id=#{id} AND (d.parent_type_code='ECOMMERCE' OR d.type_code='MERCHANT_TYPE') FOR UPDATE
+  </select>
+  <select id="merchantType" resultType="map">
+    SELECT t.id,t.type_code typeCode,t.name,t.description,t.status,t.sort_order sortOrder,i.type_code categoryCode
+    FROM showcase_shop_type t JOIN sys_dict_item i ON i.item_code=t.type_code
+    JOIN sys_dict_type d ON d.type_code=i.type_code
+    WHERE t.type_code=#{code} AND (d.parent_type_code='ECOMMERCE' OR d.type_code='MERCHANT_TYPE')
+  </select>
+  <update id="syncMerchantTypes">
+    INSERT INTO showcase_shop_type(type_code,name,description,status,sort_order)
+    SELECT i.item_code,i.name,LEFT(i.description,300),
+      CASE WHEN d.status='ENABLED' AND i.status='ENABLED' AND (d.parent_type_code IS NULL OR parent.status='ENABLED') THEN 'ENABLED' ELSE 'DISABLED' END,i.sort_order
+    FROM sys_dict_item i JOIN sys_dict_type d ON d.type_code=i.type_code LEFT JOIN sys_dict_type parent ON parent.type_code=d.parent_type_code WHERE i.type_code='MERCHANT_TYPE' OR d.parent_type_code='ECOMMERCE'
+    ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),status=VALUES(status),sort_order=VALUES(sort_order)
+  </update>
+  <update id="refreshMerchantProducts">
+    UPDATE showcase_product p JOIN showcase_shop_type t ON t.id=p.type_id
+    SET p.category=t.name,p.status=CASE WHEN t.status='DISABLED' AND p.status='PUBLISHED' THEN 'OFFLINE' ELSE p.status END
+  </update>
+  <select id="merchantReferences" resultType="long">
+    SELECT (SELECT COUNT(*) FROM showcase_shop_type_rel WHERE type_code=#{itemCode}) +
+      (SELECT COUNT(*) FROM showcase_product p JOIN showcase_shop_type t ON t.id=p.type_id WHERE t.type_code=#{itemCode})
+  </select>
+  <delete id="deleteMerchantType">DELETE FROM showcase_shop_type WHERE type_code=#{itemCode}</delete>
+  <select id="countChildren" resultType="long">SELECT COUNT(*) FROM sys_dict_type WHERE parent_type_code=#{typeCode}</select>
+  <select id="conflictingMerchantItems" resultType="long">
+    SELECT COUNT(*) FROM sys_dict_item i JOIN sys_dict_type d ON d.type_code=i.type_code
+    WHERE (i.type_code='MERCHANT_TYPE' OR d.parent_type_code='ECOMMERCE')
+      AND i.item_code=#{itemCode} AND i.type_code != #{typeCode}
+  </select>
+  <sql id="Table"><choose><when test="kind == 'types'">sys_dict_type</when><otherwise>sys_dict_item</otherwise></choose></sql>
+  <sql id="Columns">id,type_code typeCode,name,description,status,sort_order sortOrder,updated_at updatedAt<choose><when test="kind == 'items'">,item_code itemCode</when><otherwise>,parent_type_code parentTypeCode</otherwise></choose></sql>
+  <sql id="Filter"><where>
+    <if test="keyword != null">AND (name LIKE CONCAT('%',#{keyword},'%') OR type_code LIKE CONCAT('%',#{keyword},'%')<if test="kind == 'items'"> OR item_code LIKE CONCAT('%',#{keyword},'%')</if>)</if>
+    <if test="status != null">AND status=#{status}</if>
+  </where></sql>
+  <select id="count" resultType="long">SELECT COUNT(*) FROM <include refid="Table"/><include refid="Filter"/></select>
+  <select id="page" resultType="map">SELECT <include refid="Columns"/> FROM <include refid="Table"/><include refid="Filter"/> ORDER BY sort_order,id DESC LIMIT #{pageSize} OFFSET #{offset}</select>
+  <select id="find" resultType="map">SELECT <include refid="Columns"/> FROM <include refid="Table"/> WHERE id=#{id} FOR UPDATE</select>
+  <select id="lockType" resultType="map">SELECT id,type_code typeCode,parent_type_code parentTypeCode,status FROM sys_dict_type WHERE type_code=#{typeCode} FOR UPDATE</select>
+  <select id="countItems" resultType="long">SELECT COUNT(*) FROM sys_dict_item WHERE type_code=#{typeCode}</select>
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">INSERT INTO <include refid="Table"/>(type_code,name,description,status,sort_order<choose><when test="kind == 'items'">,item_code</when><otherwise>,parent_type_code</otherwise></choose>) VALUES(#{typeCode},#{name},#{description},#{status},#{sortOrder}<choose><when test="kind == 'items'">,#{itemCode}</when><otherwise>,#{parentTypeCode}</otherwise></choose>)</insert>
+  <update id="update">UPDATE <include refid="Table"/> SET name=#{name},description=#{description},status=#{status},sort_order=#{sortOrder} WHERE id=#{id}</update>
+  <delete id="delete">DELETE FROM <include refid="Table"/> WHERE id=#{id}</delete>
+  <select id="types" resultType="map">SELECT type_code typeCode,parent_type_code parentTypeCode,name,status FROM sys_dict_type ORDER BY sort_order,id</select>
+</mapper>

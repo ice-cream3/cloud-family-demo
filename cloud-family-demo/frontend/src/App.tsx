@@ -23,6 +23,7 @@ import {
   loadSystemUsers,
   resetPartnerInfoPassword,
   resetMembershipPassword,
+  loadDictionaryPage,
   resetSystemUserPassword,
   replaceSystemMenuPermissions,
   replaceSystemRoleMenus,
@@ -340,6 +341,8 @@ function getSystemPageLoader(path?: string) {
 
 function getSystemPageLoaders(): Record<string, (pageNum: number, pageSize: number, query?: PageQuery) => Promise<PageResult<SystemPageRecord>>> {
   return {
+    '/api/manager/system/dictionaries/types': (pageNum, pageSize, query) => loadDictionaryPage('types', pageNum, pageSize, query),
+    '/api/manager/system/dictionaries/items': (pageNum, pageSize, query) => loadDictionaryPage('items', pageNum, pageSize, query),
     '/api/manager/system/users': loadSystemUsers,
     '/api/manager/system/roles': loadSystemRoles,
     '/api/manager/system/permissions': loadSystemPermissions,

@@ -5,9 +5,11 @@
     <sql id="PublicShop">s.status='ACTIVE' AND u.status='ENABLED'</sql>
     <sql id="ShopFilter">
         WHERE <include refid="PublicShop"/>
-        <if test="typeCode != null and typeCode != ''">
+        <if test="typeCodes != null and typeCodes.size() > 0">
           AND EXISTS(SELECT 1 FROM showcase_shop_type_rel r JOIN showcase_shop_type t ON t.type_code=r.type_code
-            WHERE r.shop_id=s.id AND t.type_code=#{typeCode} AND t.status='ENABLED')
+            WHERE r.shop_id=s.id AND t.type_code IN
+            <foreach collection="typeCodes" item="code" open="(" close=")" separator=",">#{code}</foreach>
+            AND t.status='ENABLED' )
         </if>
         <if test="keyword != null and keyword != ''">AND (s.name LIKE CONCAT('%',#{keyword},'%') OR s.description LIKE CONCAT('%',#{keyword},'%'))</if>
     </sql>

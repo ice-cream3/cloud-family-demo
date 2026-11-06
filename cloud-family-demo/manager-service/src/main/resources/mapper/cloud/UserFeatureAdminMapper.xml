@@ -471,7 +471,12 @@
       <if test="status != null and status != ''">AND status=#{status}</if>
     </where></sql>
     <select id="countCommerceTypes" resultType="long">SELECT COUNT(*) FROM showcase_shop_type <include refid="CommerceTypeFilters"/></select>
-    <select id="findCommerceTypes" resultType="map">SELECT id,type_code typeCode,name,description,status,sort_order sortOrder,updated_at updatedAt FROM showcase_shop_type <include refid="CommerceTypeFilters"/> ORDER BY sort_order,id LIMIT #{pageSize} OFFSET #{offset}</select>
+    <select id="findCommerceTypes" resultType="map">SELECT id,type_code typeCode,name,description,status,sort_order sortOrder,updated_at updatedAt,
+    (SELECT i.type_code FROM sys_dict_item i JOIN sys_dict_type d ON d.type_code=i.type_code
+      WHERE i.item_code=showcase_shop_type.type_code AND (d.parent_type_code='ECOMMERCE' OR d.type_code='MERCHANT_TYPE') LIMIT 1) categoryCode,
+    (SELECT d.name FROM sys_dict_item i JOIN sys_dict_type d ON d.type_code=i.type_code
+      WHERE i.item_code=showcase_shop_type.type_code AND (d.parent_type_code='ECOMMERCE' OR d.type_code='MERCHANT_TYPE') LIMIT 1) categoryName
+    FROM showcase_shop_type <include refid="CommerceTypeFilters"/> ORDER BY sort_order,id LIMIT #{pageSize} OFFSET #{offset}</select>
     <insert id="insertCommerceType" parameterType="map" useGeneratedKeys="true" keyProperty="id">INSERT INTO showcase_shop_type(type_code,name,description,status,sort_order) VALUES(#{typeCode},#{name},#{description},#{status},#{sortOrder})</insert>
     <select id="findCommerceTypeCode" resultType="string">SELECT type_code FROM showcase_shop_type WHERE id=#{id} FOR UPDATE</select>
     <update id="updateCommerceType">UPDATE showcase_shop_type SET name=#{record.name},description=#{record.description},status=#{record.status},sort_order=#{record.sortOrder} WHERE id=#{id}</update>

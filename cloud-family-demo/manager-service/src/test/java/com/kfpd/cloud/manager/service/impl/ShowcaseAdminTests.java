@@ -15,7 +15,8 @@ class ShowcaseAdminTests {
     private final UserFeatureAdminDao dao = mock(UserFeatureAdminDao.class, withSettings().mockMaker("mock-maker-subclass"));
     private final OperationLogService logs = mock(OperationLogService.class, withSettings().mockMaker("mock-maker-subclass"));
     private final CommerceTypeDao types=mock(CommerceTypeDao.class,withSettings().mockMaker("mock-maker-subclass"));
-    private final UserFeatureAdminServiceImpl service = new UserFeatureAdminServiceImpl(dao, logs,types);
+    private final MerchantTypeAdminService merchantAdmin=mock(MerchantTypeAdminService.class,withSettings().mockMaker("mock-maker-subclass"));
+    private final UserFeatureAdminServiceImpl service = new UserFeatureAdminServiceImpl(dao, logs,types,merchantAdmin);
     @org.junit.jupiter.api.BeforeEach void typeSetup() {
         when(types.productShop(3L)).thenReturn(7L);
         when(dao.findCommerceTypeCode(2L)).thenReturn("TEST_TYPE");
@@ -85,20 +86,17 @@ class ShowcaseAdminTests {
         assertThat(service.update("commerce-products",3L,input)).containsEntry("moderationReason",null);
     }
 
-    @Test void typeDisableRefreshesProductsAndReferencedTypeCannotBeDeleted() {
-        when(dao.updateCommerceType(eq(2L),anyMap())).thenReturn(1);
-        service.update("commerce-types",2L,Map.of("typeCode","TEST_TYPE","name","食品","status","DISABLED","sortOrder",0));
-        verify(dao).refreshCommerceTypeProducts(eq(2L),argThat(row->"DISABLED".equals(row.get("status"))));
-        when(dao.countCommerceTypeUsage(2L)).thenReturn(1L);
-        assertThatThrownBy(()->service.delete("commerce-types",2L)).isInstanceOf(BusinessException.class);
+    @Test void merchantTypeWritesUseDictionaryBackedService() {
+        var input=Map.<String,Object>of("categoryCode","FOOD","typeCode","TEST_TYPE","name","食品");
+        when(merchantAdmin.save(null,input)).thenReturn(Map.of("id",2L));
+        assertThat(service.create("commerce-types",input)).containsEntry("id",2L);
+        service.update("commerce-types",2L,input);
+        service.delete("commerce-types",2L);
+        verify(merchantAdmin).save(2L,input);
+        verify(merchantAdmin).delete(2L);
+        verify(dao,never()).insertCommerceType(anyMap());
+        verify(dao,never()).updateCommerceType(anyLong(),anyMap());
         verify(dao,never()).deleteCommerceType(anyLong());
-    }
-
-    @Test void typeCodeRequiredAndImmutableButDisplayNameMayChange() {
-        assertThatThrownBy(()->service.create("commerce-types",Map.of("name","食品"))).isInstanceOf(BusinessException.class);
-        assertThatThrownBy(()->service.update("commerce-types",2L,Map.of("typeCode","CHANGED","name","食品"))).isInstanceOf(BusinessException.class).hasMessageContaining("不可修改");
-        when(dao.updateCommerceType(eq(2L),anyMap())).thenReturn(1);
-        assertThat(service.update("commerce-types",2L,Map.of("typeCode","test_type","name","展示新名称"))).containsEntry("typeCode","TEST_TYPE").containsEntry("name","展示新名称");
     }
 
     @Test void missingUpdateAndDeleteAreReported() {

@@ -114,7 +114,7 @@ export function SellerCenter({ onBack, initialStatus = '' }: { onBack: () => voi
                 onChange={(event) => setSelectedTypeCodes((codes) => event.target.checked ? [...codes, type.typeCode] : codes.filter((code) => code !== type.typeCode))} />
               {type.name}{type.status !== 'ENABLED' ? '（已停用，请取消）' : ''}
             </label>)}
-            {!merchantTypes.length ? <p>暂无可用商家类型，请联系管理员。</p> : null}
+            {!merchantTypes.length ? <p>暂无可用商家类型，请联系管理员在商家类型字典中添加。</p> : null}
             <small>类型由后台维护，申请类型需经后台审核，提交后仅可查看。</small>
           </fieldset>
           <label>店铺介绍<textarea required rows={4} maxLength={2000} value={shopValues.description} onChange={(event) => setShopValues({ ...shopValues, description: event.target.value })} /></label>
@@ -123,7 +123,7 @@ export function SellerCenter({ onBack, initialStatus = '' }: { onBack: () => voi
       </section>
       {shop ? <section className="seller-products">
         <div className="seller-panel-heading"><h2>我的商品</h2><button className="seller-primary" type="button" disabled={saving || shop.status !== 'ACTIVE' || allowedTypes.length===0} onClick={() => { setError(null); setSuccess(null); setEditor({ id: null, values: { ...emptyProduct } }); }}><Plus size={16} />新增商品</button></div>
-        {!allowedTypes.length ? <p className="settings-message error">商家类型由后台管理，暂无可用类型，请联系管理员。</p> : null}
+        {!allowedTypes.length ? <p className="settings-message error">商家类型由后台字典管理，暂无可用类型，请联系管理员。</p> : null}
         <div className="seller-status-tabs" role="group" aria-label="商品状态筛选">
           {[['', '全部'], ['PUBLISHED', '已上架'], ['DRAFT', '草稿'], ['OFFLINE', '已下架'], ['SYSTEM_BLOCKED', '系统停用']].map(([value, label]) => (
             <button key={value} type="button" aria-pressed={status === value}

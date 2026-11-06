@@ -22,7 +22,7 @@ public class CommerceService {
     private final CommerceTypeDao types;
     public CommerceService(CommerceDao dao, VipUserDao users,CommerceTypeDao types) { this.dao=dao; this.users=users;this.types=types; }
     public PageVO<Map<String,Object>> shops(CommerceQueryVO q) {
-        var query=normalize(q); var rows=dao.shops(query.keyword(),query.typeCode(),offset(query),query.pageSize()); CommerceTypePolicy.attach(types,rows); return new PageVO<>(dao.countShops(query.keyword(),query.typeCode()),query.pageNum(),query.pageSize(),rows);
+        var query=normalize(q); var rows=dao.shops(query.keyword(),shopTypeCodes(query),offset(query),query.pageSize()); CommerceTypePolicy.attach(types,rows); return new PageVO<>(dao.countShops(query.keyword(),shopTypeCodes(query)),query.pageNum(),query.pageSize(),rows);
     }
     public Map<String,Object> shop(Long id) { var shop=found(dao.shop(id));CommerceTypePolicy.attach(types,List.of(shop));return shop; }
     public PageVO<Map<String,Object>> products(Long shopId,CommerceQueryVO q) {
@@ -85,11 +85,20 @@ public class CommerceService {
         if(value==null) throw new BusinessException(ErrorCode.COMMON_NOT_FOUND,"商家或商品不存在、已下架或已停用"); return value;
     }
     private int offset(CommerceQueryVO q) { return (q.pageNum()-1)*q.pageSize(); }
+    private List<String> shopTypeCodes(CommerceQueryVO q) {
+        var codes=new java.util.ArrayList<String>();
+        if(q.typeCodes()!=null) {
+            CommerceRules.require(q.typeCodes().size()<=100,"最多选择100个商家类型");
+            for(String code:q.typeCodes()) codes.add(CommerceRules.typeCode(code));
+        }
+        if(q.typeCode()!=null) codes.add(q.typeCode());
+        return codes.stream().distinct().toList();
+    }
     private CommerceQueryVO normalize(CommerceQueryVO q) {
         if(q==null) return new CommerceQueryVO(1,12,null,null,null);
         CommerceRules.require(q.category()==null||q.category().isBlank(),"请使用typeCode筛选商品类型，名称仅用于展示");
         String status=q.status()==null||q.status().isBlank()?null:CommerceRules.state(q.status(),List.of("DRAFT","PUBLISHED","OFFLINE","SYSTEM_BLOCKED"),"DRAFT");
-        return new CommerceQueryVO(q.pageNum()==null?1:Math.max(1,Math.min(1000000,q.pageNum())),q.pageSize()==null?12:Math.max(1,Math.min(100,q.pageSize())),trim(q.keyword(),100),null,status,q.typeCode()==null||q.typeCode().isBlank()?null:CommerceRules.typeCode(q.typeCode()));
+        return new CommerceQueryVO(q.pageNum()==null?1:Math.max(1,Math.min(1000000,q.pageNum())),q.pageSize()==null?12:Math.max(1,Math.min(100,q.pageSize())),trim(q.keyword(),100),null,status,q.typeCode()==null||q.typeCode().isBlank()?null:CommerceRules.typeCode(q.typeCode()),q.typeCodes());
     }
     private String trim(String value,int max) { if(value==null||value.isBlank()) return null; CommerceRules.require(value.trim().length()<=max,"查询条件过长"); return value.trim(); }
 }

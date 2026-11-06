@@ -100,12 +100,23 @@ class CommerceServiceTests {
     @Test void blocksHiddenShopsAndProducts() { when(dao.shop(99L)).thenReturn(null);when(dao.product(99L)).thenReturn(null);assertThatThrownBy(()->service.products(99L,null)).isInstanceOf(BusinessException.class);assertThatThrownBy(()->service.product(99L)).isInstanceOf(BusinessException.class); }
     @Test void filtersShopListAndTotalByNormalizedType() {
         service.shops(new CommerceQueryVO(2,12," 超市 ",null,null," retail "));
-        verify(dao).shops("超市","RETAIL",12,12);
-        verify(dao).countShops("超市","RETAIL");
+        verify(dao).shops("超市",java.util.List.of("RETAIL"),12,12);
+        verify(dao).countShops("超市",java.util.List.of("RETAIL"));
     }
     @Test void rejectsInvalidShopTypeFilter() {
         assertThatThrownBy(()->service.shops(new CommerceQueryVO(1,12,null,null,null,"bad type!"))).isInstanceOf(BusinessException.class);
         verifyNoInteractions(dao);
     }
-    @Test void clampsPagingAndTrimsShopSearch() { service.shops(new CommerceQueryVO(-1,1000," 店铺 ",null,null));verify(dao).shops("店铺",null,0,100); }
+    @Test void clampsPagingAndTrimsShopSearch() { service.shops(new CommerceQueryVO(-1,1000," 店铺 ",null,null));verify(dao).shops("店铺",java.util.List.of(),0,100); }
+    @Test void normalizesMultipleShopTypesAndSharesFilterWithCount() {
+        service.shops(new CommerceQueryVO(2,12," 商家 ",null,null,null,java.util.List.of(" cake_shop ","FRUIT_STORE","CAKE_SHOP")));
+        var expected=java.util.List.of("CAKE_SHOP","FRUIT_STORE");
+        verify(dao).shops("商家",expected,12,12);
+        verify(dao).countShops("商家",expected);
+    }
+    @Test void rejectsInvalidAndOversizedMultiTypeFilters() {
+        assertThatThrownBy(()->service.shops(new CommerceQueryVO(1,12,null,null,null,null,java.util.List.of("BAD!")))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->service.shops(new CommerceQueryVO(1,12,null,null,null,null,java.util.Collections.nCopies(101,"CAKE_SHOP")))).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(dao);
+    }
 }

@@ -1,7 +1,16 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.kfpd.cloud.partner.dao.cloud.CommerceTypeDao">
-  <select id="available" resultType="map">SELECT id,type_code typeCode,name,status,description,sort_order sortOrder FROM showcase_shop_type WHERE status='ENABLED' ORDER BY sort_order,id</select>
+  <select id="available" resultType="map">
+    SELECT t.id,t.type_code typeCode,t.name,t.status,t.description,t.sort_order sortOrder,
+      c.categoryCode,c.categoryName,c.categorySortOrder
+    FROM showcase_shop_type t LEFT JOIN (
+      SELECT i.item_code,d.type_code categoryCode,d.name categoryName,d.sort_order categorySortOrder
+      FROM sys_dict_item i JOIN sys_dict_type d ON d.type_code=i.type_code
+      WHERE d.parent_type_code='ECOMMERCE' OR d.type_code='MERCHANT_TYPE'
+    ) c ON c.item_code=t.type_code
+    WHERE t.status='ENABLED' ORDER BY t.sort_order,t.id
+  </select>
   <select id="shopTypes" resultType="map">
     SELECT r.shop_id shopId,t.id,t.type_code typeCode,t.name,t.status FROM showcase_shop_type_rel r JOIN showcase_shop_type t ON t.type_code=r.type_code
     WHERE r.shop_id IN <foreach collection="shopIds" item="id" open="(" close=")" separator=",">#{id}</foreach> ORDER BY t.sort_order,t.id
