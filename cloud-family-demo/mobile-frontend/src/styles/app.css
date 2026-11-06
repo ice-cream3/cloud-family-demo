@@ -5041,3 +5041,34 @@ img {
 .commerce-selected-types > div { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; max-height: 70px; overflow-y: auto; overscroll-behavior: contain; }
 .commerce-selected-types button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid #f2d6ad; border-radius: 6px; background: #fff5e6; color: #a94c08; font-size: 11px; }
 .commerce-selected-types button svg { flex-shrink: 0; }
+
+/* 商家申请：表单仅展示选择入口和已选经营类型。 */
+.merchant-application-field { min-width: 0; margin: 0; padding: 12px; border: 1px solid #e5eaf1; border-radius: 12px; background: #fcfdff; }
+.merchant-application-field legend { padding: 0 5px; color: #475569; font-size: 13px; font-weight: 500; }
+.merchant-application-field legend span { margin-left: 3px; color: #b45309; font-size: 10px; font-weight: 400; }
+.merchant-application-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; color: #94a3b8; font-size: 11px; }
+.merchant-application-heading strong { flex-shrink: 0; color: #94a3b8; font-weight: 500; font-variant-numeric: tabular-nums; }
+.merchant-application-heading strong.has-selection { color: #b45309; }
+.merchant-application-trigger { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; padding: 11px 10px; border: 1px solid #f3dfc1; border-radius: 9px; background: #fffaf2; color: #9a4a12; text-align: left; }
+.merchant-application-icon { display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; background: #fff0d8; }
+.merchant-application-trigger > span:nth-child(2) { flex: 1; min-width: 0; }
+.merchant-application-trigger strong { display: block; font-size: 13px; font-weight: 600; }
+.merchant-application-trigger small { display: block; margin-top: 4px; color: #a28d75; font-size: 10px; line-height: 1.5; }
+.merchant-application-trigger > svg { flex-shrink: 0; }
+.merchant-application-trigger:disabled { border-color: #e5e7eb; background: #f4f6f8; color: #94a3b8; }
+.merchant-application-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
+.merchant-application-tags button { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 6px 8px; border: 1px solid #f0d8b5; border-radius: 7px; background: #fff5e6; color: #a94c08; font-size: 11px; overflow-wrap: anywhere; }
+.merchant-application-tags button svg { flex-shrink: 0; }
+.merchant-application-tags .is-unavailable { border-color: #f3c9c9; background: #fff3f3; color: #b54747; }
+.merchant-application-tags small { font-size: 10px; }
+.merchant-application-empty, .merchant-application-hint, .merchant-application-warning { margin: 9px 0 0; font-size: 11px; line-height: 1.6; }
+.merchant-application-empty { color: #8a94a3; }
+.merchant-application-hint { color: #94a3b8; }
+.merchant-application-warning { color: #b54747; }
+.seller-form .commerce-filter-search { display: flex; align-items: center; gap: 7px; font-weight: 400; }
+.seller-form .commerce-filter-search input { border: 0; padding: 0; border-radius: 0; background: transparent; box-shadow: none; font-size: 13px; }
+.commerce-filter-options button:disabled { opacity: .45; cursor: not-allowed; }
+.merchant-application-selector button:focus-visible { outline: 2px solid #b45309; outline-offset: 2px; }
+@media (max-width: 340px) { .merchant-application-field { padding: 10px; } .merchant-application-heading { font-size: 10px; } }
+
+.merchant-application-tags .merchant-application-more { border-style: dashed; border-color: #dce2eb; color: #64748b; background: #fff; }

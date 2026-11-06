@@ -1,3 +1,4 @@
+import { MerchantTypeFilter } from './MerchantTypeFilter';
 import { ProductTypePicker } from './ProductTypePicker';
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Package, Trash2, X } from 'lucide-react';
@@ -104,18 +105,12 @@ export function SellerCenter({ onBack, initialStatus = '' }: { onBack: () => voi
       <section className="seller-panel">
         <div className="seller-panel-heading"><h2>{shop ? shop.name : '申请成为商家'}</h2>{shop?.status === 'REJECTED' ? <button type="button" disabled={saving} onClick={() => setShopEditing(!shopEditing)}>{shopEditing ? '收起' : '编辑资料'}</button> : null}</div>
         {shop && !shopEditing ? <><p>{shop.description}</p><p>经营类型：{shop.typeNames || '待后台设置'}</p><small>商家ID：{shop.id} · 当前列表 {total} 件</small></> : null}
-        {!shop || (shop.status === 'REJECTED' && shopEditing) ? <form className="seller-form" onSubmit={(event) => { event.preventDefault(); if (!selectedTypeCodes.length || selectedTypeCodes.some((code) => !merchantTypes.some((type) => type.typeCode === code))) { setError('请选择至少一个已启用的商家类型'); return; } void act(() => saveMyShop({...shopValues, typeCodes: selectedTypeCodes}), '商家申请已提交，请等待后台审核'); }}>
+        {!shop || (shop.status === 'REJECTED' && shopEditing) ? <form className="seller-form" onSubmit={(event) => { event.preventDefault(); if (!selectedTypeCodes.length || selectedTypeCodes.length > 20 || selectedTypeCodes.some((code) => !merchantTypes.some((type) => type.typeCode === code && type.status === 'ENABLED'))) { setError('请选择1至20个已启用的商家类型'); return; } void act(() => saveMyShop({...shopValues, typeCodes: selectedTypeCodes}), '商家申请已提交，请等待后台审核'); }}>
           <label>店铺名称<input required maxLength={100} value={shopValues.name} onChange={(event) => setShopValues({ ...shopValues, name: event.target.value })} /></label>
           <label>封面图片地址<input maxLength={1024} value={shopValues.coverUrl} onChange={(event) => setShopValues({ ...shopValues, coverUrl: event.target.value })} /></label>
           <label>公开联系方式<input maxLength={100} placeholder="自愿填写，展示给浏览商品的用户" value={shopValues.contact} onChange={(event) => setShopValues({ ...shopValues, contact: event.target.value })} /></label>
-          <fieldset className="seller-type-choices" disabled={saving}><legend>申请商家类型（必选，可多选）</legend>
-            {[...merchantTypes, ...(shop?.types || []).filter((type) => !merchantTypes.some((item) => item.typeCode === type.typeCode))].map((type) => <label key={type.typeCode}>
-              <input type="checkbox" checked={selectedTypeCodes.includes(type.typeCode)} disabled={type.status !== 'ENABLED' && !selectedTypeCodes.includes(type.typeCode)}
-                onChange={(event) => setSelectedTypeCodes((codes) => event.target.checked ? [...codes, type.typeCode] : codes.filter((code) => code !== type.typeCode))} />
-              {type.name}{type.status !== 'ENABLED' ? '（已停用，请取消）' : ''}
-            </label>)}
-            {!merchantTypes.length ? <p>暂无可用商家类型，请联系管理员在商家类型字典中添加。</p> : null}
-            <small>类型由后台维护，申请类型需经后台审核，提交后仅可查看。</small>
+          <fieldset className="merchant-application-field" disabled={saving}><legend>申请商家类型 <span>必选</span></legend>
+            <MerchantTypeFilter variant="application" types={merchantTypes} values={selectedTypeCodes} disabled={saving} historicalTypes={shop?.types || []} onChange={setSelectedTypeCodes} />
           </fieldset>
           <label>店铺介绍<textarea required rows={4} maxLength={2000} value={shopValues.description} onChange={(event) => setShopValues({ ...shopValues, description: event.target.value })} /></label>
           <button className="seller-primary" type="submit" disabled={saving}>{saving ? '保存中…' : !shop || shop.status === 'REJECTED' ? '提交商家申请' : '保存店铺'}</button>

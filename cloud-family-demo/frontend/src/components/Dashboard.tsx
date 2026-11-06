@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ChevronRight, Eye, EyeOff, FolderTree, KeyRound, Layers3, ListTree, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
 import type { LoginTrendPoint, ManagerDashboard, MenuTreeNode, OperationLog, PageQuery, PageResult, SysMenu, SysPermission, SysRole, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
 import type { Session } from '../services/tokenStore';
 import { loadMerchantCategories, loadDictionaryTypes, loadCommerceTypeOptions, loadMembershipDetail, loadSystemMenuTree } from '../services/dashboardService';
+import { JsonTree } from './JsonTree';
 import { ParentCategorySelect } from './ParentCategorySelect';
 import { COUNTRY_CALLING_CODE_OPTIONS } from '../constants/countryCallingCodes';
 
@@ -177,10 +178,16 @@ function InfoCard({ title, value, meta }: { title: string; value: string; meta: 
 }
 
 function DataPanel({ title, data, emptyText }: { title: string; data: unknown; emptyText: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const contentId = useId();
   return (
     <article className="data-panel">
-      <h2>{title}</h2>
-      {data ? <pre>{JSON.stringify(data, null, 2)}</pre> : <div className="empty-state">{emptyText}</div>}
+      <h2 className="data-panel-heading"><button className="data-panel-toggle" type="button" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded((current) => !current)}>
+        <span>{title}</span><small>{expanded ? '收起' : '展开'}</small><ChevronRight size={16} className={expanded ? 'expanded' : ''} aria-hidden="true" />
+      </button></h2>
+      <div id={contentId} hidden={!expanded}>
+        {expanded ? data ? <JsonTree data={data} /> : <div className="empty-state">{emptyText}</div> : null}
+      </div>
     </article>
   );
 }
@@ -4294,14 +4301,18 @@ function readErrorMessage(error: unknown) {
 }
 
 function MenuTreePanel({ nodes, total, error }: { nodes: MenuTreeNode[]; total: number; error: string | null }) {
+  const [expanded, setExpanded] = useState(false);
+  const contentId = useId();
   return (
     <article className="menu-tree-panel">
-      <div className="section-heading">
-        <div>
-          <h2>当前用户菜单树</h2>
-          <p>调用 /api/manager/system/menus/current-user/tree，按登录用户角色授权展示 {total} 个可见菜单。</p>
-        </div>
-      </div>
+      <button className="menu-tree-panel-toggle" type="button" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded(!expanded)}>
+        <span className="menu-tree-panel-title">当前用户菜单树</span>
+        <span className="menu-tree-panel-count">{total} 个菜单{error ? ' · 加载异常' : ''}</span>
+        <span className="menu-tree-panel-action">{expanded ? '收起' : '展开'}</span>
+        <ChevronRight className={expanded ? 'expanded' : ''} size={16} aria-hidden="true" />
+      </button>
+      <div id={contentId} hidden={!expanded}>
+      {expanded ? <>
       {error ? (
         <div className="empty-state compact">{error}</div>
       ) : nodes.length > 0 ? (
@@ -4313,19 +4324,24 @@ function MenuTreePanel({ nodes, total, error }: { nodes: MenuTreeNode[]; total: 
       ) : (
         <div className="empty-state compact">当前登录用户暂无可显示菜单。</div>
       )}
+      </> : null}
+      </div>
     </article>
   );
 }
 
 function MenuNode({ node, level }: { node: MenuTreeNode; level: number }) {
+  const [expanded, setExpanded] = useState(false);
   const hasChildren = node.children.length > 0;
 
   return (
-    <div className="menu-node" role="treeitem" aria-expanded={hasChildren || undefined}>
-      <div className="menu-node-row" style={{ paddingLeft: 14 + level * 22 }}>
-        <span className={hasChildren ? 'node-toggle visible' : 'node-toggle'}>
-          <ChevronRight size={15} />
-        </span>
+    <div className="menu-node" role="treeitem" aria-expanded={hasChildren ? expanded : undefined}>
+      <div className={`menu-node-row ${hasChildren ? 'is-expandable' : ''}`} style={{ paddingLeft: 14 + level * 22 }}
+        role={hasChildren ? 'button' : undefined} tabIndex={hasChildren ? 0 : undefined}
+        aria-expanded={hasChildren ? expanded : undefined}
+        onClick={hasChildren ? () => setExpanded((current) => !current) : undefined}
+        onKeyDown={hasChildren ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setExpanded((current) => !current); } } : undefined}>
+        <span className={`node-toggle ${hasChildren ? `visible ${expanded ? 'expanded' : ''}` : ''}`} aria-hidden="true"><ChevronRight size={15} /></span>
         <div className="menu-node-main">
           <strong>{node.menuName || node.menuCode || `菜单 ${node.id}`}</strong>
           <span>{node.path || node.component || '未配置路径'}</span>
@@ -4335,7 +4351,7 @@ function MenuNode({ node, level }: { node: MenuTreeNode; level: number }) {
           <span className={node.visible === false ? 'muted-pill' : 'status-pill'}>{node.visible === false ? '隐藏' : '显示'}</span>
         </div>
       </div>
-      {hasChildren ? (
+      {hasChildren && expanded ? (
         <div role="group">
           {node.children.map((child) => (
             <MenuNode key={child.id} node={child} level={level + 1} />

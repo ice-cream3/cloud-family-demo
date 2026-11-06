@@ -2533,3 +2533,51 @@ tbody tr.selected-row {
 .record-form .category-search-input { height: 34px; padding-left: 30px; border-radius: 6px; font-size: 12px; font-weight: 400; background: #f8fafc; }
 .category-tree-scroll { max-height: 230px; overflow-y: auto; overscroll-behavior: contain; }
 .category-search-empty { padding: 20px 10px; text-align: center; color: #728094; font-size: 12px; font-weight: 400; }
+
+
+.menu-tree-panel-toggle { display: flex; align-items: center; gap: 10px; width: 100%; padding: 17px 20px; border: 0; border-radius: inherit; background: #fff; color: #475569; text-align: left; cursor: pointer; }
+.menu-tree-panel-title { flex: 1; color: #273142; font-size: 15px; font-weight: 600; }
+.menu-tree-panel-count, .menu-tree-panel-action { color: #728094; font-size: 12px; }
+.menu-tree-panel-toggle > svg { flex-shrink: 0; transition: transform .16s ease; }
+.menu-tree-panel-toggle > svg.expanded { transform: rotate(90deg); }
+.menu-tree-panel-toggle[aria-expanded="true"] { border-bottom: 1px solid #e5ebf2; border-radius: 8px 8px 0 0; }
+.menu-tree-panel-toggle:hover { background: #f8fafc; }
+.menu-tree-panel-toggle:focus-visible, .menu-tree-panel .node-toggle:focus-visible { outline: 2px solid #0f766e; outline-offset: -3px; }
+.menu-tree-panel button.node-toggle { padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: pointer; }
+@media (max-width: 480px) { .menu-tree-panel-toggle { gap: 6px; padding: 14px 12px; } .menu-tree-panel-title { font-size: 14px; } .menu-tree-panel-action { display: none; } }
+
+.menu-tree-panel .menu-node-row.is-expandable { cursor: pointer; transition: background .15s; }
+.menu-tree-panel .menu-node-row.is-expandable:hover { background: #f8fafc; }
+.menu-tree-panel .menu-node-row.is-expandable:focus-visible { outline: 2px solid #0f766e; outline-offset: -2px; background: #f1f7f5; }
+
+
+.data-panel { align-self: start; }
+.data-panel h2.data-panel-heading { padding: 0; border: 0; }
+.data-panel-toggle { display: flex; align-items: center; gap: 10px; width: 100%; padding: 16px 18px; border: 0; background: #fff; color: #273142; font: inherit; text-align: left; cursor: pointer; }
+.data-panel-toggle > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.data-panel-toggle small { flex-shrink: 0; color: #728094; font-size: 12px; font-weight: 400; }
+.data-panel-toggle > svg { flex-shrink: 0; transition: transform .16s ease; }
+.data-panel-toggle > svg.expanded { transform: rotate(90deg); }
+.data-panel-toggle[aria-expanded="true"] { border-bottom: 1px solid #e5ebf1; }
+.data-panel-toggle:hover { background: #f8fafc; }
+.data-panel-toggle:focus-visible { outline: 2px solid #0f766e; outline-offset: -3px; }
+
+
+.json-tree { max-height: 520px; overflow: auto; padding: 14px 12px; background: #fbfcfd; color: #334155; font: 12px/1.8 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; tab-size: 2; }
+.json-branch > summary { display: flex; align-items: baseline; gap: 5px; min-height: 25px; padding: 1px 4px; border-radius: 4px; cursor: pointer; list-style: none; }
+.json-branch > summary::-webkit-details-marker { display: none; }
+.json-branch > summary > svg { position: relative; top: 2px; flex-shrink: 0; color: #94a3b8; transition: transform .15s; }
+.json-branch[open] > summary > svg { transform: rotate(90deg); }
+.json-branch > summary:hover { background: #eef3f7; }
+.json-branch > summary:focus-visible { outline: 2px solid #0f766e; outline-offset: -2px; }
+.json-summary-value { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.json-branch > summary small { flex-shrink: 0; color: #94a3b8; font: 10px/1.8 system-ui, sans-serif; }
+.json-branch[open] > summary .json-collapsed-preview { display: none; }
+.json-children { margin-left: 10px; padding-left: 12px; border-left: 1px solid #e2e8f0; }
+.json-leaf, .json-closing { min-height: 25px; padding: 1px 4px 1px 22px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.json-key { color: #344b83; }
+.json-punctuation { color: #7b8794; }
+.json-string { color: #0f766e; }
+.json-number { color: #b45309; }
+.json-boolean { color: #7c3aed; }
+.json-null, .json-undefined { color: #94a3b8; }
