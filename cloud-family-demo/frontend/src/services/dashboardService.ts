@@ -229,7 +229,7 @@ export function loadMembershipDetail(id: number) {
 }
 
 export function loadCommerceTypeOptions(shopId?: number) {
-  return post<{ id: number; typeCode: string; name: string }[]>('/api/manager/partner/shop-types/options', { body: shopId ? { shopId } : {} });
+  return post<{ id: number; typeCode: string; name: string; categoryCode?: string; categoryName?: string; categorySortOrder?: number }[]>('/api/manager/partner/shop-types/options', { body: shopId ? { shopId } : {} });
 }
 
 export function resetMembershipPassword(id: number, password: string) {
@@ -249,4 +249,12 @@ export function loadDictionaryTypes() {
 
 export function loadMerchantCategories() {
   return post<Array<{typeCode:string;parentTypeCode?:string | null;name:string;status:string}>>('/api/manager/partner/shop-types/categories');
+}
+
+export function setMerchantTypeStatus(id: number, status: 'ENABLED' | 'DISABLED') {
+  return post<SystemPageRecord>(`/api/manager/partner/shop-types/status/${id}`, {body: {status}});
+}
+
+export function setDictionaryStatus(kind: 'types' | 'items', id: number, status: 'ENABLED' | 'DISABLED') {
+  return post<SystemPageRecord>(`/api/manager/system/dictionaries/${kind}/status/${id}`, {body: {status}});
 }

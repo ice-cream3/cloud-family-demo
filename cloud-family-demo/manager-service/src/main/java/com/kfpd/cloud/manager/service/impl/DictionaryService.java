@@ -82,6 +82,27 @@ public class DictionaryService {
         return r;
     }
     @Transactional(transactionManager=MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public Map<String,Object> setStatus(String kind,Long id,String status) {
+        kind(kind);
+        CommerceRules.require("ENABLED".equals(status) || "DISABLED".equals(status),"状态仅支持启用或停用");
+        var before=dao.find(kind,id);
+        if(before==null) throw SystemManagementSupport.notFound("字典记录不存在");
+        String typeCode=(String)before.get("typeCode");
+        boolean merchant="MERCHANT_TYPE".equals(typeCode) || ("types".equals(kind) &&
+            ("ECOMMERCE".equals(typeCode) || "ECOMMERCE".equals(before.get("parentTypeCode"))));
+        if("items".equals(kind)) {
+            var type=dao.lockType(typeCode);
+            CommerceRules.require(type!=null,"所属字典类型不存在");
+            merchant=merchant || "ECOMMERCE".equals(type.get("parentTypeCode"));
+        }
+        if(dao.updateStatus(Map.of("kind",kind,"id",id,"status",status))==0)
+            throw SystemManagementSupport.notFound("字典记录不存在");
+        if(merchant) { dao.syncMerchantTypes();dao.refreshMerchantProducts(); }
+        var after=new HashMap<String,Object>(before);after.put("id",id);after.put("status",status);
+        logs.recordUpdate("SYSTEM","DICTIONARY_"+kind.toUpperCase(Locale.ROOT),id,(String)before.get("name"),before,after);
+        return after;
+    }
+    @Transactional(transactionManager=MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void delete(String kind,Long id) {
         kind(kind);var record=dao.find(kind,id);if(record==null)throw SystemManagementSupport.notFound("字典记录不存在");
         if("types".equals(kind)) CommerceRules.require(dao.countChildren((String)record.get("typeCode"))==0,"大类下存在子类型，不能删除");

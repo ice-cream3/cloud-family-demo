@@ -15,6 +15,11 @@ public class CommerceTypeAdminController {
     @PostMapping("/categories")
     @PreAuthorize("hasAuthority('partner:shop-type:view') or hasAuthority('partner:shop-type:add') or hasAuthority('partner:shop-type:edit')")
     public ApiResponse<List<Map<String,Object>>> categories() { return ApiResponse.success(admin.categories()); }
+    @PostMapping("/status/{id}")
+    @PreAuthorize("hasAuthority('partner:shop-type:edit')")
+    public ApiResponse<Map<String,Object>> status(@PathVariable Long id,@RequestBody Map<String,Object> request) {
+        return ApiResponse.success(admin.setStatus(id,request.get("status") instanceof String status ? status : null));
+    }
     @PostMapping("/options")
     @PreAuthorize("hasAuthority('partner:showcase:view') or hasAuthority('partner:shop-type:view')")
     public ApiResponse<List<Map<String,Object>>> options(@RequestBody(required=false) Map<String,Object> query) {

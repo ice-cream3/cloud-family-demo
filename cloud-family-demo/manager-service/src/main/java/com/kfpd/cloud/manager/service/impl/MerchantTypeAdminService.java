@@ -32,6 +32,26 @@ public class MerchantTypeAdminService {
         return dao.merchantType((String)record.get("itemCode"));
     }
     @Transactional(transactionManager=MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
+    public Map<String,Object> setStatus(Long id,String status) {
+        CommerceRules.require("ENABLED".equals(status) || "DISABLED".equals(status),"状态仅支持启用或停用");
+        var item=dao.merchantItem(id);
+        if(item==null) throw SystemManagementSupport.notFound("商家类型不存在或尚未关联字典");
+        if("ENABLED".equals(status)) {
+            var category=dao.lockType((String)item.get("typeCode"));
+            CommerceRules.require(category!=null && !"DISABLED".equals(category.get("status")),"请先启用所属经营大类");
+            if(category.get("parentTypeCode")!=null) {
+                var parent=dao.lockType((String)category.get("parentTypeCode"));
+                CommerceRules.require(parent!=null && !"DISABLED".equals(parent.get("status")),"请先启用上级电商大类");
+            }
+        }
+        Long dictionaryId=((Number)item.get("id")).longValue();
+        var existing=dao.find("items",dictionaryId);
+        if(existing==null) throw SystemManagementSupport.notFound("字典项不存在");
+        var values=new HashMap<>(existing);values.put("status",status);
+        dictionaries.save("items",dictionaryId,values);
+        return dao.merchantType((String)item.get("itemCode"));
+    }
+    @Transactional(transactionManager=MultiDataSourceNames.FA_CLOUD_TRANSACTION_MANAGER)
     public void delete(Long id) {
         var item=dao.merchantItem(id);
         if(item==null) throw SystemManagementSupport.notFound("商家类型不存在或尚未关联字典");

@@ -18,6 +18,10 @@ public class DictionaryController {
     public ApiResponse<Map<String,Object>> create(@PathVariable String kind,@RequestBody Map<String,Object> r) { return ApiResponse.success(service.save(kind,null,r)); }
     @PostMapping("/{kind}/update/{id}") @PreAuthorize("hasAuthority('system:dict:edit')")
     public ApiResponse<Map<String,Object>> update(@PathVariable String kind,@PathVariable Long id,@RequestBody Map<String,Object> r) { return ApiResponse.success(service.save(kind,id,r)); }
+    @PostMapping("/{kind}/status/{id}") @PreAuthorize("hasAuthority('system:dict:edit')")
+    public ApiResponse<Map<String,Object>> status(@PathVariable String kind,@PathVariable Long id,@RequestBody Map<String,Object> r) {
+        return ApiResponse.success(service.setStatus(kind,id,r.get("status") instanceof String status ? status : null));
+    }
     @PostMapping("/{kind}/delete/{id}") @PreAuthorize("hasAuthority('system:dict:delete')")
     public ApiResponse<Void> delete(@PathVariable String kind,@PathVariable Long id) { service.delete(kind,id);return ApiResponse.success(); }
 }

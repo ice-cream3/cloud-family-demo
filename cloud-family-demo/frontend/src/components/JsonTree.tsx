@@ -1,3 +1,4 @@
+import { isStatusField, statusLabel } from '../utils/statusLabels';
 import { ChevronRight } from 'lucide-react';
 
 export function JsonTree({ data }: { data: unknown }) {
@@ -29,5 +30,5 @@ function JsonNode({ value, name, comma = false, root = false }: {
   }
   const type = value === null ? 'null' : typeof value;
   const text = type === 'string' ? JSON.stringify(value) : String(value);
-  return <div className="json-leaf">{key}<span className={`json-value json-${type}`}>{text}</span><span className="json-punctuation">{suffix}</span></div>;
+  return <div className="json-leaf">{key}<span className={`json-value json-${type}`}>{text}</span><span className="json-punctuation">{suffix}</span>{name && isStatusField(name) && typeof value === 'string' ? <small className="json-status-description">{statusLabel(value,['moderationStatus','moderation_status'].includes(name) ? 'moderation' : 'default')}</small> : null}</div>;
 }

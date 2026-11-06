@@ -2581,3 +2581,56 @@ tbody tr.selected-row {
 .json-number { color: #b45309; }
 .json-boolean { color: #7c3aed; }
 .json-null, .json-undefined { color: #94a3b8; }
+
+.manager-type-field { min-width: 0; margin: 0; padding: 12px; border: 1px solid #dce2eb; border-radius: 9px; }
+.manager-type-field legend { padding: 0 5px; color: #475569; font-size: 13px; }
+.manager-type-field legend small { margin-left: 5px; color: #94a3b8; font-size: 11px; }
+.manager-type-selector { min-width: 0; }
+.manager-type-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #728094; font-size: 12px; }
+.manager-type-summary strong { margin-left: 7px; color: #0f766e; font-weight: 600; }
+.manager-type-expand { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border: 1px solid #cce3de; border-radius: 6px; background: #f0f9f6; color: #0f766e; font: inherit; cursor: pointer; }
+.manager-type-expand svg { transition: transform .15s; }
+.manager-type-expand svg.expanded { transform: rotate(180deg); }
+.manager-type-selected { display: flex; flex-wrap: wrap; gap: 6px; max-height: 90px; overflow-y: auto; margin-top: 9px; }
+.manager-type-selected button { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 5px 7px; border: 1px solid #cce3de; border-radius: 6px; background: #edf8f3; color: #0f766e; font-size: 12px; cursor: pointer; overflow-wrap: anywhere; }
+.manager-type-selected button svg { flex-shrink: 0; }
+.manager-type-selected button.is-unavailable { background: #fff1f0; border-color: #f0c6c1; color: #b54747; }
+.manager-type-selected small { font-size: 10px; }
+.manager-type-selected button.manager-type-more { border-style: dashed; border-color: #d7e0ea; color: #728094; background: #fff; }
+.manager-type-placeholder { margin: 10px 0; color: #94a3b8; font-size: 12px; }
+.manager-type-search { position: relative; margin: 11px 0 9px; }
+.manager-type-search > svg { position: absolute; left: 10px; top: 11px; color: #94a3b8; }
+.record-form .manager-type-search input { padding-left: 32px; font-size: 12px; background: #fafcfd; }
+.manager-type-browser { display: grid; grid-template-columns: 100px minmax(0,1fr); height: 260px; overflow: hidden; border: 1px solid #e5ebf1; border-radius: 7px; }
+.manager-type-browser nav { overflow-y: auto; padding: 4px 0; background: #f7f9fb; }
+.manager-type-browser nav button { display: flex; align-items: center; justify-content: space-between; gap: 4px; width: 100%; min-height: 35px; padding: 7px 10px; border: 0; background: transparent; color: #728094; font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.manager-type-browser nav button.active { color: #0f766e; background: #eaf5f0; font-weight: 600; box-shadow: inset 3px 0 #0f766e; }
+.manager-type-browser nav small { color: #0f766e; font-size: 10px; }
+.manager-type-groups { min-width: 0; overflow-y: auto; padding: 10px; overscroll-behavior: contain; }
+.manager-type-groups section + section { margin-top: 14px; }
+.manager-type-groups h3 { display: flex; justify-content: space-between; gap: 8px; margin: 0 0 7px; color: #475569; font-size: 12px; }
+.manager-type-groups h3 small { color: #94a3b8; font-size: 10px; font-weight: 400; }
+.manager-type-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; }
+.record-form label.manager-type-choice { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 8px; border: 1px solid #e7ecf1; border-radius: 6px; background: #fff; cursor: pointer; }
+.record-form .manager-type-choice input[type="checkbox"] { flex-shrink: 0; width: 15px; height: 15px; margin: 0; padding: 0; accent-color: #0f766e; }
+.manager-type-choice > span { display: grid; gap: 3px; min-width: 0; }
+.manager-type-choice strong { color: #475569; font-size: 12px; font-weight: 500; }
+.manager-type-choice small { overflow: hidden; color: #94a3b8; font-size: 9px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.record-form .manager-type-choice.is-selected { border-color: #badbd1; background: #f0f9f5; }
+.manager-type-choice.is-unavailable strong { color: #b54747; }
+.manager-type-choice:has(input:disabled) { opacity: .5; cursor: not-allowed; }
+.manager-type-selection-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; color: #94a3b8; font-size: 11px; }
+.manager-type-selection-actions button { padding: 3px 0; border: 0; background: transparent; color: #0f766e; font-size: 11px; cursor: pointer; }
+.manager-type-warning, .manager-type-invalid { margin: 9px 0 0; font-size: 11px; line-height: 1.6; }
+.manager-type-warning { color: #a47b45; }
+.manager-type-invalid { color: #b54747; }
+.manager-type-selector button:disabled { opacity: .5; cursor: not-allowed; }
+.manager-type-selector button:focus-visible { outline: 2px solid #0f766e; outline-offset: 2px; }
+@media (max-width: 480px) { .manager-type-browser { grid-template-columns: 84px minmax(0,1fr); } .manager-type-options { grid-template-columns: minmax(0,1fr); } }
+
+.merchant-status-dialog { width: min(440px, 100%); }
+.merchant-status-copy { padding: 4px 20px 16px; color: #475569; font-size: 14px; line-height: 1.7; }
+.merchant-status-copy p + p { color: #728094; font-size: 13px; }
+.merchant-status-actions { padding: 0 20px 20px; }
+
+.json-status-description { margin-left: 8px; padding: 1px 5px; border-radius: 4px; color: #0f766e; background: #edf8f3; font: 11px/1.5 system-ui, sans-serif; }

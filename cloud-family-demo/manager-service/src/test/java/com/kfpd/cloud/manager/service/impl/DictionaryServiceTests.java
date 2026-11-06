@@ -90,4 +90,40 @@ class DictionaryServiceTests {
         assertThatThrownBy(()->service.delete("items",2L)).hasMessageContaining("已引用");
         verify(dao,never()).deleteMerchantType(anyString());
     }
+    @Test void ordinaryDictionaryStatusChangesOnlyStateAndRecordsBeforeAfter() {
+        var existing=new HashMap<String,Object>();existing.put("id",12L);existing.put("typeCode","REASON");existing.put("name","原因");existing.put("description",null);existing.put("sortOrder",9);existing.put("status","ENABLED");
+        when(dao.find("types",12L)).thenReturn(existing);
+        when(dao.updateStatus(anyMap())).thenReturn(1);
+        var updated=service.setStatus("types",12L,"DISABLED");
+        assertThat(updated).containsEntry("status","DISABLED").containsEntry("description",null).containsEntry("sortOrder",9);
+        assertThat(existing).containsEntry("status","ENABLED");
+        verify(dao).updateStatus(Map.of("kind","types","id",12L,"status","DISABLED"));
+        verify(dao,never()).update(anyMap());verify(dao,never()).syncMerchantTypes();
+        verify(logs).recordUpdate(eq("SYSTEM"),eq("DICTIONARY_TYPES"),eq(12L),eq("原因"),same(existing),eq(updated));
+    }
+    @Test void ecommerceRootAndChildStatusSynchronizeEffectiveMerchantStatus() {
+        when(dao.find("types",1L)).thenReturn(Map.of("typeCode","ECOMMERCE","name","电商大类"));
+        when(dao.find("types",2L)).thenReturn(Map.of("typeCode","FOOD","parentTypeCode","ECOMMERCE","name","食品类"));
+        when(dao.updateStatus(anyMap())).thenReturn(1);
+        service.setStatus("types",1L,"DISABLED");service.setStatus("types",2L,"ENABLED");
+        verify(dao,times(2)).syncMerchantTypes();verify(dao,times(2)).refreshMerchantProducts();
+    }
+    @Test void dictionaryItemStatusRequiresParentAndSynchronizesCommerce() {
+        when(dao.find("items",3L)).thenReturn(Map.of("typeCode","FOOD","name","餐厅"));
+        when(dao.lockType("FOOD")).thenReturn(null);
+        assertThatThrownBy(()->service.setStatus("items",3L,"DISABLED")).hasMessageContaining("所属字典类型不存在");
+        when(dao.lockType("FOOD")).thenReturn(Map.of("parentTypeCode","ECOMMERCE"));
+        when(dao.updateStatus(anyMap())).thenReturn(1);
+        service.setStatus("items",3L,"DISABLED");
+        verify(dao).updateStatus(Map.of("kind","items","id",3L,"status","DISABLED"));
+        verify(dao).syncMerchantTypes();verify(dao).refreshMerchantProducts();
+    }
+    @Test void statusActionRejectsInvalidResourcesStatusesAndMissingRecords() {
+        assertThatThrownBy(()->service.setStatus("sql",1L,"DISABLED")).hasMessageContaining("资源不存在");
+        assertThatThrownBy(()->service.setStatus("types",1L,null)).hasMessageContaining("状态");
+        assertThatThrownBy(()->service.setStatus("items",1L,"BOGUS")).hasMessageContaining("状态");
+        when(dao.find("types",99L)).thenReturn(null);
+        assertThatThrownBy(()->service.setStatus("types",99L,"ENABLED")).hasMessageContaining("记录不存在");
+        verify(dao,never()).updateStatus(anyMap());
+    }
 }

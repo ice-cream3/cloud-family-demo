@@ -1,3 +1,4 @@
+import { statusLabel } from '../utils/statusLabels';
 import { ShowcaseScreen } from './ShowcaseScreen';
 import { useEffect, useState } from 'react';
 import type { FocusEvent, FormEvent, MouseEvent } from 'react';
@@ -759,7 +760,7 @@ function ProfileScreen({
         </div>
         <div>
           <h1>Hello, {displayName}</h1>
-          <p>ID: 12345678 · {serviceStatus}</p>
+          <p>ID: 12345678 · {statusLabel(serviceStatus,'service')}</p>
         </div>
         <button type="button" aria-label="通知">
           <Bell size={22} />
@@ -817,7 +818,7 @@ function ProfileAssetCards({
   const creditIcon = tripCreditIcon(credit.creditLevel);
   const CreditIcon = creditIcon.icon;
   const planName = membership?.planName || '普通会员';
-  const membershipStatus = membership?.status === 'ACTIVE' ? '权益生效中' : membership?.status || '基础权益';
+  const membershipStatus = membership?.status === 'ACTIVE' ? '权益生效中' : membership?.status ? statusLabel(membership.status,'membership') : '基础权益';
 
   return (
     <>

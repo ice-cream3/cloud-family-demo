@@ -19,6 +19,7 @@ public interface DictionaryDao {
     long countItems(@Param("typeCode") String typeCode);
     int insert(Map<String,Object> record);
     int update(Map<String,Object> record);
+    int updateStatus(Map<String,Object> record);
     int delete(@Param("kind") String kind,@Param("id") Long id);
     List<Map<String,Object>> types();
 }

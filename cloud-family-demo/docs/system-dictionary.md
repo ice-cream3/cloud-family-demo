@@ -78,3 +78,9 @@ npm --prefix frontend run build
 ## 商家类型页面维护
 
 商家类型管理页面支持新增、修改、删除及批量删除，沿用独立的 `partner:shop-type:add/edit/delete` 权限，无需额外授予通用字典权限。新增时选择电商经营大类；类型编码及所属大类创建后不可修改。页面修改通过字典服务同步商家类型，停用会下架相关商品。已被店铺或商品引用时禁止删除，未引用类型删除时同时删除对应字典项。后台提供 `/api/manager/partner/shop-types/categories` 加载经营大类，供商家类型查询、新增和修改权限使用。
+
+## 状态快捷操作
+
+字典类型、字典项列表均提供“启用 / 停用”按钮，需 `system:dict:edit` 权限。接口为 `POST /api/manager/system/dictionaries/{types或items}/status/{id}`，JSON 请求体仅包含 `status`（`ENABLED` / `DISABLED`）。只更新目标记录状态，不覆盖名称、编码、上级、说明或排序，记录操作日志。
+
+停用类型会使其下属业务选项不可用，但不会更改子类型、字典项各自保存的状态；恢复时仍要求项及全部上级启用。电商类型及字典项的状态变化同步商家类型，停用会下架相关已上架商品，启用不会自动恢复上架。

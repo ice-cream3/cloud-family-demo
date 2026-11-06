@@ -1,9 +1,13 @@
+import { isStatusField, statusLabel } from '../utils/statusLabels';
+import type { StatusContext } from '../utils/statusLabels';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ChevronRight, Eye, EyeOff, FolderTree, KeyRound, Layers3, ListTree, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
 import type { LoginTrendPoint, ManagerDashboard, MenuTreeNode, OperationLog, PageQuery, PageResult, SysMenu, SysPermission, SysRole, SystemPageRecord, SystemRecordPayload, UserProfile } from '../types/api';
 import type { Session } from '../services/tokenStore';
-import { loadMerchantCategories, loadDictionaryTypes, loadCommerceTypeOptions, loadMembershipDetail, loadSystemMenuTree } from '../services/dashboardService';
+import { setDictionaryStatus, setMerchantTypeStatus, loadMerchantCategories, loadDictionaryTypes, loadCommerceTypeOptions, loadMembershipDetail, loadSystemMenuTree } from '../services/dashboardService';
+import { MerchantTypeMultiSelect } from './MerchantTypeMultiSelect';
+import type { MerchantTypeOption } from './MerchantTypeMultiSelect';
 import { JsonTree } from './JsonTree';
 import { ParentCategorySelect } from './ParentCategorySelect';
 import { COUNTRY_CALLING_CODE_OPTIONS } from '../constants/countryCallingCodes';
@@ -573,6 +577,8 @@ function SystemPagePanel({
     });
   }
 
+  const [merchantStatusTarget, setMerchantStatusTarget] = useState<{record:SystemPageRecord;status:'ENABLED'|'DISABLED';kind?:'types'|'items'} | null>(null);
+  const [merchantStatusError, setMerchantStatusError] = useState<string | null>(null);
   const [editorRecord, setEditorRecord] = useState<SystemPageRecord | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
@@ -606,6 +612,8 @@ function SystemPagePanel({
 
   useEffect(() => {
     setViewMode(menu?.path === '/api/manager/system/menus' ? 'tree' : 'table');
+    setMerchantStatusTarget(null);
+    setMerchantStatusError(null);
     setSelectedTreeMenu(null);
     setTreeNodes([]);
     setTreeError(null);
@@ -694,6 +702,19 @@ function SystemPagePanel({
     } finally {
       setSaving(false);
     }
+  }
+
+  async function changeMerchantTypeStatus() {
+    if (!merchantStatusTarget || saving) return;
+    setSaving(true); setMerchantStatusError(null);
+    try {
+      if (merchantStatusTarget.kind) await setDictionaryStatus(merchantStatusTarget.kind,merchantStatusTarget.record.id,merchantStatusTarget.status);
+      else await setMerchantTypeStatus(merchantStatusTarget.record.id, merchantStatusTarget.status);
+      setOperationMessage({type:'success',text:merchantStatusTarget.kind ? `${merchantStatusTarget.kind === 'types' ? '字典类型' : '字典项'}已${merchantStatusTarget.status === 'ENABLED' ? '启用' : '停用'}` : merchantStatusTarget.status === 'ENABLED' ? '商家类型已启用，商品需手动重新上架' : '商家类型已停用，相关上架商品已自动下架'});
+      setMerchantStatusTarget(null);
+      onPageChange(pageNum);
+    } catch (err) { setMerchantStatusError(err instanceof Error ? err.message : '状态修改失败'); }
+    finally { setSaving(false); }
   }
 
   async function saveRecord(payload: SystemRecordPayload) {
@@ -1021,7 +1042,7 @@ function SystemPagePanel({
           statusLabel="状态"
           statusOptions={[
             { label: '启用', value: 'ENABLED' },
-            { label: '禁用', value: 'DISABLED' },
+            { label: '停用', value: 'DISABLED' },
           ]}
           onSearch={onSearch}
         />
@@ -1133,6 +1154,9 @@ function SystemPagePanel({
                             setReviewMode(true); setEditorRecord(record); setEditorError(null); setEditorOpen(true);
                           }}><Search size={14} />审核</button>
                         ) : null}
+                        {canEdit && (menu?.path === '/api/manager/partner/shop-types' || menu?.path === '/api/manager/system/dictionaries/types' || menu?.path === '/api/manager/system/dictionaries/items') ? <button type="button" className={readField(record,'status') === 'ENABLED' ? 'danger' : ''} disabled={saving || loading} onClick={() => { setMerchantStatusError(null);setMerchantStatusTarget({record,status:readField(record,'status') === 'ENABLED' ? 'DISABLED' : 'ENABLED',kind:menu?.path === '/api/manager/system/dictionaries/types' ? 'types' : menu?.path === '/api/manager/system/dictionaries/items' ? 'items' : undefined}); }}>
+                          {readField(record,'status') === 'ENABLED' ? '停用' : '启用'}
+                        </button> : null}
                         {canEdit && (!isMenuManagement || !isOperationLogMenuRecord(record)) ? (
                           <button type="button" onClick={() => openEdit(record)} disabled={saving}>
                             <Pencil size={14} />
@@ -1213,6 +1237,7 @@ function SystemPagePanel({
       ) : (
         <div className="empty-state compact">{loading ? '数据加载中。' : '暂无分页数据。'}</div>
       )}
+      {merchantStatusTarget ? <StatusConfirmDialog resource={merchantStatusTarget.kind || 'merchant'} name={textValue(readField(merchantStatusTarget.record,'name'))} status={merchantStatusTarget.status} saving={saving} error={merchantStatusError} onClose={() => {if(!saving)setMerchantStatusTarget(null);}} onConfirm={() => {void changeMerchantTypeStatus();}} /> : null}
       {deleteTarget ? <DeleteConfirmDialog
         records={deleteTarget.records}
         batch={deleteTarget.batch}
@@ -1840,7 +1865,7 @@ function PartnerInfoQueryBar({
         <select value={status} onChange={(event) => setStatus(event.target.value)}>
           <option value="">全部状态</option>
           <option value="ENABLED">启用</option>
-          <option value="DISABLED">禁用</option>
+          <option value="DISABLED">停用</option>
         </select>
       </label>
       <div className="query-actions">
@@ -1980,7 +2005,7 @@ type EditorField = {
   required?: boolean;
   createOnly?: boolean;
   readonlyOnEdit?: boolean;
-  options?: Array<{ label: string; value: string; parentValue?: string | null; disabled?: boolean }>;
+  options?: MerchantTypeOption[];
   placeholder?: string;
 };
 
@@ -1996,6 +2021,23 @@ type SystemPageConfig = {
   columns: TableColumn[];
   fields: EditorField[];
 };
+
+function StatusConfirmDialog({name,status,saving,error,onClose,onConfirm,resource}: {
+  name:string;status:'ENABLED'|'DISABLED';saving:boolean;error:string|null;onClose:()=>void;onConfirm:()=>void;resource:'merchant'|'types'|'items';
+}) {
+  const cancelRef=useRef<HTMLButtonElement>(null);
+  const subject=resource==='types'?'字典类型':resource==='items'?'字典项':'商家类型';
+  const description=resource==='merchant' ? (status==='DISABLED'?'停用后该类型不可再选择，相关上架商品将自动下架。':'启用后可重新选择该类型；此前下架的商品需手动上架。') : status==='DISABLED' ? (resource==='types'?'停用后，该类型及下属分类的字典项不再作为业务选项返回，不改变子项自身状态；关联的电商商家类型将同步停用，相关商品自动下架。':'停用后该字典项不再作为业务选项返回；若关联商家类型，将同步停用并下架相关商品。') : '启用后，上级类型及字典项均启用时才会恢复业务可选；此前下架的商品需手动上架。';
+  const titleId=useId();
+  useEffect(()=>{cancelRef.current?.focus();},[]);
+  return <div className="modal-backdrop" onClick={(event)=>{if(event.target===event.currentTarget && !saving)onClose();}} onKeyDown={(event)=>{if(event.key==='Escape' && !saving)onClose();}}>
+    <section className="record-dialog merchant-status-dialog" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
+      <div className="dialog-heading"><h2 id={titleId}>{status==='ENABLED'?'启用':'停用'}{subject}</h2><button type="button" className="icon-button" aria-label="关闭" disabled={saving} onClick={onClose}><X size={18}/></button></div>
+      <div className="merchant-status-copy"><p>确认{status==='ENABLED'?'启用':'停用'}“{name}”？</p><p>{description}</p>{error?<p className="error-banner compact" role="alert">{error}</p>:null}</div>
+      <div className="dialog-actions merchant-status-actions"><button ref={cancelRef} type="button" className="ghost-button" disabled={saving} onClick={onClose}>取消</button><button type="button" className="primary-button" disabled={saving} onClick={onConfirm}>{saving?'处理中…':status==='ENABLED'?'确认启用':'确认停用'}</button></div>
+    </section>
+  </div>;
+}
 
 function RecordEditorDialog({
   reviewMode = false,
@@ -2030,7 +2072,7 @@ function RecordEditorDialog({
       .finally(() => { if(active) setDictionaryLoading(false); });
     return () => { active = false; };
   }, [isDictionaryItem,isDictionaryType,isMerchantType]);
-  const [typeOptions,setTypeOptions]=useState<Array<{label:string;value:string;disabled?:boolean}>>([]);
+  const [typeOptions,setTypeOptions]=useState<MerchantTypeOption[]>([]);
   const [typeOptionsError,setTypeOptionsError]=useState<string|null>(null);
   const [typeOptionsLoading,setTypeOptionsLoading]=useState(false);
   const visibleFields = config.fields.filter((field) => !field.createOnly || !record).map((field) =>
@@ -2049,12 +2091,12 @@ function RecordEditorDialog({
     if (config.fields.some((field)=>field.key==='typeCode' && field.type==='select') && !typeShopId) { setTypeOptions([]);setTypeOptionsLoading(false);return; }
     loadCommerceTypeOptions(typeShopId).then((rows)=>{
       if(!active)return;
-      const options:Array<{label:string;value:string;disabled?:boolean}>=rows.map((row)=>({label:`${row.name}（${row.typeCode}）`,value:row.typeCode}));
+      const options:MerchantTypeOption[]=rows.map((row)=>({label:`${row.name}（${row.typeCode}）`,name:row.name,value:row.typeCode,categoryCode:row.categoryCode,categoryName:row.categoryName,categorySortOrder:row.categorySortOrder}));
       const existing=record ? (record as unknown as Record<string,unknown>).types : undefined;
       if(config.fields.some((field)=>field.key==='typeCodes') && Array.isArray(existing)) {
         for(const item of existing) {
           const type=item as {id:number;typeCode:string;name:string};
-          if(!options.some((option)=>option.value===type.typeCode)) options.push({label:`${type.name}（已停用，请取消）`,value:type.typeCode,disabled:true});
+          if(!options.some((option)=>option.value===type.typeCode)) options.push({label:`${type.name}（已停用，请取消）`,name:type.name,value:type.typeCode,disabled:true});
         }
       }
       setTypeOptions(options);
@@ -2093,7 +2135,11 @@ function RecordEditorDialog({
           </button>
         </div>
         <form className="record-form" onSubmit={submit}>
-          {fields.map((field) => field.type === 'multi-select' ? (
+          {fields.map((field) => field.type === 'multi-select' && field.key === 'typeCodes' ? (
+            <fieldset key={field.key} className="manager-type-field full-width-field" disabled={saving || typeOptionsLoading}><legend>商家类型 <small>必选，可多选</small></legend>
+              <MerchantTypeMultiSelect options={field.options || []} values={String(values[field.key] || '').split(',').filter(Boolean)} disabled={saving || typeOptionsLoading} loading={typeOptionsLoading} onChange={(codes) => setValues((current) => ({...current,[field.key]:codes.join(',')}))} />
+            </fieldset>
+          ) : field.type === 'multi-select' ? (
             <fieldset key={field.key} className="record-type-choices full-width-field" disabled={saving || typeOptionsLoading}>
               <legend>{field.label}</legend>
               {field.options?.map((option) => <label key={option.value}>
@@ -3054,6 +3100,11 @@ function validateEditorValues(fields: EditorField[], values: Record<string, stri
     const value = values[field.key];
     const text = typeof value === 'string' ? value.trim() : '';
     if(field.type==='multi-select' && field.required && !text) return '请至少选择一个商家类型';
+    if (field.key === 'typeCodes' && text) {
+      const codes = text.split(',').filter(Boolean);
+      if (codes.length > 20) return '最多选择20个商家类型';
+      if (codes.some((code) => !field.options?.some((option) => option.value === code && !option.disabled))) return '请选择已启用的商家类型，移除已停用或失效类型';
+    }
     if (!text) {
       continue;
     }
@@ -3116,7 +3167,7 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
     required: true,
     options: [
       { label: '启用', value: 'ENABLED' },
-      { label: '禁用', value: 'DISABLED' },
+      { label: '停用', value: 'DISABLED' },
     ],
   };
   const commonColumns: TableColumn[] = [
@@ -3363,7 +3414,7 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
       title: '商家管理', apiPath: '/api/manager/partner/features/commerce-shops/page',
       columns: [commonColumns[0],
         ...[['ownerUsername','所属账号'],['name','店铺名称'],['typeNames','商家类型'],['contact','公开联系方式'],['productCount','商品数'],['sortOrder','排序']].map(([key,title]) => ({key,title,render:(record: SystemPageRecord)=>textValue(readField(record,key))})),
-        {key:'status',title:'状态',render:(record)=>({PENDING:'待审核',ACTIVE:'审核通过',REJECTED:'已驳回',BLOCKED:'已停用'}[textValue(readField(record,'status'))] || '未知')},
+        {key:'status',title:'状态',render:(record)=><StatusValue value={readField(record,'status')} context="shop" />},
         {key:'updatedAt',title:'更新时间',render:(record)=>formatDate(readField(record,'updatedAt'))},
       ],
       fields: [
@@ -3381,8 +3432,8 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
       title: '商品管理', apiPath: '/api/manager/partner/features/commerce-products/page',
       columns: [commonColumns[0],
         ...[['ownerUsername','所属账号'],['shopId','商家ID'],['shopName','店铺'],['title','商品名称'],['category','分类'],['price','价格（元）'],['stock','库存']].map(([key,title])=>({key,title,render:(record:SystemPageRecord)=>textValue(readField(record,key))})),
-        {key:'status',title:'上架状态',render:(record)=>({DRAFT:'草稿',PUBLISHED:'已上架',OFFLINE:'已下架'}[readField(record,'status')||'']||'-')},
-        {key:'moderationStatus',title:'系统状态',render:(record)=>readField(record,'moderationStatus')==='ACTIVE'?'正常':'系统停用'},
+        {key:'status',title:'上架状态',render:(record)=><StatusValue value={readField(record,'status')} context="product" />},
+        {key:'moderationStatus',title:'系统状态',render:(record)=><StatusValue value={readField(record,'moderationStatus')} context="moderation" />},
         {key:'moderationReason',title:'停用原因',render:(record)=>truncateText(readField(record,'moderationReason'),40)},
       ],
       fields: [
@@ -3407,7 +3458,7 @@ function getSystemPageConfig(path?: string): SystemPageConfig {
         { key: 'title', title: '标题', render: (record) => textValue(readField(record, 'title')) },
         { key: 'category', title: '分类', render: (record) => textValue(readField(record, 'category')) },
         { key: 'summary', title: '摘要', render: (record) => truncateText(readField(record, 'summary'), 40) },
-        { key: 'status', title: '状态', render: (record) => ({ DRAFT: '草稿', PUBLISHED: '已上架', OFFLINE: '已下架' }[readField(record, 'status') || ''] || '-') },
+        { key: 'status', title: '状态', render: (record) => <StatusValue value={readField(record,'status')} context="product" /> },
         { key: 'sortOrder', title: '排序', render: (record) => textValue(readField(record, 'sortOrder')) },
         { key: 'publishedAt', title: '上架时间', render: (record) => formatDate(readField(record, 'publishedAt')) },
         { key: 'updatedAt', title: '更新时间', render: (record) => formatDate(readField(record, 'updatedAt')) },
@@ -3777,8 +3828,9 @@ function operationLogBusinessTypeOptions(businessModule?: string) {
   return [...systemOptions, ...partnerOptions];
 }
 
-function StatusValue({ value }: { value?: string }) {
-  return <span className={value === 'ENABLED' ? 'status-pill' : 'muted-pill'}>{value === 'EXPIRED' ? '已过期' : value || '-'}</span>;
+function StatusValue({ value, context = 'default' }: { value?: string; context?: StatusContext }) {
+  const positive = ['ENABLED','ACTIVE','PUBLISHED','BOOKED','APPROVED','SUCCESS','UP','ONLINE'].includes(String(value).toUpperCase());
+  return <span className={positive ? 'status-pill' : 'muted-pill'} title={value}>{statusLabel(value,context)}</span>;
 }
 
 function OperationTypeValue({ value }: { value?: string }) {
@@ -3941,8 +3993,8 @@ function buildLogCompareRows(before: ParsedLogData, after: ParsedLogData, busine
     keys.push('原始数据');
   }
   const rows = keys.map((key) => {
-    const beforeValue = displayLogFieldValue(key, readFlattenedLogField(before.flattened, key) ?? (key === '原始数据' ? before.raw : '-'));
-    const afterValue = displayLogFieldValue(key, readFlattenedLogField(after.flattened, key) ?? (key === '原始数据' ? after.raw : '-'));
+    const beforeValue = displayLogFieldValue(key, readFlattenedLogField(before.flattened, key) ?? (key === '原始数据' ? before.raw : '-'), businessType);
+    const afterValue = displayLogFieldValue(key, readFlattenedLogField(after.flattened, key) ?? (key === '原始数据' ? after.raw : '-'), businessType);
     return {
       key,
       label: operationLogFieldLabel(labels, businessType, key),
@@ -4201,13 +4253,13 @@ function logFieldDisplayLabel(key: string) {
   return labels[baseLogFieldKey(key)] || key;
 }
 
-function displayLogFieldValue(key: string, value: string) {
+function displayLogFieldValue(key: string, value: string, businessType?: string) {
   const baseKey = baseLogFieldKey(key);
   if (value === '-') {
     return value;
   }
-  if (baseKey === 'status') {
-    return value === 'ENABLED' ? '启用' : value === 'DISABLED' ? '禁用' : value;
+  if (isStatusField(baseKey)) {
+    return statusLabel(value, ['moderationStatus','moderation_status'].includes(baseKey) ? 'moderation' : businessType?.replace(/-/g,'_').endsWith('COMMERCE_SHOPS') ? 'shop' : 'default');
   }
   if (baseKey === 'buttonFlag') {
     return value === 'true' ? '按钮' : value === 'false' ? '菜单' : value;

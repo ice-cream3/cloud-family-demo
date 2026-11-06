@@ -60,4 +60,30 @@ class MerchantTypeAdminServiceTests {
         verify(dao).delete("items",42L);
         verify(logs).recordDelete(eq("SYSTEM"),eq("DICTIONARY_ITEMS"),eq(42L),any(),any());
     }
+    @Test void statusActionPreservesStoredMetadataAndSyncsDictionary() {
+        existing();
+        when(dao.find("items",42L)).thenReturn(Map.of("typeCode","FOOD","itemCode","NEW_SHOP","name","已有名称","description","已有说明","sortOrder",8,"status","ENABLED"));
+        service.setStatus(7L,"DISABLED");
+        verify(dao).update(argThat(row->"DISABLED".equals(row.get("status")) && "已有名称".equals(row.get("name")) && "已有说明".equals(row.get("description")) && Integer.valueOf(8).equals(row.get("sortOrder"))));
+        verify(dao).syncMerchantTypes();verify(dao).refreshMerchantProducts();
+    }
+    @Test void rejectsInvalidStatusAndDisabledAncestors() {
+        assertThatThrownBy(()->service.setStatus(7L,null)).hasMessageContaining("状态");
+        assertThatThrownBy(()->service.setStatus(7L,"PUBLISHED")).hasMessageContaining("状态");
+        existing();
+        when(dao.lockType("FOOD")).thenReturn(Map.of("status","DISABLED","parentTypeCode","ECOMMERCE"));
+        assertThatThrownBy(()->service.setStatus(7L,"ENABLED")).hasMessageContaining("所属经营大类");
+        when(dao.lockType("FOOD")).thenReturn(Map.of("status","ENABLED","parentTypeCode","ECOMMERCE"));
+        when(dao.lockType("ECOMMERCE")).thenReturn(Map.of("status","DISABLED"));
+        assertThatThrownBy(()->service.setStatus(7L,"ENABLED")).hasMessageContaining("上级电商大类");
+        verify(dao,never()).update(anyMap());
+    }
+    @Test void enablingUpdatesItemWithoutPublishingProducts() {
+        existing();
+        when(dao.find("items",42L)).thenReturn(Map.of("typeCode","FOOD","itemCode","NEW_SHOP","name","类型","status","DISABLED"));
+        when(dao.lockType("ECOMMERCE")).thenReturn(Map.of("status","ENABLED"));
+        service.setStatus(7L,"ENABLED");
+        verify(dao).update(argThat(row->"ENABLED".equals(row.get("status"))));
+        verify(dao).refreshMerchantProducts();
+    }
 }
